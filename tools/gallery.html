@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hole Munch – Boss & level gallery</title>
+  <style>
+    body { margin: 0; padding: 20px; background: #1b1e30; color: #fff; font-family: 'Trebuchet MS', sans-serif; }
+    h1 { margin: 0 0 6px; }
+    h2 { margin: 28px 0 12px; }
+    .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 8px; }
+    .bar label { display: flex; gap: 6px; align-items: center; }
+    select, input, button { font: inherit; padding: 4px 8px; border-radius: 8px; border: none; }
+    button { background: #6c4bff; color: #fff; cursor: pointer; }
+    .hint { opacity: 0.7; font-size: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+    .grid.levels { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+    .card { background: #2a2f4a; border-radius: 14px; padding: 10px; }
+    .card canvas { display: block; width: 100%; border-radius: 10px; background: #111; }
+    .card .title { font-weight: bold; font-size: 17px; margin-top: 8px; }
+    .card .sub { opacity: 0.8; font-size: 14px; }
+    .card .stats { font-size: 12px; opacity: 0.75; margin-top: 6px; line-height: 1.5; font-family: monospace; }
+    .tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; background: #ffd23f; color: #222; margin-left: 6px; }
+    .tag.landmark { background: #4cc9f0; }
+    a.play { color: #ffd23f; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>Hole Munch – gallery</h1>
+  <p class="hint">Dev only, not part of the game bundle. Everything below is drawn with the real game code.</p>
+  <div class="bar">
+    <label>Language <select id="lang"></select></label>
+    <label>Levels from <input id="from" type="number" min="1" value="1" style="width: 70px" /></label>
+    <label>count <input id="count" type="number" min="1" max="60" value="54" style="width: 60px" /></label>
+    <button id="reroll">Re-roll maps</button>
+  </div>
+
+  <h2>Bosses &amp; landmarks</h2>
+  <div id="bosses" class="grid"></div>
+
+  <h2>Structures &amp; props</h2>
+  <p class="hint">New city structures (any level) and themed props (landmark levels), zoomed in. The label lists the levels that use a themed prop.</p>
+  <div id="props" class="grid" style="grid-template-columns: repeat(auto-fill, minmax(130px, 1fr))"></div>
+
+  <h2>Levels</h2>
+  <p class="hint">Whole map shown from above, with the level's weather overlay. "Play" opens the game at that level in dev mode.</p>
+  <div id="levels" class="grid levels"></div>
+
+  <script type="module" src="./gallery.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "hole-munch",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Single-player hole.io style game for YouTube Playables",
+  "type": "module",
+  "scripts": {
+    "dev": "node tools/serve.mjs",
+    "package": "powershell -NoProfile -Command \"New-Item -ItemType Directory -Force dist | Out-Null; Compress-Archive -Force -Path index.html,style.css,src -DestinationPath dist/hole-munch.zip\""
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "^1.0.9"
+  }
+}
