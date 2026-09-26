@@ -53,12 +53,21 @@ export const audio = {
   },
 
   // Bigger objects make deeper pops.
-  pop(size) {
+  pop(size, multiplier = 1) {
     const now = performance.now();
     if (now - lastPop < 35) return;
     lastPop = now;
-    const f = Math.max(90, 900 - size * 9);
+    const f = Math.max(90, 900 - size * 9) * (1 + (multiplier - 1) * 0.12);
     tone({ freq: f, to: f * 0.4, dur: 0.1 + Math.min(size, 80) / 400, type: 'triangle', vol: 0.25 });
+    if (size > 35) tone({freq:90,to:35,dur:0.19,type:'sine',vol:0.16});
+  },
+
+  combo(multiplier) {
+    [0, 0.065, 0.13].forEach((delay,i) => tone({freq:440*multiplier*(1+i*0.25),dur:0.09,type:'sine',vol:0.1,delay}));
+  },
+
+  challenge() {
+    [659, 880, 1046].forEach((freq,i) => tone({freq,dur:0.15,type:'triangle',vol:0.13,delay:i*0.08}));
   },
 
   grow() {

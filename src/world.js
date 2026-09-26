@@ -207,6 +207,20 @@ export function generateWorld(level) {
 
   const bossX = ROAD + center * (BLOCK + ROAD) + BLOCK / 2;
   const bossY = ROAD + center * (BLOCK + ROAD) + BLOCK / 2;
+  if (level.number <= 5) {
+    // A readable snack trail along the spawn road removes the random slow start.
+    // Its area is included before sizing the boss and calculating completion.
+    const spawnY = bossY + BLOCK / 2 + ROAD / 2;
+    for (const side of [-1, 1]) {
+      for (let i = 1; i <= 12; i++) {
+        add(i % 3 === 0 ? 'tree' : 'cone', bossX + side * i * 22, spawnY,
+          { r: i % 3 === 0 ? 11 : 5, starter: true });
+      }
+      if (level.number === 4) for (let i=0;i<3;i++) {
+        add('car',bossX+side*(70+i*65),spawnY+25,{w:30,h:16,color:'#ffd23f',starter:true});
+      }
+    }
+  }
   // Size the boss from what this map can actually feed: the hole must eat bossShare of
   // the props' area first, so every level stays winnable however large it gets.
   const area = objects.reduce((s, o) => s + o.r * o.r, 0);
@@ -234,7 +248,7 @@ export function generateWorld(level) {
 export function updateObjects(world, dt, time) {
   const size = world.size;
   for (const o of world.objects) {
-    if (o.eaten || o.falling) continue;
+    if (o.eaten || o.falling || o.abducted) continue;
     if (o.vx || o.vy) {
       o.x += o.vx * dt;
       o.y += o.vy * dt;
@@ -348,6 +362,14 @@ export function drawObject(ctx, o, time) {
   ctx.save();
   ctx.translate(o.x, o.y);
   switch (o.kind) {
+    case 'duckling':
+      shadowCircle(ctx, o.r, 2);
+      ctx.fillStyle='#ffdb55';ctx.beginPath();ctx.ellipse(0,0,o.r,o.r*0.7,0,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(o.r*0.35,-o.r*0.55,o.r*0.55,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#fff1a3';ctx.beginPath();ctx.ellipse(-o.r*0.25,-o.r*0.05,o.r*0.42,o.r*0.28,-0.3,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#ff8b38';ctx.fillRect(o.r*0.65,-o.r*0.55,o.r*0.55,o.r*0.22);
+      ctx.fillStyle='#23334a';ctx.beginPath();ctx.arc(o.r*0.48,-o.r*0.65,o.r*0.1,0,Math.PI*2);ctx.fill();
+      break;
     case 'person':
       shadowCircle(ctx, o.r, 2);
       ctx.fillStyle = o.color;

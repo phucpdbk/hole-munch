@@ -1,0 +1,8 @@
+{
+  "appId": "io.github.phucpdbk.holemunch",
+  "appName": "Hole Munch",
+  "webDir": "www",
+  "android": {
+    "adjustMarginsForEdgeToEdge": "force"
+  }
+}

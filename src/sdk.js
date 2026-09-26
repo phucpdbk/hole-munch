@@ -1,4 +1,7 @@
-// Thin wrapper around the YouTube Playables SDK with a localStorage fallback for local dev.
+// Thin wrapper around the YouTube Playables SDK with a localStorage fallback for local dev
+// and the web, plus AdMob and app lifecycle events in the Android app.
+import { native } from './native.js';
+
 const yt = window.ytgame;
 const inPlayables = !!(yt && yt.IN_PLAYABLES_ENV);
 const LOCAL_KEY = 'holemunch_save';
@@ -94,25 +97,31 @@ export const sdk = {
 
   // Certification forbids the Page Visibility API inside Playables; it is only a local fallback.
   onPause(cb) {
-    if (inPlayables) safe(() => yt.system.onPause(cb));
-    else document.addEventListener('visibilitychange', () => document.hidden && cb());
+    if (inPlayables) return void safe(() => yt.system.onPause(cb));
+    document.addEventListener('visibilitychange', () => document.hidden && cb());
+    native.onAppStateChange((active) => !active && cb());
   },
 
   onResume(cb) {
-    if (inPlayables) safe(() => yt.system.onResume(cb));
-    else document.addEventListener('visibilitychange', () => !document.hidden && cb());
+    if (inPlayables) return void safe(() => yt.system.onResume(cb));
+    document.addEventListener('visibilitychange', () => !document.hidden && cb());
+    native.onAppStateChange((active) => active && cb());
   },
+
+  onBackButton: native.onBackButton,
+  minimizeApp: native.minimizeApp,
 
   logError(err) {
     if (inPlayables) safe(() => yt.health.logError(err));
   },
 
-  rewardedAdsAvailable: inPlayables || mockAds,
+  rewardedAdsAvailable: inPlayables || !!native.ads || mockAds,
 
   // Resolves when the ad flow ends; never rejects, since a missing ad must not block play.
   async showInterstitial() {
     try {
       if (inPlayables) await yt.ads.requestInterstitialAd();
+      else if (native.ads) await native.ads.showInterstitial();
       else if (mockAds) await mockAd('interstitial');
     } catch (err) {
       console.warn('[sdk] interstitial failed', err);
@@ -123,6 +132,7 @@ export const sdk = {
   async showRewarded(rewardId) {
     try {
       if (inPlayables) return (await yt.ads.requestRewardedAd(rewardId)) === true;
+      if (native.ads) return await native.ads.showRewarded();
       if (mockAds) {
         await mockAd(rewardId);
         return true;

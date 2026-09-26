@@ -229,6 +229,8 @@ function renderResult(r) {
   $('result-twist').textContent = r.twist;
   $('result-score').textContent = r.score;
   $('result-eaten').textContent = `${Math.floor(r.pct * 100)}%`;
+  $('result-combo').textContent = r.bestCombo || 0;
+  $('result-challenge').textContent = t(r.objectiveComplete ? 'challengeYes' : 'challengeNo');
   $('result-coins').textContent = `+${r.doubled ? r.coins * 2 : r.coins}`;
   $('btn-next').textContent = r.cleared ? t('next') : t('retry');
   const double = $('btn-double');
@@ -471,6 +473,14 @@ sdk.onPause(() => {
   persist();
 });
 sdk.onResume(() => setPause('system', false));
+
+// Android back button: close the open sub-screen, otherwise background the app so a run is never lost.
+const BACK_BUTTONS = { levels: 'btn-levels-back', shop: 'btn-shop-back', confirm: 'btn-reset-no', continue: 'btn-continue-no' };
+sdk.onBackButton(() => {
+  const open = Object.keys(BACK_BUTTONS).find((id) => !$(id).classList.contains('hidden'));
+  if (open && !adBusy) $(BACK_BUTTONS[open]).click();
+  else sdk.minimizeApp();
+});
 audio.setEnabled(sdk.isAudioEnabled());
 sdk.onAudioEnabledChange((on) => audio.setEnabled(on));
 

@@ -5,10 +5,19 @@
   "description": "Single-player hole.io style game for YouTube Playables",
   "type": "module",
   "scripts": {
+    "test": "node tools/check-gameplay.mjs && node tools/check-content.mjs",
     "dev": "node tools/serve.mjs",
-    "package": "node tools/package.mjs"
+    "package": "node tools/package.mjs",
+    "build:app": "node tools/build-app.mjs && npx cap sync android"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.6.9",
     "@napi-rs/canvas": "^1.0.9"
+  },
+  "dependencies": {
+    "@capacitor-community/admob": "^7.2.0",
+    "@capacitor/android": "^7.6.9",
+    "@capacitor/app": "^7.1.2",
+    "@capacitor/core": "^7.6.9"
   }
 }

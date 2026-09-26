@@ -252,3 +252,7 @@ h2 { font-size: clamp(28px, 7vmin, 48px); text-shadow: 0 4px 0 #000; }
 .twist { font-size: 18px; font-style: italic; max-width: 440px; color: #ffe9a8; }
 .result-rows { display: flex; flex-direction: column; gap: 6px; min-width: 240px; font-size: 18px; }
 .result-rows div { display: flex; justify-content: space-between; gap: 20px; }
+.result-rows { width: min(440px, 100%); min-width: 0; font-size: 16px; }
+.result-rows div { gap: 16px; text-align: start; }
+.result-rows b { max-width: 55%; text-align: end; }
+#result { overflow-y: auto; justify-content: safe center; touch-action: pan-y; }
