@@ -3,8 +3,9 @@ import { SHOP_STRINGS } from './locales-shop.js';
 import { WEATHER_STRINGS } from './locales-weather.js';
 import { AD_STRINGS } from './locales-ads.js';
 import { LANDMARK_STRINGS } from './locales-landmarks.js';
+import { EXPANSION_STRINGS } from './locales-expansion.js';
 
-for (const extra of [SHOP_STRINGS, WEATHER_STRINGS, AD_STRINGS, LANDMARK_STRINGS]) {
+for (const extra of [SHOP_STRINGS, WEATHER_STRINGS, AD_STRINGS, LANDMARK_STRINGS, EXPANSION_STRINGS]) {
   for (const [code, strings] of Object.entries(extra)) Object.assign(STRINGS[code], strings);
 }
 

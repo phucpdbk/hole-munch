@@ -12,6 +12,12 @@ const BOSSES = {
   pumpkin: { weather: 'fog', ground: '#3d2c4d', road: '#1f1a2b', block: '#54406b', roofs: ['#ff7b00', '#6a4c93', '#8ac926', '#3a0ca3'] },
   kraken: { weather: 'storm', ground: '#4f6d7a', road: '#2b3a42', block: '#6f8f9c', roofs: ['#e07a5f', '#3d405b', '#81b29a', '#f2cc8f'] },
   ufo: { weather: 'wind', ground: '#3a3f5c', road: '#1f2235', block: '#50577a', roofs: ['#9b5de5', '#f15bb5', '#00bbf9', '#00f5d4'] },
+  dino: { weather: 'clear', ground: '#6daf70', road: '#3c6157', block: '#a9d990', roofs: ['#fca65c', '#349b88', '#ffe08a', '#ea6785'], props: ['palm', 'hay'] },
+  crab: { weather: 'sun', ground: '#f5cd89', road: '#358f9e', block: '#ffe6ac', roofs: ['#ff7369', '#41bdb3', '#ffffff', '#fab64c'], props: ['palm', 'gelato'] },
+  dragon: { weather: 'storm', ground: '#74628b', road: '#322c4e', block: '#9c82ac', roofs: ['#ef8256', '#dfb452', '#7155bb', '#ecb5d4'], props: ['lantern', 'column'] },
+  robot: { weather: 'wind', ground: '#45748c', road: '#24334b', block: '#6a9cae', roofs: ['#55dfdb', '#f981bd', '#f8d767', '#7e75e5'], props: ['lamp', 'phonebox'] },
+  yeti: { weather: 'snow', ground: '#c7e8f0', road: '#6e9bab', block: '#ecfaff', roofs: ['#709ce5', '#f37f90', '#6ebbaa', '#a296d4'], props: ['pine', 'sheep'] },
+  donut: { weather: 'clear', ground: '#e7acd2', road: '#8b638d', block: '#f6d4e8', roofs: ['#70d8e6', '#ff8aab', '#ffe083', '#b1a0ef'], props: ['cafe', 'gelato'] },
 };
 
 // Real-world landmarks take the boss slot on every third level.
@@ -37,11 +43,18 @@ const LANDMARKS = {
   chichen: { weather: 'rain', ground: '#5f8d4e', road: '#6b4f3a', block: '#8fbf7a', roofs: ['#f77f00', '#fcbf49', '#d62828', '#2a9d8f'], props: ['cactus', 'palm'] },
   machupicchu: { weather: 'fog', ground: '#7aa36b', road: '#5a4a3c', block: '#a7c796', roofs: ['#9c6644', '#b08968', '#7f5539', '#ddb892'], props: ['llama', 'hay'] },
   moai: { weather: 'clear', ground: '#90be6d', road: '#4a4e69', block: '#b9d89a', roofs: ['#f9844a', '#43aa8b', '#577590', '#f9c74f'], props: ['minimoai', 'palm'] },
+  sydney: { weather: 'clear', ground: '#70c9bd', road: '#347a95', block: '#b0e9d3', roofs: ['#ffb174', '#f6efe0', '#66b4d4', '#ed7d89'], props: ['palm', 'cafe'] },
+  petra: { weather: 'sun', ground: '#d78b69', road: '#915b58', block: '#edb791', roofs: ['#b76252', '#ecc389', '#df897c', '#79576b'], props: ['camel', 'amphora', 'column'] },
+  pagoda: { weather: 'fog', ground: '#8ecaa0', road: '#45776c', block: '#c1e2ad', roofs: ['#cf5b47', '#f4bc5e', '#609a87', '#e99580'], props: ['lantern', 'cyclo', 'palm'] },
+  burj: { weather: 'sun', ground: '#edd8b1', road: '#5c728d', block: '#fae9ca', roofs: ['#69cfe0', '#b4cae2', '#e6b273', '#738caf'], props: ['palm', 'lamp'] },
+  sphinx: { weather: 'wind', ground: '#ddb469', road: '#987347', block: '#f3d799', roofs: ['#c87f53', '#e9bb73', '#68a5a4', '#e39177'], props: ['obelisk', 'camel', 'palm'] },
+  saintbasil: { weather: 'snow', ground: '#c8d8e5', road: '#788398', block: '#eef3fa', roofs: ['#d94a69', '#6abcad', '#f0c550', '#8477bf'], props: ['pine', 'lamp'] },
 };
 
 export const LANDMARK_IDS = new Set(Object.keys(LANDMARKS));
 
-// 54-level loop: boss, boss, landmark. Ordered so each weather debuts gradually
+// 90-level loop: boss, boss, landmark. The original 54 stay in place for saved progress.
+// Ordered so each weather debuts gradually
 // (sun 2, rain 4, wind 5, snow 8, fog 11, storm 13) and no three harsh weathers line up.
 const SEQUENCE = [
   'duck', 'pizza', 'eiffel',
@@ -62,6 +75,18 @@ const SEQUENCE = [
   'pizza', 'ufo', 'chichen',
   'cat', 'snowman', 'machupicchu',
   'dumbbell', 'kraken', 'moai',
+  'dino', 'crab', 'sydney',
+  'donut', 'robot', 'petra',
+  'yeti', 'dragon', 'pagoda',
+  'crab', 'dino', 'burj',
+  'robot', 'donut', 'sphinx',
+  'dragon', 'yeti', 'saintbasil',
+  'dino', 'donut', 'fuji',
+  'crab', 'robot', 'turtle',
+  'yeti', 'dino', 'tajmahal',
+  'donut', 'dragon', 'sydney',
+  'robot', 'crab', 'pagoda',
+  'dragon', 'yeti', 'saintbasil',
 ];
 
 export const THEMES = SEQUENCE.map((id) => ({

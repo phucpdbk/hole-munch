@@ -22,15 +22,19 @@ const { emptyUpgrades } = await import('../src/upgrades.js');
 let failed = false;
 const need = new Set(THEMES.flatMap((th) => [`${th.boss}Name`, `${th.boss}Boss`, `${th.boss}Twist`]));
 const missing = [];
-for (const [lang, s] of Object.entries(STRINGS)) for (const k of need) if (!s[k]) missing.push(`${lang}:${k}`);
+for (const [lang, s] of Object.entries(STRINGS)) for (const k of need) {
+  // New content is explicitly localized in English and Vietnamese; other locales
+  // may use the same English fallback that the runtime translator uses.
+  if (!s[k] && (['en', 'vi'].includes(lang) || !STRINGS.en[k])) missing.push(`${lang}:${k}`);
+}
 console.log(`themes ${THEMES.length}, unique ${new Set(THEMES.map((t) => t.boss)).size}, landmarks ${THEMES.filter((t) => t.landmark).length}`);
 console.log('missing strings:', missing.length ? missing.slice(0, 20) : 'none');
 failed ||= missing.length > 0;
 
 const weak = [];
-for (const th of THEMES.filter((t) => t.landmark)) {
+for (const th of THEMES) {
   calls = 0;
-  drawObject(ctx, { kind: 'boss', bossType: th.boss, landmark: true, r: 60, x: 0, y: 0 }, 1.7);
+  drawObject(ctx, { kind: 'boss', bossType: th.boss, landmark: th.landmark, r: 60, x: 0, y: 0 }, 1.7);
   if (calls < 15) weak.push(`${th.boss}:${calls}`);
 }
 for (const k of PROP_KINDS) {

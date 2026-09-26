@@ -265,6 +265,22 @@ export function drawGround(ctx, world, view) {
       ctx.fillRect(x0 - 6, y0 - 6, BLOCK + 12, BLOCK + 12);
       ctx.fillStyle = theme.block;
       ctx.fillRect(x0, y0, BLOCK, BLOCK);
+      // Inset sidewalks, paving joints and a landscaped central boss plaza.
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)';ctx.lineWidth = 2;
+      ctx.strokeRect(x0+9,y0+9,BLOCK-18,BLOCK-18);
+      ctx.fillStyle='rgba(40,55,75,0.08)';
+      for(let i=32;i<BLOCK;i+=32) {
+        ctx.fillRect(x0+i,y0-6,1,6);ctx.fillRect(x0-6,y0+i,6,1);
+      }
+      if(bx===Math.floor(n/2)&&by===Math.floor(n/2)) {
+        const cx=x0+BLOCK/2,cy=y0+BLOCK/2;
+        const garden=ctx.createRadialGradient(cx-35,cy-45,10,cx,cy,155);
+        garden.addColorStop(0,theme.block);garden.addColorStop(1,theme.ground);
+        ctx.fillStyle=garden;ctx.beginPath();ctx.arc(cx,cy,148,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle='rgba(255,248,216,0.5)';ctx.lineWidth=8;ctx.stroke();
+        ctx.strokeStyle='rgba(40,55,75,0.13)';ctx.lineWidth=2;
+        ctx.beginPath();ctx.arc(cx,cy,125,0,Math.PI*2);ctx.stroke();
+      }
     }
   }
 

@@ -29,6 +29,57 @@ html, body {
 }
 .hidden { display: none !important; }
 
+#menu {
+  background: radial-gradient(ellipse at 78% 20%, #263c68 0%, #111a32 52%, #0b1023 100%);
+  isolation: isolate;
+  padding: 0;
+  flex-direction: row;
+  gap: clamp(24px, 6vw, 110px);
+}
+.cover-art {
+  height: min(90vh, 75vw, 850px);
+  aspect-ratio: 2 / 3;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 26px;
+  box-shadow: 0 28px 100px #0008, 0 0 0 1px #ffffff25;
+}
+.cover-art img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.menu-content { display: flex; flex-direction: column; align-items: center; gap: 16px; max-width: 440px; padding: 26px; }
+.eyebrow { color: #7ce8ec; font-size: 12px; font-weight: 800; letter-spacing: 3px; }
+.campaign-info { font-size: 13px; color: #b2c4df; line-height: 1.5; }
+#menu .title { font-size: clamp(52px, 7.6vw, 100px); text-shadow: 0 5px 0 #080d22, 0 10px 30px #6550ff50; }
+#menu .subtitle { margin-top: 4px; line-height: 1.4; }
+#menu .menu-stats { border: 1px solid #ffffff18; background: #ffffff08; padding: 12px 22px; border-radius: 14px; }
+#menu .btn { width: 100%; }
+#menu .btn.big { background: linear-gradient(#ffdc69, #ffb738); color: #392449; box-shadow: 0 6px 0 #bc702c, 0 12px 28px #ffa92d20; }
+#menu .lang-picker { z-index: 2; background: #10192be6; border: 1px solid #ffffff25; }
+.btn:focus-visible, select:focus-visible { outline: 3px solid #84f6f0; outline-offset: 5px; }
+
+@media (max-width: 700px) and (min-height: 501px) {
+  #menu { flex-direction: column; justify-content: flex-end; gap: 0; overflow-y: auto; }
+  .cover-art { position: absolute; inset: 0 0 auto; width: 100%; height: 78%; border-radius: 0; box-shadow: none; }
+  .cover-art img { object-position: center 36%; }
+  .cover-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(transparent 40%, #10172dd9 77%, #10172d 98%); }
+  .menu-content { z-index: 1; width: 100%; max-width: 440px; gap: 11px; padding: 18px 28px max(24px, env(safe-area-inset-bottom)); }
+  #menu .title, #menu .eyebrow { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  #menu .subtitle { font-size: 19px; font-weight: bold; text-shadow: 0 2px 12px #000; }
+  #menu .menu-stats { padding: 7px 20px; font-size: 15px; }
+  #menu .btn { padding: 11px 20px; font-size: 16px; }
+  #menu .btn.big { padding: 15px 24px; font-size: 23px; }
+}
+@media (max-height: 500px) {
+  #menu { gap: 20px; overflow-y: auto; }
+  .cover-art { height: 94vh; border-radius: 16px; flex-shrink: 0; }
+  .menu-content { gap: 7px; padding: 12px; }
+  #menu .title { font-size: 42px; }
+  #menu .eyebrow { display: none; }
+  #menu .subtitle { font-size: 15px; }
+  #menu .menu-stats { padding: 5px 14px; font-size: 14px; }
+  #menu .btn, #menu .btn.big { font-size: 16px; padding: 8px 18px; }
+  #menu .campaign-info { font-size: 11px; }
+}
+
 .title {
   font-size: clamp(48px, 13vmin, 110px);
   line-height: 0.9;

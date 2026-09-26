@@ -1,5 +1,6 @@
 // Stylised front-view landmarks drawn in the boss slot. Coordinates are in units of the
 // boss radius r, centred on the boss; everything fits roughly inside [-r, r].
+import { drawNewLandmark } from './landmarks-expansion.js';
 
 function poly(ctx, r, pts) {
   ctx.beginPath();
@@ -735,5 +736,31 @@ const DRAW = {
 };
 
 export function drawLandmark(ctx, type, r, time) {
-  DRAW[type]?.(ctx, r, time);
+  // A layered miniature foundation anchors every destination in the world.
+  ctx.save();
+  const base = ctx.createLinearGradient(0, r*0.75, 0, r*1.1);
+  base.addColorStop(0, '#f2deac');base.addColorStop(1, '#8b706b');
+  ctx.fillStyle = base;
+  ctx.beginPath();ctx.ellipse(0,r*0.91,r*1.07,r*0.2,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle = '#c8ddae';
+  ctx.beginPath();ctx.ellipse(0,r*0.86,r*1.07,r*0.17,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle = 'rgba(255,249,220,0.8)';ctx.lineWidth = r*0.023;ctx.stroke();
+  if (!drawNewLandmark(ctx, type, r, time)) DRAW[type]?.(ctx, r, time);
+  // Fine architectural details remain visible in close-up and simplify at thumbnail size.
+  if (type === 'eiffel') {
+    ctx.strokeStyle='#f7cc82';ctx.lineWidth=r*0.016;
+    for(const s of [-1,1]) {
+      ctx.beginPath();ctx.moveTo(s*0.74*r,0.89*r);ctx.lineTo(s*0.32*r,0.2*r);ctx.lineTo(s*0.11*r,-0.43*r);ctx.lineTo(s*0.025*r,-0.88*r);ctx.stroke();
+      for(let i=0;i<5;i++) {const y=0.35+i*0.11,x=0.34+(y-0.2)*0.45;ctx.beginPath();ctx.moveTo(s*(x-0.12)*r,y*r);ctx.lineTo(s*x*r,(y-0.09)*r);ctx.stroke();}
+    }
+    for(const [y,w] of [[0.18,0.85],[-0.44,0.38]]) {ctx.fillStyle='#ffe1a0';ctx.fillRect(-w*r/2,y*r,w*r,r*0.024);}
+  }
+  if (['eiffel','bigben','pisa','colosseum','arc','parthenon','tajmahal','turtle','towerbridge','neuschwanstein','pagoda','petra','saintbasil'].includes(type)) {
+    // Tiny flowering gardens frame the architecture without hiding the silhouette.
+    for(const s of [-1,1]) {
+      ctx.fillStyle='#417e68';ctx.beginPath();ctx.ellipse(s*0.82*r,0.87*r,r*0.15,r*0.065,0,0,Math.PI*2);ctx.fill();
+      for(let i=0;i<3;i++) {ctx.fillStyle=i%2?'#fff5c0':'#f593b0';ctx.beginPath();ctx.arc((s*0.82+(i-1)*0.065)*r,(0.845-(i%2)*0.026)*r,r*0.022,0,Math.PI*2);ctx.fill();}
+    }
+  }
+  ctx.restore();
 }

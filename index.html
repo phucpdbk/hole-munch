@@ -4,6 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>Hole Munch</title>
+  <meta name="description" content="Start small. Swallow the world. Explore 90 levels, 16 playful bosses and 24 iconic landmarks in Hole Munch." />
+  <meta property="og:title" content="Hole Munch — Swallow the World" />
+  <meta property="og:description" content="Grow your hole, gulp giant bosses, and explore 90 levels around the world." />
+  <meta property="og:image" content="assets/hole-munch-cover.png" />
   <script src="https://www.youtube.com/game_api/v1"></script>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -11,12 +15,16 @@
   <canvas id="game"></canvas>
 
   <div id="menu" class="screen hidden">
+    <div class="cover-art" aria-hidden="true"><img src="assets/hole-munch-cover.webp" alt="" fetchpriority="high" /></div>
     <label class="lang-picker">
       <span aria-hidden="true">🌐</span>
       <select id="lang-select" aria-label="Language"></select>
     </label>
+    <div class="menu-content">
+    <p class="eyebrow" data-i18n="worldTour"></p>
     <h1 class="title">HOLE<br /><span>MUNCH</span></h1>
-    <p class="subtitle" data-i18n="tagline"></p>
+    <p class="subtitle" data-i18n="coverPitch"></p>
+    <p id="campaign-info" class="campaign-info"></p>
     <div class="menu-stats">
       <span id="menu-level"></span>
       <span id="menu-coins" class="coins"></span>
@@ -25,6 +33,7 @@
     <button id="btn-levels" class="btn" data-i18n="levelList"></button>
     <button id="btn-shop" class="btn" data-i18n="upgrades"></button>
     <button id="btn-reset" class="btn ghost hidden" data-i18n="resetProgress"></button>
+    </div>
   </div>
 
   <div id="continue" class="screen hidden">
@@ -43,6 +52,7 @@
 
   <div id="levels" class="screen hidden">
     <h2 data-i18n="levelList"></h2>
+    <p class="subtitle" data-i18n="journey"></p>
     <div id="level-grid" class="level-grid"></div>
     <button id="btn-levels-back" class="btn" data-i18n="back"></button>
   </div>

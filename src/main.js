@@ -82,6 +82,11 @@ function persist() {
 }
 
 function renderMenu() {
+  $('campaign-info').textContent = t('campaignInfo', {
+    levels: THEMES.length,
+    bosses: new Set(THEMES.filter(th => !th.landmark).map(th => th.boss)).size,
+    places: new Set(THEMES.filter(th => th.landmark).map(th => th.boss)).size,
+  });
   $('menu-level').textContent = `${t('level')} ${save.level}`;
   $('menu-coins').textContent = save.coins;
 }
@@ -325,17 +330,17 @@ function levelTile(n) {
     tile.addEventListener('click', () => startLevel(n));
   } else if (n === save.level) {
     tile.classList.add('current');
-    add('span', 'play', '▶');
+    drawBossPortrait(add('canvas', ''), theme);
     add('span', 'num', `${t('level')} ${n}`);
-    add('span', 'boss-name', t('play'));
+    add('span', 'boss-name', t(`${theme.boss}Boss`));
     add('span', 'mini-stars');
     tile.addEventListener('click', () => startLevel(n));
   } else {
     tile.classList.add('locked');
     tile.disabled = true;
-    add('span', 'lock', '🔒');
+    drawBossPortrait(add('canvas', ''), theme);
     add('span', 'num', `${t('level')} ${n}`);
-    add('span', 'boss-name', '');
+    add('span', 'boss-name', `🔒 ${t(`${theme.boss}Boss`)}`);
     add('span', 'mini-stars');
   }
   return tile;
