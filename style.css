@@ -13,6 +13,7 @@ html, body {
 }
 
 #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.world-3d { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
 
 .screen {
   position: fixed;
@@ -256,3 +257,65 @@ h2 { font-size: clamp(28px, 7vmin, 48px); text-shadow: 0 4px 0 #000; }
 .result-rows div { gap: 16px; text-align: start; }
 .result-rows b { max-width: 55%; text-align: end; }
 #result { overflow-y: auto; justify-content: safe center; touch-action: pan-y; }
+
+#levels { background: radial-gradient(ellipse at top,#224851,#101e34 65%); gap: 10px; padding: 20px 18px; }
+#levels h2 { font-size: clamp(24px,4vw,38px); }
+#journey-total { color: #c9e7dc; font-size: 14px; }
+.next-reward { color:#ffda8a; font-size:13px; max-width:700px; }
+.journey-content { width:min(920px,100%); min-height:0; flex:1; overflow-y:auto; touch-action:pan-y; padding:8px; overscroll-behavior:contain; }
+.chapter-nav { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+.chapter-nav .btn { min-width:0; font-size:13px; padding:9px 15px; background:#315667; box-shadow:0 3px #182f42; }
+.chapter-nav h3 { font-size:22px; color:#ffdb8c; }
+.chapter-nav p { font-size:12px; color:#adc3cf; margin-top:4px; }
+.world-atlas { position:relative; background:#152e42; border:1px solid #8ad2c52e; border-radius:22px; overflow:hidden; margin-bottom:20px; box-shadow:inset 0 0 60px #05182670; }
+.world-atlas svg { display:block; width:100%; }
+.world-atlas { max-width:620px; margin-inline:auto; }
+.atlas-pin { position:absolute; width:30px; height:30px; display:grid; place-items:center; transform:translate(-50%,-50%); font-size:11px; font-weight:bold; border-radius:50%; background:#233f50; color:#9ab5bb; border:2px solid #78999e; }
+.atlas-pin.visited { background:#3f9d89; border-color:#c2ffe1; color:white; }
+.atlas-pin.here { background:#ffd476; border-color:white; color:#332847; box-shadow:0 0 0 6px #ffd47626; }
+.route-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+.route-stop { display:flex; flex-direction:column; align-items:center; gap:5px; padding:12px 8px; border-radius:20px; background:linear-gradient(145deg,#37516a,#213647); border:1px solid #b2e8db30; font:inherit; color:#fff; cursor:pointer; }
+.route-stop:nth-child(3n+2) { transform:translateY(8px); }
+.route-stop.current { border:2px solid #ffe39d; background:linear-gradient(145deg,#6c5674,#36445d); box-shadow:0 0 18px #ffdb8130; }
+.route-stop.locked { opacity:.6; cursor:default; }
+.route-stop canvas { width:72px; height:72px; }
+.route-stop b { min-height:30px; display:flex; align-items:center; font-size:13px; }
+.route-number { color:#c6e9e5; font-size:12px; }
+.route-goal { font-size:11px; color:#cce3dc; min-height:26px; }
+.route-time { font-size:11px; color:#f6d898; }
+.route-stars { color:#ffde8b; letter-spacing:2px; }
+.route-medals { display:flex; gap:12px; color:#70889b; }
+.route-medals .earned { color:#92ffe1; text-shadow:0 0 8px #61efc8; }
+.medal-guide { margin:26px 0 8px; color:#bad1d7; text-align:start; font-size:12px; line-height:1.8; padding:14px; background:#06172855; border-radius:14px; }
+.passport-grid,.reward-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:16px; }
+.stamp-card { display:flex; flex-direction:column; align-items:center; gap:10px; padding:18px 12px; border-radius:8px 24px 8px 24px; border:2px dashed #9ecbb575; background:linear-gradient(145deg,#fff0cc,#e4d6b4); color:#3b4b51; }
+.stamp-card.uncollected { background:linear-gradient(145deg,#344958,#253746); color:#bdccd4; border-color:#617682; }
+.stamp-card.uncollected canvas { filter:grayscale(.85); opacity:.45; }
+.stamp-card canvas { width:110px; height:110px; }
+.stamp-status { font-size:11px; letter-spacing:1px; text-transform:uppercase; font-weight:bold; }
+.stamp-card h3 { font-size:17px; min-height:40px; display:flex; align-items:center; }
+.stamp-card p { font-size:12px; }
+.stamp-card .btn,.reward-card .btn { min-width:0; width:100%; font-size:13px; padding:10px; margin-top:auto; }
+.reward-card { display:flex; flex-direction:column; align-items:center; gap:12px; padding:20px; border-radius:22px; border:1px solid #658c9b65; background:#233c52; }
+.reward-card.ready { border-color:#f7d58b; }
+.reward-card canvas { width:120px; height:120px; }
+.reward-icon { display:grid; place-items:center; font-size:65px; height:120px; }
+.reward-card h3 { color:#ffdf92; font-size:18px; }
+.reward-card p,.reward-card span { font-size:12px; color:#c2d6df; }
+.reward-card progress { width:100%; height:8px; accent-color:#8ceacb; }
+.discoveries { color:#92ffe1; font-size:14px; max-width:440px; }
+.discoveries:empty { display:none; }
+@media(max-width:500px) {
+  #levels { padding:14px 10px; }
+  #journey-tabs { gap:5px; }
+  #journey-tabs .tab { font-size:12px; padding:8px 10px; }
+  .route-grid { gap:8px; }
+  .route-stop { padding:8px 4px; border-radius:13px; }
+  .route-stop b { font-size:11px; }
+  .route-medals { gap:8px; }
+  .passport-grid,.reward-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+  .stamp-card,.reward-card { padding:12px 8px; }
+  .stamp-card h3,.reward-card h3 { font-size:14px; }
+  .atlas-pin { width:23px;height:23px;font-size:9px; }
+  .next-reward { font-size:11px; }
+}

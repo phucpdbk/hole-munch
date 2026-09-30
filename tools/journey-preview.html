@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Journey preview — test data</title><link rel="stylesheet" href="../style.css"></head>
+<body><main id="levels" class="screen">
+  <h2 data-i18n="travelMap"></h2><p id="journey-total" class="subtitle"></p>
+  <div id="journey-tabs" class="tabs"></div><p id="preview-status" class="next-reward">Bản xem thử — không dùng dữ liệu đã lưu</p>
+  <div id="journey-content" class="journey-content"></div>
+</main><script type="module">
+import {JourneyView} from '../src/journey.js';
+import {restoreJourney,recordJourney} from '../src/progression.js';
+import {drawObject} from '../src/world.js';
+import {setLanguage,applyStaticText} from '../src/i18n.js';
+setLanguage('vi');applyStaticText();
+const save={level:73,stars:Array(72).fill(3),journey:restoreJourney(null,73),owned:{skin:['classic'],fx:['dust'],trail:['none']}};
+for(let n=1;n<=6;n++) recordJourney(save.journey,{level:n,cleared:true,medals:['task','quick','clean']});
+const portrait=(canvas,theme)=>{canvas.width=canvas.height=160;drawObject(canvas.getContext('2d'),{kind:'boss',bossType:theme.boss,landmark:theme.landmark,r:58,x:80,y:84},0.7);};
+const view=new JourneyView(save,portrait,n=>{document.getElementById('preview-status').textContent=`Chơi lại màn ${n} (xem thử)`;},()=>{document.getElementById('preview-status').textContent=`Đã nhận · ${Object.values(save.owned).flat().join(', ')}`;});
+view.open();
+</script></body></html>

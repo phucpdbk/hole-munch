@@ -33,4 +33,14 @@ for(const [n,name] of [[14,'ufo'],[56,'crab']]) {
   for(let i=0;i<(name==='ufo'?180:125);i++) g.behavior.update(0.02,g.hole);
   shot(`gameplay-${name}`,g,c);
 }
-console.log('Rendered combo, UFO beam and crab warning at 390 × 844');
+for (const [n,name] of [[3,'candy'],[4,'parade'],[5,'garden']]) {
+  const {game:g,canvas:c}=setup(n);
+  g.encounter.activate(g);
+  g.cam={x:g.encounter.anchor.x,y:g.encounter.anchor.y};g.zoom=1;
+  shot(`event-${name}`,g,c);
+  if(name==='garden') {
+    g.encounter.gate.falling=true;g.encounter.update(0.02,g);
+    shot('event-garden-open',g,c);
+  }
+}
+console.log('Rendered combo, boss phases and all world events at 390 × 844');

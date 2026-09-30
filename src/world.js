@@ -207,6 +207,14 @@ export function generateWorld(level) {
 
   const bossX = ROAD + center * (BLOCK + ROAD) + BLOCK / 2;
   const bossY = ROAD + center * (BLOCK + ROAD) + BLOCK / 2;
+  if (level.number >= 3) {
+    const event = ['candy', 'parade', 'garden'][(level.number - 3) % 3];
+    for (let i=0;i<12;i++) {
+      const kind = event === 'parade' ? 'car' : event === 'candy' ? 'candyDrop' : 'gardenFruit';
+      add(kind,bossX,bossY,{r:8,hidden:true,eventFood:true,
+        ...(kind === 'car' ? {w:26,h:14,color:['#ffcb52','#ee80be','#72d9d8'][i%3]} : {})});
+    }
+  }
   if (level.number <= 5) {
     // A readable snack trail along the spawn road removes the random slow start.
     // Its area is included before sizing the boss and calculating completion.
@@ -248,7 +256,7 @@ export function generateWorld(level) {
 export function updateObjects(world, dt, time) {
   const size = world.size;
   for (const o of world.objects) {
-    if (o.eaten || o.falling || o.abducted) continue;
+    if (o.eaten || o.falling || o.abducted || o.hidden) continue;
     if (o.vx || o.vy) {
       o.x += o.vx * dt;
       o.y += o.vy * dt;
@@ -362,6 +370,22 @@ export function drawObject(ctx, o, time) {
   ctx.save();
   ctx.translate(o.x, o.y);
   switch (o.kind) {
+    case 'eventGate':
+      ctx.fillStyle='#8469b5';ctx.fillRect(-o.r,-o.r*0.7,o.r*2,o.r*1.4);
+      ctx.strokeStyle='#f9d982';ctx.lineWidth=o.r*0.16;
+      ctx.strokeRect(-o.r,-o.r*0.7,o.r*2,o.r*1.4);
+      for(const x of [-0.5,0,0.5]) {ctx.beginPath();ctx.moveTo(x*o.r,-o.r*0.7);ctx.lineTo(x*o.r,o.r*0.7);ctx.stroke();}
+      break;
+    case 'candyDrop':
+      ctx.fillStyle='#fff0a1';ctx.beginPath();ctx.moveTo(-o.r*1.5,-o.r*0.65);ctx.lineTo(0,0);ctx.lineTo(-o.r*1.5,o.r*0.65);ctx.fill();
+      ctx.beginPath();ctx.moveTo(o.r*1.5,-o.r*0.65);ctx.lineTo(0,0);ctx.lineTo(o.r*1.5,o.r*0.65);ctx.fill();
+      ctx.fillStyle='#f275b1';ctx.beginPath();ctx.arc(0,0,o.r,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#ffe1f1';ctx.beginPath();ctx.arc(-o.r*0.25,-o.r*0.3,o.r*0.32,0,Math.PI*2);ctx.fill();
+      break;
+    case 'gardenFruit':
+      ctx.fillStyle='#faaf47';ctx.beginPath();ctx.arc(0,0,o.r,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#76d49e';ctx.beginPath();ctx.ellipse(o.r*0.25,-o.r*0.9,o.r*0.55,o.r*0.25,-0.4,0,Math.PI*2);ctx.fill();
+      break;
     case 'duckling':
       shadowCircle(ctx, o.r, 2);
       ctx.fillStyle='#ffdb55';ctx.beginPath();ctx.ellipse(0,0,o.r,o.r*0.7,0,0,Math.PI*2);ctx.fill();

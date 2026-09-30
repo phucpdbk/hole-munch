@@ -96,8 +96,7 @@ export const THEMES = SEQUENCE.map((id) => ({
 }));
 
 // Difficulty curve: 0 at level 1, 1 at level 20, then a slow climb.
-// Tuned with tools/balance-sim.mjs against attempts-per-success targets
-// (~1.0 early, ~1.3 mid, spikes ~1.6-1.9).
+// Simulated with tools/balance-sim.mjs; late levels expect upgrades and retries.
 const RAMP_LEVELS = 20;
 const LATE_SLOPE = 0.1;
 // Past level 30 the climb flattens so the long tail stays playable.
@@ -125,18 +124,23 @@ export function getLevel(n) {
   const d = difficulty(n);
   const early = Math.min(d, 1);
   const late = Math.max(0, d - 1);
+  const pressure = Math.min(1, Math.max(0, (n - 3) / 17));
+  const weatherAllowance = n < 8 ? 0 : ({storm:8,snow:5,rain:4}[theme.weather] || 0);
+  const duration = Math.max(64, Math.round(lerp(105, 72, Math.sqrt(early)) - late * 2))
+    + weatherAllowance + Math.round(Math.min(6, late * 3));
   return {
     number: n,
     theme,
     weather: theme.weather,
     difficulty: d,
     // Fraction of an eaten object's area the hole gains; high early so the snowball is fast.
-    growth: Math.max(0.12, lerp(0.3, 0.15, Math.pow(early, 0.4)) - late * 0.03),
+    growth: Math.max(0.105, lerp(0.3, 0.15, Math.pow(early, 0.4)) - late * 0.025),
     weatherPower: Math.min(1.4, lerp(0.3, 0.85, early) + late * 0.25),
     blocks: Math.min(5 + Math.round(d * 4), 9),
-    density: 1 + d * 0.6,
+    density: Math.min(2.6, 1 + d * 0.6),
     // Share of the map's prop area the hole must eat before it can swallow the boss.
-    bossShare: Math.min(0.8, lerp(0.2, 0.5, early) + late * 0.15),
-    duration: Math.max(60, Math.round(lerp(110, 80, Math.sqrt(early)) - late * 8)),
+    bossShare: Math.min(0.78, lerp(0.23, 0.58, early) + pressure * 0.03 + late * 0.08),
+    duration,
+    quickTarget: Math.round(duration * 0.6),
   };
 }

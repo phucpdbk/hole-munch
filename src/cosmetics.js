@@ -10,6 +10,9 @@ export const SKINS = [
   { id: 'neon', price: 1500 },
   { id: 'xmas', price: 2000 },
   { id: 'gold', price: 5000 },
+  { id: 'comet', price: null, rewardOnly: true },
+  { id: 'atlas', price: null, rewardOnly: true },
+  { id: 'crown', price: null, rewardOnly: true },
 ];
 
 export const EAT_FX = [
@@ -68,6 +71,9 @@ function hash(i) {
 }
 
 const INSIDE = {
+  comet: [[0, '#050d23'], [0.65, '#123246'], [1, '#6651a9']],
+  atlas: [[0, '#031e29'], [0.7, '#10575a'], [1, '#27857d']],
+  crown: [[0, '#110820'], [0.75, '#39223c'], [1, '#8d6533']],
   classic: [[0, '#000'], [0.75, '#0b0616'], [1, '#2a1650']],
   candy: [[0, '#000'], [0.8, '#1a0410'], [1, '#4d0f2a']],
   slime: [[0, '#000'], [0.8, '#0a1f00'], [1, '#1f4d00']],
@@ -80,6 +86,11 @@ const INSIDE = {
 
 export function drawSkinInside(ctx, id, x, y, r, time) {
   fillHole(ctx, x, y, r, INSIDE[id] || INSIDE.classic);
+  if (id === 'atlas') {
+    ctx.save();ctx.strokeStyle='rgba(146,245,216,0.3)';ctx.lineWidth=Math.max(1,r*0.02);
+    for(const s of [0.35,0.7]) {ctx.beginPath();ctx.ellipse(x,y,r*s,r*0.85,0,0,TAU);ctx.stroke();ctx.beginPath();ctx.ellipse(x,y,r*0.85,r*s,0,0,TAU);ctx.stroke();}
+    ctx.restore();
+  }
   if (id === 'galaxy') {
     for (let i = 0; i < 26; i++) {
       const a = hash(i) * TAU + time * 0.15;
@@ -97,6 +108,22 @@ export function drawSkinInside(ctx, id, x, y, r, time) {
 export function drawSkinRim(ctx, id, x, y, r, time, pulse) {
   const w = Math.max(3, r * 0.08);
   switch (id) {
+    case 'comet':
+      ring(ctx,x,y,r,w,'#97f6ee','#56e0da');
+      for(let i=0;i<14;i++) {
+        const a=time*1.4-i*0.08;ctx.fillStyle=`rgba(244,219,255,${1-i/15})`;
+        ctx.beginPath();ctx.arc(x+Math.cos(a)*r,y+Math.sin(a)*r,w*(1-i/17),0,TAU);ctx.fill();
+      }
+      break;
+    case 'atlas':
+      ring(ctx,x,y,r,w,'#dfd19a');
+      ctx.fillStyle='#b1ffe1';
+      for(let i=0;i<4;i++) {const a=i*TAU/4;ctx.beginPath();ctx.moveTo(x+Math.cos(a)*(r+w*2.4),y+Math.sin(a)*(r+w*2.4));ctx.lineTo(x+Math.cos(a-0.09)*r,y+Math.sin(a-0.09)*r);ctx.lineTo(x+Math.cos(a+0.09)*r,y+Math.sin(a+0.09)*r);ctx.fill();}
+      break;
+    case 'crown':
+      ring(ctx,x,y,r,w*1.6,'#ffc867','#ffb331');
+      for(let i=0;i<8;i++) {const a=i*TAU/8+time*0.15;ctx.fillStyle=i%2?'#ff7cac':'#7ff7e9';ctx.beginPath();ctx.arc(x+Math.cos(a)*r,y+Math.sin(a)*r,w*0.6,0,TAU);ctx.fill();}
+      break;
     case 'candy': {
       const n = 16;
       ctx.lineWidth = w * 1.4;

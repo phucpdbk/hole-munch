@@ -56,7 +56,7 @@ export class BossBehavior {
       if (this.phase === 'sweep') {
         b.x += Math.sin(this.clock * 1.4) * 95 * dt;
         for (const o of this.world.objects) {
-          if (o.isBoss || o.eaten || o.falling || o.r > 24) continue;
+          if (o.isBoss || o.eaten || o.falling || o.hidden || o.r > 24) continue;
           if (Math.hypot(o.x - b.x, o.y - b.y) > b.r + 100) continue;
           const side = o.x < b.x ? -1 : 1;
           o.x = clamp(o.x + side * 125 * dt, o.r, this.world.size - o.r);
@@ -67,7 +67,7 @@ export class BossBehavior {
         if (this.phase === 'rest') { this.phase = 'warn'; this.phaseTime = 1.2; }
         else if (this.phase === 'warn') {
           this.phase = 'beam'; this.phaseTime = 2.4;
-          this.cargo = this.world.objects.filter(o => !o.isBoss && !o.eaten && !o.falling && o.r <= 24
+          this.cargo = this.world.objects.filter(o => !o.isBoss && !o.eaten && !o.falling && !o.hidden && o.r <= 24
             && Math.hypot(o.x - b.x, o.y - b.y) < b.r + 230)
             .sort((a, z) => Math.hypot(a.x-b.x,a.y-b.y)-Math.hypot(z.x-b.x,z.y-b.y)).slice(0, 6);
           for (const o of this.cargo) o.abducted = true;

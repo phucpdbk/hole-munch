@@ -27,7 +27,9 @@ g.world.objects=[g.world.boss];
 for(let i=0;i<19;i++) {
   g.world.objects.push(food(g.hole.x,g.hole.y));g.checkEating(0.02);
 }
-assert.equal(g.bestCombo,20);assert.equal(comboMultiplier(g.combo),3);
+assert.equal(g.bestCombo,20);assert.equal(comboMultiplier(g.combo),2);
+assert.deepEqual([7,8,15,16,29,30].map(comboMultiplier),[1,1.5,1.5,2,2,3]);
+assert.equal(g.ripples.length,0,'Small bites must not trigger combo rings');
 assert.equal(g.eatenPts,40,'Combo must not inflate completion percentage');
 assert(g.score>g.eatenPts,'Combos should award bonus score');
 const beforeReward=g.timeLeft;g.updateObjective(0);
@@ -35,7 +37,10 @@ assert.equal(g.timeLeft,beforeReward+5);g.updateObjective(1);
 assert.equal(g.timeLeft,beforeReward+5,'Challenge reward is one-time');
 g.setPaused(true);const beforePause=g.comboTime;tick(g,3);
 assert.equal(g.comboTime,beforePause);g.setPaused(false);
-g.world.objects=[g.world.boss];tick(g,COMBO_WINDOW+0.1);
+g.world.objects=[g.world.boss];tick(g,0.8);
+assert.equal(g.combo,20,'A chain survives a short gap between bites');
+tick(g,0.3);
+assert.equal(COMBO_WINDOW,1);
 assert.equal(g.combo,0);assert.equal(g.bestCombo,20);
 g.state='offer';g.comboTime=1;tick(g,1);assert.equal(g.comboTime,1);
 g.start(getLevel(2),emptyUpgrades());

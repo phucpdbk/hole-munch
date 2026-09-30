@@ -1,4 +1,4 @@
-// Capacitor (Android app) integration. The plugin globals only exist in the app build, where
+// Capacitor (Android/iOS app) integration. The plugin globals only exist in the app build, where
 // tools/build-app.mjs adds their script tags, so the web and YouTube builds get `null` here.
 import { ADMOB_UNITS } from './ads-config.js';
 
@@ -6,6 +6,7 @@ const cap = window.Capacitor;
 const admob = window.capacitorAdMob;
 const appPlugin = window.capacitorApp?.App;
 const isNative = !!cap?.isNativePlatform?.();
+const platform = cap?.getPlatform?.();
 
 // Listeners must be attached before an ad is shown; `result` settles with the first event's value.
 async function listen(AdMob, outcomes) {
@@ -18,7 +19,8 @@ async function listen(AdMob, outcomes) {
 }
 
 function createAds() {
-  if (!isNative || !admob) return null;
+  const units = ADMOB_UNITS[platform];
+  if (!isNative || !admob || !units) return null;
   const { AdMob, InterstitialAdPluginEvents: IE, RewardAdPluginEvents: RE, MaxAdContentRating } = admob;
   const loaded = { interstitial: false, rewarded: false };
 
@@ -30,8 +32,8 @@ function createAds() {
   });
 
   const prepare = {
-    interstitial: () => AdMob.prepareInterstitial({ adId: ADMOB_UNITS.interstitial }),
-    rewarded: () => AdMob.prepareRewardVideoAd({ adId: ADMOB_UNITS.rewarded }),
+    interstitial: () => AdMob.prepareInterstitial({ adId: units.interstitial }),
+    rewarded: () => AdMob.prepareRewardVideoAd({ adId: units.rewarded }),
   };
 
   async function load(kind) {
@@ -92,10 +94,10 @@ export const native = {
   },
 
   onBackButton(cb) {
-    if (isNative && appPlugin) appPlugin.addListener('backButton', cb);
+    if (platform === 'android' && appPlugin) appPlugin.addListener('backButton', cb);
   },
 
   minimizeApp() {
-    appPlugin?.minimizeApp();
+    if (platform === 'android') appPlugin?.minimizeApp();
   },
 };

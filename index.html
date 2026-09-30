@@ -30,7 +30,7 @@
       <span id="menu-coins" class="coins"></span>
     </div>
     <button id="btn-play" class="btn big" data-i18n="play"></button>
-    <button id="btn-levels" class="btn" data-i18n="levelList"></button>
+    <button id="btn-levels" class="btn" data-i18n="travelMap"></button>
     <button id="btn-shop" class="btn" data-i18n="upgrades"></button>
     <button id="btn-reset" class="btn ghost hidden" data-i18n="resetProgress"></button>
     </div>
@@ -51,9 +51,11 @@
   </div>
 
   <div id="levels" class="screen hidden">
-    <h2 data-i18n="levelList"></h2>
-    <p class="subtitle" data-i18n="journey"></p>
-    <div id="level-grid" class="level-grid"></div>
+    <h2 data-i18n="travelMap"></h2>
+    <p id="journey-total" class="subtitle"></p>
+    <div id="journey-tabs" class="tabs"></div>
+    <p id="next-reward" class="next-reward"></p>
+    <div id="journey-content" class="journey-content"></div>
     <button id="btn-levels-back" class="btn" data-i18n="back"></button>
   </div>
 
@@ -70,16 +72,19 @@
     <h2 id="result-title"></h2>
     <div id="result-stars" class="stars"></div>
     <p id="result-twist" class="twist"></p>
+    <p id="result-discoveries" class="discoveries"></p>
     <div class="result-rows">
       <div><span data-i18n="score"></span><b id="result-score"></b></div>
       <div><span data-i18n="eaten"></span><b id="result-eaten"></b></div>
       <div><span data-i18n="bestCombo"></span><b id="result-combo"></b></div>
       <div><span data-i18n="challengeResult"></span><b id="result-challenge"></b></div>
+      <div><span data-i18n="runMedals"></span><b id="result-medals"></b></div>
       <div><span data-i18n="coinsEarned"></span><b id="result-coins" class="coins"></b></div>
     </div>
     <button id="btn-double" class="btn reward hidden" data-i18n="adDouble"></button>
     <button id="btn-next" class="btn big"></button>
     <button id="btn-result-shop" class="btn" data-i18n="upgrades"></button>
+    <button id="btn-result-journey" class="btn ghost" data-i18n="resultJourney"></button>
   </div>
 
   <script type="module" src="src/main.js"></script>

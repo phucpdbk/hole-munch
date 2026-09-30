@@ -7,6 +7,8 @@ import { Weather, WEATHER_ICONS } from './weather.js';
 import { BossFx } from './bossfx.js';
 import { BossBehavior } from './boss-behavior.js';
 import { COMBO_WINDOW, comboMultiplier, objectiveFor, objectiveProgress } from './engagement.js';
+import { WorldEvent } from './world-events.js';
+import { World3D } from './world3d.js';
 
 export const STAR2_PCT = 0.75;
 export const STAR3_PCT = 0.9;
@@ -25,6 +27,7 @@ export class Game {
   constructor(canvas, callbacks) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
+    this.view3d = World3D.create(canvas);
     this.cb = callbacks;
     this.state = 'idle';
     this.paused = false;
@@ -51,6 +54,7 @@ export class Game {
     this.h = window.innerHeight;
     this.canvas.width = Math.floor(this.w * dpr);
     this.canvas.height = Math.floor(this.h * dpr);
+    this.view3d?.resize(this.w, this.h, dpr);
   }
 
   bindInput() {
@@ -102,6 +106,9 @@ export class Game {
     this.level = level;
     this.world = generateWorld(level);
     this.behavior = new BossBehavior(this.world);
+    this.encounter = new WorldEvent(this.world, level);
+    this.elapsedPlay = 0;
+    this.bossCaughtAt = null;
     this.combo = 0;
     this.comboTime = 0;
     this.bestCombo = 0;
@@ -263,9 +270,11 @@ export class Game {
       this.comboTime = Math.max(0, this.comboTime - dt);
       if (!this.comboTime) this.combo = 0;
       if (this.startedMoving) {
+        this.elapsedPlay += dt;
         this.weather.updateGameplay(dt, this);
         this.moveHole(dt);
         this.behavior.update(dt, this.hole);
+        this.encounter.update(dt, this);
         this.checkEating(dt);
         this.updateObjective(dt);
         const shrink = this.weather.shrinkPerSec(this.hole.targetR);
@@ -383,7 +392,7 @@ export class Game {
     }
     const h = this.hole;
     const w = this.weather;
-    const speed = BASE_SPEED * this.speedMul * w.speedMul * (1 + h.r / 90);
+    const speed = BASE_SPEED * this.speedMul * w.speedMul * (1 + Math.min(2.2, h.r / 145));
     const tvx = dx * speed * mag;
     const tvy = dy * speed * mag;
     const follow = Math.min(1, dt * w.grip);
@@ -409,7 +418,7 @@ export class Game {
     const magR = magnet ? h.r * (1.25 + magnet * 0.15) : 0;
     const pull = (60 + magnet * 30) * (1 + h.r / 90) * dt;
     for (const o of this.world.objects) {
-      if (o.eaten || o.falling || o.r > maxR) continue;
+      if (o.eaten || o.falling || o.hidden || o.r > maxR) continue;
       let ddx = o.x - h.x;
       let ddy = o.y - h.y;
       // Magnet only tugs small props; dragging whole buildings around looks wrong.
@@ -439,11 +448,12 @@ export class Game {
       this.eatenPts += o.pts;
       h.targetR = Math.sqrt(h.targetR * h.targetR + o.r * o.r * this.level.growth);
       this.bitePulse = Math.max(this.bitePulse, Math.min(0.65, o.r / 75));
-      audio.pop(o.r, comboMultiplier(this.combo));
+      audio.pop(o.r);
       emitEatFx(this.particles, this.look.fx, o.x, o.y, o.r, h.r, o.color);
 
       if (o.isBoss) {
         this.bossEaten = true;
+        this.bossCaughtAt = this.elapsedPlay;
         this.scorePop = 0;
         this.floaters = [];
         this.behavior.release();
@@ -454,7 +464,7 @@ export class Game {
         this.floaters.push({ x: o.x, y: o.y - o.r, text: `+${bonus}`, t: 0, big: true });
         this.showBanner(t('cleared'), this.twist(), 3);
         audio.boss();
-      } else {
+      } else if (!o.eventGate) {
         this.swallowed++;
         if (o.kind === 'car') this.carsEaten++;
         this.combo++;
@@ -464,10 +474,7 @@ export class Game {
         const points = Math.round(o.pts * multiplier);
         this.score += points;
         this.scorePop += points;
-        if ([5, 10, 20].includes(this.combo)) {
-          audio.combo(multiplier);
-        }
-        if ((o.r >= 20 || this.combo % 5 === 0) && this.ripples.length < 20) {
+        if (o.r >= 20 && this.ripples.length < 20) {
           this.ripples.push({x:h.x,y:h.y,r:h.r,t:0});
         }
       }
@@ -499,7 +506,7 @@ export class Game {
     if (!objective.complete && objective.progress >= objective.goal) {
       objective.complete = true;
       objective.celebration = 3;
-      this.timeLeft += 5;
+      if (this.level.number <= 5) this.timeLeft += 5;
       audio.challenge();
     }
   }
@@ -508,7 +515,9 @@ export class Game {
     const pct = this.world.totalPts ? this.eatenPts / this.world.totalPts : 0;
     const cleared = this.bossEaten;
     const stars = cleared ? 1 + (pct >= STAR2_PCT ? 1 : 0) + (pct >= STAR3_PCT ? 1 : 0) : 0;
-    const baseCoins = cleared ? this.score / 100 + stars * 15 : this.score / 200;
+    // Combo score is for records. Coins follow unmultiplied food and a bounded
+    // clear reward, preventing combo farming from buying all upgrades too early.
+    const baseCoins = cleared ? this.eatenPts / 150 + stars * 12 + Math.min(80, this.level.number * 2) : this.eatenPts / 350;
     const coins = Math.floor(baseCoins * this.stats.coinMul);
     return {
       level: this.level.number,
@@ -519,6 +528,12 @@ export class Game {
       coins,
       bestCombo: this.bestCombo,
       objectiveComplete: this.objective.complete,
+      medals: cleared ? [
+        ...(this.objective.complete ? ['task'] : []),
+        ...(this.bossCaughtAt !== null && this.bossCaughtAt <= this.level.quickTarget ? ['quick'] : []),
+        ...(pct >= 0.9 ? ['clean'] : []),
+      ] : [],
+      quickTarget: this.level.quickTarget,
       twist: cleared ? this.twist() : t('bossFailed', { boss: this.bossName() }),
     };
   }
@@ -530,6 +545,28 @@ export class Game {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (!this.world) {
       this.renderAttract();
+      return;
+    }
+
+    if (this.view3d && !this.view3d.lost) {
+      this.view3d.render(this);
+      ctx.clearRect(0, 0, this.w, this.h);
+      for (const f of this.floaters) {
+        const p = this.view3d.project(f.x, f.y, 25);
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, 1 - f.t / 0.9);
+        ctx.textAlign = 'center';
+        ctx.font = `bold ${f.big ? 36 : 18}px Trebuchet MS, sans-serif`;
+        ctx.strokeStyle = '#172439'; ctx.lineWidth = 4;
+        ctx.fillStyle = f.bad ? '#ff4f4f' : f.big ? '#ffd23f' : '#fff';
+        ctx.strokeText(f.text, p.x, p.y); ctx.fillText(f.text, p.x, p.y);
+        ctx.restore();
+      }
+      const hp = this.view3d.project(this.hole.x, this.hole.y);
+      this.weather.drawScreen(ctx, this.w, this.h, hp.x, hp.y, this.hole.r * this.zoom);
+      this.fx.drawScreen(ctx, this.w, this.h);
+      if (this.state === 'playing' || this.state === 'ending') this.drawHud(ctx);
+      this.drawJoystick(ctx); this.drawIntro(ctx); this.drawBanner(ctx);
       return;
     }
 
@@ -550,6 +587,7 @@ export class Game {
     ctx.translate(-this.cam.x, -this.cam.y);
 
     drawGround(ctx, this.world, view);
+    this.encounter?.draw(ctx);
     if (this.state === 'playing') this.behavior?.draw(ctx);
     drawParticles(ctx, this.particles, 0);
     this.drawHole(ctx);
@@ -561,7 +599,7 @@ export class Game {
     const pad = 200;
     const visible = [];
     for (const o of this.world.objects) {
-      if (o.eaten || (o.falling && o.fallT >= 0.24)) continue;
+      if (o.eaten || o.hidden || (o.falling && o.fallT >= 0.24)) continue;
       if (o.x < view.x0 - pad || o.x > view.x1 + pad || o.y < view.y0 - pad || o.y > view.y1 + pad) continue;
       visible.push(o);
     }
@@ -750,12 +788,14 @@ export class Game {
     if (!this.objective) return;
     const w=this.w, objective=this.objective;
     ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';
-    if(this.combo >= 2 && this.comboTime > 0) {
-      const width=Math.min(210,w-36),x=(w-width)/2,y=111;
-      ctx.fillStyle='rgba(18,18,43,0.85)';ctx.beginPath();ctx.roundRect(x,y,width,45,14);ctx.fill();
-      ctx.fillStyle=this.combo>=20?'#92ffe4':'#ffdf73';ctx.font='bold 18px Trebuchet MS, sans-serif';
-      ctx.fillText(`${t('combo')} ${this.combo}  ·  ×${comboMultiplier(this.combo)}`,w/2,y+18,width-16);
-      ctx.fillRect(x+12,y+35,(width-24)*this.comboTime/COMBO_WINDOW,3);
+    if (this.encounter?.noticeTime > 0) {
+      const eventWidth=Math.min(360,w-28);
+      ctx.fillStyle='rgba(35,48,66,0.94)';ctx.beginPath();ctx.roundRect((w-eventWidth)/2,164,eventWidth,48,12);ctx.fill();
+      ctx.fillStyle='#abffe2';ctx.font='bold 14px Trebuchet MS, sans-serif';
+      ctx.fillText(t(this.encounter.title),w/2,181,eventWidth-18);
+      ctx.fillStyle='#fff';ctx.font='12px Trebuchet MS, sans-serif';
+      const hintKey = this.encounter.kind === 'garden' && this.encounter.state === 'opened' ? 'eventHint_gardenOpen' : `eventHint_${this.encounter.kind}`;
+      ctx.fillText(t(hintKey),w/2,198,eventWidth-18);
     }
     const width=Math.min(370,w-28),x=(w-width)/2,y=this.h-86;
     ctx.fillStyle='rgba(18,18,43,0.88)';ctx.beginPath();ctx.roundRect(x,y,width,67,15);ctx.fill();
@@ -763,9 +803,9 @@ export class Game {
     const title=objective.complete?t('missionDone'):t(objective.key,{n:objective.goal});
     ctx.fillText(title,w/2,y+19,width-24);
     ctx.fillStyle='#cad8ee';ctx.font='12px Trebuchet MS, sans-serif';
-    const hint=!this.startedMoving?t('lessonMove'):objective.celebration>0?t('timeGift'):
-      objective.complete?t('keepMunching'):objective.hint && this.playTime<16?t(objective.hint):
-        `${objective.progress}/${objective.goal} · ${t('rewardTime')}`;
+    const hint=!this.startedMoving?t('lessonMove'):objective.celebration>0?t(this.level.number<=5?'timeGift':'medalOnClear'):
+      objective.complete?t('medalGoals',{s:this.level.quickTarget}):objective.hint && this.playTime<16?t(objective.hint):
+        `${objective.progress}/${objective.goal} · ${t(this.level.number<=5?'rewardTime':'medalOnClear')}`;
     ctx.fillText(hint,w/2,y+39,width-24);
     ctx.fillStyle=objective.complete?'#5eeac7':'#ffcf63';
     ctx.fillRect(x+12,y+56,(width-24)*objective.progress/objective.goal,3);
@@ -774,8 +814,9 @@ export class Game {
 
   drawBossArrow(ctx, boss) {
     const z = this.zoom;
-    const sx = (boss.x - this.cam.x) * z + this.w / 2;
-    const sy = (boss.y - this.cam.y) * z + this.h / 2;
+    const projected = this.view3d && !this.view3d.lost ? this.view3d.project(boss.x, boss.y) : null;
+    const sx = projected ? projected.x : (boss.x - this.cam.x) * z + this.w / 2;
+    const sy = projected ? projected.y : (boss.y - this.cam.y) * z + this.h / 2;
     const margin = 40;
     if (sx > margin && sx < this.w - margin && sy > margin + 80 && sy < this.h - margin) return;
     const cx = this.w / 2;
@@ -879,6 +920,7 @@ export class Game {
   }
 
   showWorldBackdrop(level) {
+    this.encounter = null;
     this.behavior?.release();
     this.behavior = null;
     this.ripples = [];

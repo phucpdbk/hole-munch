@@ -15,6 +15,10 @@ const LEVELS = Number(process.argv[2]) || 15;
 // Fraction of full joystick deflection the bot uses; a rough stand-in for human imprecision.
 const SKILL = Number(process.argv[3]) || 0.75;
 const RUNS = Number(process.argv[4]) || 6;
+// Reproducible maps make balancing changes comparable.
+const SEED = Number(process.argv[5]) || 202609;
+let rng = SEED >>> 0;
+Math.random = () => { rng = (Math.imul(rng,1664525)+1013904223) >>> 0; return rng / 4294967296; };
 const MAX_TRIES = 6;
 const DT = 1 / 30;
 const RETARGET = 0.25;
@@ -38,7 +42,7 @@ function playLevel(levelNum, up) {
       let best = -1;
       target = null;
       for (const o of game.world.objects) {
-        if (o.eaten || o.falling || o.r > h.r * 0.85) continue;
+        if (o.eaten || o.falling || o.hidden || o.r > h.r * 0.85) continue;
         const d = Math.hypot(o.x - h.x, o.y - h.y);
         const value = (o.r * o.r) / (d + 60);
         if (value > best) {
@@ -112,7 +116,7 @@ for (let run = 0; run < RUNS; run++) {
   }
 }
 
-console.log(`skill ${SKILL}, ${RUNS} campaigns`);
+console.log(`skill ${SKILL}, ${RUNS} campaigns, seed ${SEED}`);
 console.log('lvl | diff | reach | APS  | stars | 3*%  | eaten | boss@time');
 for (let n = 1; n <= LEVELS; n++) {
   const row = rows[n];

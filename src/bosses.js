@@ -1,6 +1,7 @@
 // Boss and landmark rendering: sticker-style sprites (lit + outlined via an offscreen
 // canvas), living faces, aura and fear reactions. Coordinates are in units of r.
 import { drawLandmark } from './landmarks.js';
+import { getBossArt } from './boss-art.js';
 
 const TAU = Math.PI * 2;
 const OUTLINE = '#1d1a2e';
@@ -921,6 +922,17 @@ export function drawBoss(ctx, o, time) {
   ctx.translate(0, r * 0.9);
   ctx.scale(1 - breathe * 0.6, 1 + breathe);
   ctx.translate(0, -r * 0.9);
+
+  // Use the same breathing, bob, fear tremble, aura and alarm as the code art.
+  // The baked lighting/outline needs only one draw, not per-frame sprite rebuilds.
+  const art = !o.landmark && getBossArt(o.bossType);
+  if (art) {
+    ctx.drawImage(art, -r * 1.15, -r * 1.15, r * 2.3, r * 2.3);
+    ctx.restore();
+    drawSparkles(ctx, o, time);
+    drawAlarm(ctx, o, time);
+    return;
+  }
 
   const m = ctx.getTransform?.();
   const px = m ? Math.hypot(m.a, m.b) : 1;

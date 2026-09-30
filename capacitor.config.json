@@ -2,6 +2,10 @@
   "appId": "io.github.phucpdbk.holemunch",
   "appName": "Hole Munch",
   "webDir": "www",
+  "ios": {
+    "contentInset": "automatic",
+    "backgroundColor": "#1b1f2e"
+  },
   "android": {
     "adjustMarginsForEdgeToEdge": "force"
   }

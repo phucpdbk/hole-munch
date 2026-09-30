@@ -5,3 +5,14 @@ www/
 android/keystore.properties
 *.jks
 *.keystore
+godot/.godot/
+godot/builds/
+godot/test-output/
+godot/.export_credentials
+.env
+.env.*
+!.env.example
+*.p12
+*.pfx
+*.mobileprovision
+.DS_Store

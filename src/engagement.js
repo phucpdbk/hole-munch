@@ -1,5 +1,5 @@
-export const COMBO_WINDOW = 2.2;
-export const comboMultiplier = count => count >= 20 ? 3 : count >= 10 ? 2 : count >= 5 ? 1.5 : 1;
+export const COMBO_WINDOW = 1;
+export const comboMultiplier = count => count >= 30 ? 3 : count >= 16 ? 2 : count >= 8 ? 1.5 : 1;
 
 // One small lesson at a time. Later levels rotate optional replay challenges.
 export function objectiveFor(level) {

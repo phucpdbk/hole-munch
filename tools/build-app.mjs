@@ -1,4 +1,4 @@
-// Builds www/ for the Capacitor Android app: the same game as the web build, minus the YouTube
+// Builds www/ for the Capacitor Android/iOS apps: the same game as the web build, minus the YouTube
 // SDK (the app must run offline), plus the Capacitor plugin scripts that src/native.js reads.
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
@@ -17,6 +17,7 @@ mkdirSync(`${OUT}/assets`, { recursive: true });
 cpSync('src', `${OUT}/src`, { recursive: true });
 cpSync('style.css', `${OUT}/style.css`);
 cpSync('assets/hole-munch-cover.webp', `${OUT}/assets/hole-munch-cover.webp`);
+cpSync('assets/bosses', `${OUT}/assets/bosses`, { recursive: true });
 for (const [name, { from, global }] of Object.entries(VENDOR)) {
   let js = readFileSync(from, 'utf8');
   if (global) {
@@ -40,4 +41,4 @@ const appHtml = html
   .replace(moduleTag, `${vendorTags}\n  ${moduleTag}`);
 writeFileSync(`${OUT}/index.html`, appHtml);
 
-console.log(`Built ${OUT}/ for the Android app`);
+console.log(`Built ${OUT}/ for the native apps (Android/iOS)`);

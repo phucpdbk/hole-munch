@@ -1,4 +1,5 @@
 import { sdk } from './sdk.js';
+import { preloadBossArt } from './boss-art.js';
 import { audio } from './audio.js';
 import { setLanguage, applyStaticText, t, getLang, isSupported, LANGUAGES } from './i18n.js';
 import { getLevel, THEMES } from './levels.js';
@@ -6,8 +7,10 @@ import { Game } from './game.js';
 import { drawObject } from './world.js';
 import { STAT_UPGRADES, upgradeCost, emptyUpgrades } from './upgrades.js';
 import { COSMETIC_SLOTS, drawSkinInside, drawSkinRim } from './cosmetics.js';
+import { emptyJourney, restoreJourney, recordJourney, journeyCounts, REWARDS } from './progression.js';
+import { JourneyView, rewardName } from './journey.js';
 
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 const TABS = ['stats', 'skin', 'fx', 'trail'];
 const TAB_LABELS = { stats: 'tabStats', skin: 'tabSkins', fx: 'tabFx', trail: 'tabTrails' };
 
@@ -32,6 +35,7 @@ const save = {
   lang: null,
   // Best stars per cleared level, indexed by level - 1 (missing for levels cleared before this existed).
   stars: [],
+  journey: emptyJourney(),
 };
 
 const $ = (id) => document.getElementById(id);
@@ -156,9 +160,10 @@ function renderCosmeticCards(list, slot) {
     let label;
     if (equipped) label = t('equipped');
     else if (owned) label = t('equip');
-    else label = `● ${item.price}`;
-    const button = makeButton(label, equipped || (!owned && save.coins < item.price), () => {
+    else label = item.rewardOnly ? t('rewardExclusive') : `● ${item.price}`;
+    const button = makeButton(label, equipped || (!owned && (item.rewardOnly || save.coins < item.price)), () => {
       if (!owned) {
+        if (item.rewardOnly) return;
         if (save.coins < item.price) return;
         save.coins -= item.price;
         save.owned[slot].push(item.id);
@@ -231,6 +236,9 @@ function renderResult(r) {
   $('result-eaten').textContent = `${Math.floor(r.pct * 100)}%`;
   $('result-combo').textContent = r.bestCombo || 0;
   $('result-challenge').textContent = t(r.objectiveComplete ? 'challengeYes' : 'challengeNo');
+  $('result-medals').textContent = (r.medals || []).map(id=>t('medal_'+id)).join(' · ') || '—';
+  $('result-discoveries').textContent = [r.discoveries?.medals ? t('newMedals',{n:r.discoveries.medals}) : '',
+    r.discoveries?.stamp ? t('newStamp',{name:t(r.discoveries.stamp+'Boss')}) : ''].filter(Boolean).join(' · ');
   $('result-coins').textContent = `+${r.doubled ? r.coins * 2 : r.coins}`;
   $('btn-next').textContent = r.cleared ? t('next') : t('retry');
   const double = $('btn-double');
@@ -290,6 +298,7 @@ function onLevelEnd(r) {
     save.best = r.score;
     sdk.sendScore(save.best);
   }
+  r.discoveries = recordJourney(save.journey, r);
   persist();
   renderResult(r);
   show('result');
@@ -297,66 +306,32 @@ function onLevelEnd(r) {
 
 // Boss portraits are drawn once, not animated: dozens of live canvases would cost frames.
 function drawBossPortrait(canvas, theme) {
-  const size = 72;
+  const size = 120;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = size * dpr;
   canvas.height = size * dpr;
   const ctx = canvas.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  drawObject(ctx, { kind: 'boss', bossType: theme.boss, landmark: theme.landmark, r: 27, x: size / 2, y: size / 2 + 3 }, 0);
-}
-
-function levelTile(n) {
-  const theme = getLevel(n).theme;
-  const tile = document.createElement('button');
-  tile.className = 'level-tile';
-  const add = (tag, cls, text) => {
-    const el = document.createElement(tag);
-    el.className = cls;
-    if (text !== undefined) el.textContent = text;
-    tile.appendChild(el);
-    return el;
-  };
-  if (theme.landmark) add('span', 'badge', '🏛️');
-
-  if (n < save.level) {
-    if (theme.landmark) tile.classList.add('landmark');
-    drawBossPortrait(add('canvas', ''), theme);
-    add('span', 'num', `${t('level')} ${n}`);
-    add('span', 'boss-name', t(`${theme.boss}Boss`));
-    const stars = save.stars[n - 1];
-    const starEl = add('span', 'mini-stars');
-    if (stars !== undefined) {
-      starEl.innerHTML = [0, 1, 2].map((i) => `<span class="${i < stars ? 'on' : 'off'}">★</span>`).join('');
-    }
-    tile.addEventListener('click', () => startLevel(n));
-  } else if (n === save.level) {
-    tile.classList.add('current');
-    drawBossPortrait(add('canvas', ''), theme);
-    add('span', 'num', `${t('level')} ${n}`);
-    add('span', 'boss-name', t(`${theme.boss}Boss`));
-    add('span', 'mini-stars');
-    tile.addEventListener('click', () => startLevel(n));
-  } else {
-    tile.classList.add('locked');
-    tile.disabled = true;
-    drawBossPortrait(add('canvas', ''), theme);
-    add('span', 'num', `${t('level')} ${n}`);
-    add('span', 'boss-name', `🔒 ${t(`${theme.boss}Boss`)}`);
-    add('span', 'mini-stars');
-  }
-  return tile;
+  drawObject(ctx, { kind: 'boss', bossType: theme.boss, landmark: theme.landmark, r: 45, x: size / 2, y: size / 2 + 3 }, 0);
 }
 
 function openLevels() {
   audio.click();
-  const grid = $('level-grid');
-  grid.innerHTML = '';
-  const count = Math.ceil(save.level / THEMES.length) * THEMES.length;
-  for (let n = 1; n <= count; n++) grid.appendChild(levelTile(n));
+  journeyView.open();
+  renderNextReward();
   show('levels');
-  grid.querySelector('.current')?.scrollIntoView({ block: 'center' });
 }
+
+function renderNextReward() {
+  const counts=journeyCounts(save.journey);
+  const unclaimed=REWARDS.filter(r=>!save.journey.claimed.includes(r.id));
+  const next=unclaimed.find(r=>counts[r.track]>=r.need)||unclaimed[0];
+  $('next-reward').textContent=next?t('nextReward',{name:rewardName(next),have:counts[next.track],need:next.need}):t('allRewards');
+}
+
+const journeyView = new JourneyView(save,drawBossPortrait,startLevel,()=>{
+  audio.win();persist();renderNextReward();
+});
 
 function openShop(from) {
   audio.click();
@@ -427,6 +402,7 @@ $('btn-levels-back').addEventListener('click', () => {
 });
 $('btn-shop').addEventListener('click', () => openShop('menu'));
 $('btn-result-shop').addEventListener('click', () => openShop('result'));
+$('btn-result-journey').addEventListener('click', openLevels);
 $('btn-shop-back').addEventListener('click', () => {
   audio.click();
   if (returnTo === 'result' && lastResult) {
@@ -442,7 +418,7 @@ $('btn-shop-back').addEventListener('click', () => {
 const DEV_TOOLS = !sdk.inPlayables && new URLSearchParams(location.search).get('dev') === '1';
 
 function resetProgress() {
-  Object.assign(save, { v: SAVE_VERSION, level: 1, coins: 0, best: 0, up: emptyUpgrades(), ...defaultCosmetics(), stars: [] });
+  Object.assign(save, { v: SAVE_VERSION, level: 1, coins: 0, best: 0, up: emptyUpgrades(), ...defaultCosmetics(), stars: [], journey: emptyJourney() });
   lastResult = null;
   activeTab = 'stats';
   persist();
@@ -488,9 +464,9 @@ window.addEventListener('error', (e) => sdk.logError(e.error || e.message));
 
 const clampInt = (v, min, max) => Math.min(max, Math.max(min, v | 0));
 
-// Accepts v1 saves (no cosmetics) as well as v2.
+// Accept older saves without deleting coins, equipped items, or unlocked levels.
 function restore(data) {
-  if (!data || (data.v !== 1 && data.v !== 2)) return;
+  if (!data || ![1, 2, 3].includes(data.v)) return;
   save.level = clampInt(data.level, 1, 1e6);
   save.coins = clampInt(data.coins, 0, 1e9);
   save.best = clampInt(data.best, 0, 1e12);
@@ -507,6 +483,7 @@ function restore(data) {
   if (Array.isArray(data.stars)) {
     save.stars = data.stars.slice(0, save.level).map((s) => (s == null ? undefined : clampInt(s, 0, 3)));
   }
+  save.journey = restoreJourney(data.journey, save.level);
 }
 
 function initLanguagePicker() {
@@ -524,7 +501,7 @@ function initLanguagePicker() {
 }
 
 async function boot() {
-  const [lang, data] = await Promise.all([sdk.getLanguage(), sdk.loadData()]);
+  const [lang, data] = await Promise.all([sdk.getLanguage(), sdk.loadData(), preloadBossArt()]);
   restore(data);
   const devLevel = Number(new URLSearchParams(location.search).get('level'));
   if (DEV_TOOLS && devLevel >= 1) save.level = Math.floor(devLevel);
