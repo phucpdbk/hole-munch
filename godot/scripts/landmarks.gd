@@ -14,12 +14,98 @@ const GRASS = Color("8fbf73")
 const LEAF = Color("5f9e62")
 const WATER = Color("6fb6c9")
 const WOOD = Color("8a5a3c")
+const CITY_SITES = {
+	"namsan":["tower",7.0,Color("deded4")],"pearl":["pearl",7.0,Color("cc7192")],
+	"tokyotower":["lattice",7.0,Color("eb684c")],"cairotower":["tower",6.5,STONE],
+	"kicc":["tower",5.0,Color("b98c67")],"cntower":["tower",8.0,WHITE],
+	"willis":["skyscraper",6.5,DARK],"costanera":["skyscraper",7.0,GLASS],
+	"brandenburg":["gate",3.0,STONE],"alcala":["gate",3.5,WHITE],
+	"royalpalace":["palace",3.0,STONE],"flinders":["palace",3.0,Color("d9b660")],
+	"watarun":["temple",5.5,WHITE],"stbasils":["domes",4.5,Color("cd654d")],
+	"fijitemple":["temple",4.0,Color("e0bd6c")],"limacathedral":["church",4.0,STONE],
+	"capitol":["domes",4.5,WHITE],"nationaltheatre":["theatre",3.0,STONE],
+	"tablemountain":["mountain",3.0,Color("a2947e")],"monserrate":["mountain",4.0,LEAF],
+	"masp":["bridge",2.5,Color("d35346")],"hollywood":["sign",2.0,WHITE],
+	"belltower":["spire",6.0,Color("63a9b0")],"parliament":["parliament",3.0,WHITE],
+}
 
 func build(models, id: String) -> Array:
 	m = models
 	parts = []
-	call("lm_" + id)
+	if CITY_SITES.has(id): city_site(id)
+	else: call("lm_" + id)
 	return parts
+
+func city_site(id: String) -> void:
+	var info: Array = CITY_SITES[id]
+	var kind: String = info[0]
+	var h: float = info[1]
+	var c: Color = info[2]
+	box(Vector3(0,0.08,0),Vector3(5,0.16,4.4),STONE)
+	match kind:
+		"tower","pearl","lattice","spire":
+			if kind == "lattice":
+				for x in [-1.5,1.5]:
+					for z in [-1.2,1.2]: beam(Vector3(x,0.2,z),Vector3(x*0.12,h,z*0.12),0.22,c)
+				for y in [1.5,3.0,4.5]: box(Vector3(0,y,0),Vector3(3-y*0.3,0.18,2.5-y*0.25),WHITE)
+			else: add("cyl",Vector3(0,h*0.45,0),Vector3(0.38,h*0.9,0.38),c)
+			add("ball" if kind == "pearl" else "cyl",Vector3(0,h*0.75,0),Vector3(1.05,0.6,1.05),c)
+			add("cyl",Vector3(0,h*0.78,0),Vector3(1.08,0.2,1.08),GLASS)
+			beam(Vector3(0,h*0.8,0),Vector3(0,h+1.0,0),0.08,WHITE)
+			if kind == "pearl": add("ball",Vector3(0,1.4,0),Vector3.ONE*1.15,c)
+			if kind == "spire":
+				for x in [-1,1]: add("prism",Vector3(x*0.6,2.3,0),Vector3(0.6,4.5,1.1),c,Vector3(0,0,x*0.2))
+		"skyscraper":
+			for x in [-1.1,0.0,1.1]:
+				var height := h-absf(x)*1.2
+				box(Vector3(x,height/2,0),Vector3(1.0,height,1.4),c)
+				for i in int(height*3): box(Vector3(x,0.3+i*0.33,0.72),Vector3(0.86,0.06,0.02),GLASS.lightened(0.2))
+			for x in [-0.3,0.3]: beam(Vector3(x,h,0),Vector3(x,h+0.9,0),0.05,WHITE)
+		"gate":
+			for x in [-1.9,-1.2,-0.45,0.45,1.2,1.9]: add("cyl",Vector3(x,h/2,0),Vector3(0.2,h,0.3),c)
+			box(Vector3(0,h,0),Vector3(4.5,0.45,1.3),c)
+			box(Vector3(0,h+0.35,0),Vector3(2.0,0.3,1),c.darkened(0.15))
+		"temple":
+			for i in 7:
+				var width := 3.0-i*0.35
+				box(Vector3(0,0.35+i*h/7,0),Vector3(width,h/7,width),c if i%2 == 0 else GOLD)
+			add("point",Vector3(0,h+0.35,0),Vector3(0.25,1,0.25),GOLD)
+		"palace","church","domes","parliament":
+			box(Vector3(0,1.0,0),Vector3(4.3,2,2.0),c)
+			for x in [-1.6,-0.8,0.0,0.8,1.6]:
+				box(Vector3(x,0.9,1.02),Vector3(0.35,1.1,0.04),DARK)
+				add("cyl",Vector3(x,1.15,1.15),Vector3(0.12,2.0,0.12),WHITE)
+			for x in ([-1.5,0,1.5] if kind in ["church","domes"] else [0]):
+				add("cyl",Vector3(x,2.5,0),Vector3(0.5,1.4,0.5),c)
+				add("hemi",Vector3(x,3.2,0),Vector3(0.65,0.85,0.65),LEAF if id == "stbasils" and x != 0 else GOLD if id == "stbasils" else WHITE)
+				beam(Vector3(x,3.3,0),Vector3(x,h+0.3,0),0.04,GOLD)
+			if kind == "parliament":
+				for x in [-1.5,1.5]: beam(Vector3(x,2,0),Vector3(0,4.8,0),0.07,WHITE)
+			if id == "flinders": add("ball",Vector3(0,2.65,0.53),Vector3(0.27,0.27,0.03),WHITE)
+		"mountain":
+			add("frustum",Vector3(0,h/2,0),Vector3(2.2,h,1.7),c)
+			if id == "monserrate":
+				box(Vector3(0,h,0),Vector3(1.3,0.8,0.8),WHITE)
+				for x in [-0.5,0.5]: box(Vector3(x,h+0.55,0),Vector3(0.3,0.8,0.3),WHITE)
+		"theatre":
+			add("cyl",Vector3(0,1,0),Vector3(2.2,2,1.6),c)
+			add("smooth",Vector3(0,2.2,0),Vector3(2.3,0.65,1.7),WHITE)
+			for i in 16:
+				var a := i*TAU/16
+				box(Vector3(cos(a)*2.1,1,sin(a)*1.6),Vector3(0.12,1.8,0.12),DARK)
+		"bridge":
+			for x in [-2,2]: box(Vector3(x,1.6,0),Vector3(0.25,3.2,2.6),c)
+			box(Vector3(0,2,0),Vector3(4,1.4,2.2),GLASS)
+			box(Vector3(0,2.85,0),Vector3(4.5,0.2,2.7),c)
+		"sign":
+			add("smooth",Vector3(0,0.6,0),Vector3(2.3,1.3,1.7),LEAF)
+			# TextMesh is baked into the same single-surface landmark mesh.
+			var text := TextMesh.new()
+			text.text = "HOLLYWOOD"
+			text.font_size = 48
+			text.pixel_size = 0.011
+			text.depth = 0.07
+			parts.append({"mesh":text,"transform":Transform3D(Basis.IDENTITY,Vector3(0,2.0,0.8)),"color":WHITE})
 
 # --- helpers -------------------------------------------------------------------
 

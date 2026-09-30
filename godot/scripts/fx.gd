@@ -27,7 +27,10 @@ func _ready() -> void:
 	trail_particles = make_puff()
 	trail_particles.one_shot = false
 	trail_particles.explosiveness = 0.0
-	trail_particles.amount = 24
+	trail_particles.amount = 60
+	trail_particles.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
+	trail_particles.emission_ring_axis = Vector3.UP
+	trail_particles.emission_ring_height = 0.0
 	trail_particles.lifetime = 0.8
 	trail_particles.direction = Vector3.UP
 	trail_particles.initial_velocity_min = 0.25
@@ -57,9 +60,14 @@ func configure(effect: int, trail: int, tint: Color) -> void:
 	trail_particles.scale_amount_max = 0.8 if trail == 2 else 1.5
 	trail_particles.visible = true
 
-func move_trail(at: Vector3, moving: bool) -> void:
+# The trail sheds from the whole rim, so it is as wide as the hole.
+func move_trail(at: Vector3, moving: bool, hole_radius: float) -> void:
 	trail_particles.visible = true
 	trail_particles.position = at + Vector3(0,0.24,0)
+	trail_particles.emission_ring_radius = hole_radius
+	trail_particles.emission_ring_inner_radius = hole_radius*0.75
+	trail_particles.scale_amount_min = 0.6 + hole_radius*0.25
+	trail_particles.scale_amount_max = 1.0 + hole_radius*0.35
 	trail_particles.emitting = moving and trail_style > 0
 
 func set_frozen(value: bool) -> void:

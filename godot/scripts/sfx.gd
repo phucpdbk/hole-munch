@@ -33,6 +33,7 @@ func _ready() -> void:
 		lose.append({"freq":f, "to":f*0.8, "dur":0.25, "type":"saw", "vol":0.12, "delay":i*0.15})
 	sounds.lose = render(lose)
 	sounds.tick = render([{"freq":1000, "dur":0.05, "type":"square", "vol":0.06}])
+	sounds.shot = render([{"freq":180,"to":45,"dur":0.12,"type":"saw","vol":0.13},{"freq":1300,"to":180,"dur":0.035,"type":"square","vol":0.06}])
 	sounds.click = render([{"freq":600, "to":900, "dur":0.06, "type":"triangle", "vol":0.15}])
 
 # Bigger objects make deeper pops, as in the 2D game.

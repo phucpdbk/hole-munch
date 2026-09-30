@@ -16,6 +16,10 @@ void fragment() {
 	if (style == 4) band = pow(0.5+0.5*sin(t*4.0), 10.0);
 	if (style == 5) band = step(0.0, sin(t*2.0));
 	if (style == 6) band = 0.5+0.5*sin(angle*2.0-clock);
+	if (style == 8) band = step(0.0, sin(t*3.0))*0.85;
+	if (style == 9) band = step(0.92, fract(angle*12.0/6.2831853))*0.9;
+	if (style == 10) band = 0.35+0.35*sin(angle*8.0)+0.3*pow(0.5+0.5*sin(angle*3.0+clock*2.0), 8.0);
+	if (style == 11) band = pow(0.5+0.5*cos(angle+clock*2.2), 6.0);
 	vec3 color = mix(color_a.rgb, color_b.rgb, band);
 	if (style == 7) color = 0.65+0.35*cos(angle+clock*0.4+vec3(0.0,2.1,4.2));
 	ALBEDO = color;

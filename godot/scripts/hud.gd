@@ -6,6 +6,28 @@ signal menu_requested
 signal levels_requested
 signal styles_requested
 signal shop_requested
+signal daily_requested
+signal endless_requested
+signal help_requested
+signal language_requested
+const UiStyle = preload("res://scripts/ui_style.gd")
+const UiButton = preload("res://scripts/ui_button.gd")
+const I18n = preload("res://scripts/i18n.gd")
+var daily_button: BaseButton
+var endless_button: BaseButton
+var help_button: BaseButton
+var language_button: BaseButton
+var last_city := false
+var run_kind := "campaign"
+var stage := 0
+var lose_reason := ""
+var record_note := ""
+var goal_labels: Array = []
+var goal_mask := 0
+var rival_growth := -1.0
+var daily_won := false
+var endless_best := 0
+var gate_note := ""
 var level_title := ""
 var city := ""
 var region_title := ""
@@ -13,14 +35,17 @@ var map_title := ""
 var landmark := true
 var coins := 0
 var reward := 0
-var shop_button: Button
+var shop_button: BaseButton
 var weather_title := ""
+var weather_kind := "clear"
 var boss_title := ""
 var has_next := true
 var level_count := 12
 var playtest := false
-var levels_button: Button
-var styles_button: Button
+var levels_button: BaseButton
+var styles_button: BaseButton
+var strike_shapes: Array = []
+var defense_status := ""
 var mode := "menu"
 var last_layout_mode := ""
 var score := 0
@@ -42,102 +67,108 @@ var best_combo := 0
 var completion := 0.0
 var floaters: Array = []
 var flash := 0.0
-var play_button: Button
-var pause_button: Button
-var menu_button: Button
-var font: Font = ThemeDB.fallback_font
-const INK = Color("223649")
-const LIGHT = Color("fff9ed")
-const MUTED = Color("a4b6c5")
+var play_button: BaseButton
+var pause_button: BaseButton
+var menu_button: BaseButton
+var font: Font = UiStyle.font(700)
+var title_font: Font = UiStyle.font(800)
+var body_font: Font = UiStyle.body_font(700)
+const INK = UiStyle.INK
+const LIGHT = UiStyle.LIGHT
+const MUTED = UiStyle.MUTED
+const GOLD = UiStyle.GOLD
+const WEATHER_ICONS := {"clear":"sun", "sun":"sun", "rain":"rain", "snow":"snow", "wind":"wind", "fog":"fog", "storm":"storm"}
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	play_button = make_button("▶  CHƠI NGAY", Color("f6cb70"), INK)
+	play_button = make_button("play", Color("f6cb70"), true)
 	play_button.pressed.connect(func(): play_requested.emit())
-	pause_button = make_button("Ⅱ", Color("233c50"), LIGHT)
+	pause_button = make_button("pause", Color("2a4660"))
 	pause_button.pressed.connect(func(): pause_requested.emit())
-	menu_button = make_button("VỀ TRANG CHỦ", Color("334e60"), LIGHT)
+	menu_button = make_button("home", Color("35546d"))
 	menu_button.pressed.connect(func(): menu_requested.emit())
-	levels_button = make_button("CHỌN MÀN", Color("334e60"), LIGHT)
+	levels_button = make_button("map", Color("2f7d8c"))
 	levels_button.pressed.connect(func(): levels_requested.emit())
-	styles_button = make_button("TỦ ĐỒ", Color("334e60"), LIGHT)
-	styles_button.pressed.connect(func(): styles_requested.emit())
-	shop_button = make_button("NÂNG CẤP", Color("5b4a8a"), LIGHT)
+	shop_button = make_button("upgrade", Color("6a55a8"))
 	shop_button.pressed.connect(func(): shop_requested.emit())
-	levels_button.icon = preload("res://scripts/ui_style.gd").icon("map")
-	shop_button.icon = preload("res://scripts/ui_style.gd").icon("upgrade")
-	styles_button.icon = preload("res://scripts/ui_style.gd").icon("fleet")
+	styles_button = make_button("wardrobe", Color("b85a7a"))
+	styles_button.pressed.connect(func(): styles_requested.emit())
+	daily_button = make_button("daily", Color("a8474f"))
+	daily_button.pressed.connect(func(): daily_requested.emit())
+	endless_button = make_button("endless", Color("2f7a68"))
+	endless_button.pressed.connect(func(): endless_requested.emit())
+	help_button = make_button("help", Color("35546d"))
+	help_button.pressed.connect(func(): help_requested.emit())
+	language_button = make_button("language", Color("35546d"))
+	language_button.pressed.connect(func(): language_requested.emit())
 	resized.connect(layout)
 	layout()
 
-func make_button(text: String, bg: Color, fg: Color) -> Button:
-	var button := Button.new()
-	button.text = text
-	button.focus_mode = Control.FOCUS_NONE
-	button.add_theme_font_size_override("font_size", 20)
-	button.add_theme_color_override("font_color", fg)
-	preload("res://scripts/ui_style.gd").button(button, bg, fg == INK)
+func make_button(icon_kind: String, bg: Color, primary := false) -> BaseButton:
+	var button := UiButton.new()
+	button.icon = UiStyle.icon(icon_kind)
+	button.accent = bg
+	button.primary = primary
+	button.font_size = 20
 	add_child(button)
 	return button
+
+func place(button: BaseButton, rect: Rect2, font_size := 18) -> void:
+	button.position = rect.position
+	button.size = rect.size
+	button.font_size = font_size
 
 func layout() -> void:
 	if not is_instance_valid(play_button): return
 	var w := size.x
 	var h := size.y
-	play_button.position = Vector2(44, h - 172)
-	play_button.size = Vector2(w - 88, 66)
-	pause_button.position = Vector2(w - 84, 42)
-	pause_button.size = Vector2(54, 54)
-	menu_button.position = Vector2(44, h - 94)
-	menu_button.size = Vector2(w - 88, 52)
-	var third := (w-88-16)/3
-	for i in 3:
-		var b: Button = [levels_button, shop_button, styles_button][i]
-		b.position = Vector2(44 + i*(third+8), h-94)
-		b.size = Vector2(third, 52)
-		b.add_theme_font_size_override("font_size", 13)
+	place(pause_button, Rect2(w - 84, 36, 58, 58))
+	place(help_button, Rect2(w - 296, 26, 50, 50))
+	place(language_button, Rect2(w - 238, 26, 50, 50))
 	if w > h:
 		var left := 36.0 if mode == "menu" else w/2-264
-		var width := 360.0 if mode == "menu" else 528.0
-		play_button.position = Vector2(left,h-166)
-		play_button.size = Vector2(width,60)
-		menu_button.position = Vector2(left,h-92)
-		menu_button.size = Vector2(width,52)
+		var width := 364.0 if mode == "menu" else 528.0
+		place(play_button, Rect2(left, h-168, width, 64), 26)
+		place(menu_button, Rect2(left, h-94, width, 54), 19)
 		for i in 3:
-			var b: Button = [levels_button, shop_button, styles_button][i]
-			b.position = Vector2(36+i*124,h-92)
-			b.size = Vector2(112,52)
+			place([levels_button, shop_button, styles_button][i], Rect2(36+i*124, h-94, 116, 56), 15)
+		for i in 2:
+			place([daily_button, endless_button][i], Rect2(36+i*186, h-232, 178, 52), 16)
+		return
+	place(play_button, Rect2(44, h - 172, w - 88, 66), 26)
+	place(menu_button, Rect2(44, h - 94, w - 88, 52), 19)
+	var third := (w-88-16)/3
+	for i in 3:
+		place([levels_button, shop_button, styles_button][i], Rect2(44 + i*(third+8), h-94, third, 56), 14)
+	for i in 2:
+		place([daily_button, endless_button][i], Rect2(44 + i*((w-88)/2+4), h-340, (w-88)/2-4, 52), 15)
 
 func sync() -> void:
 	if last_layout_mode != mode:
 		layout()
 		last_layout_mode = mode
 	play_button.visible = mode != "playing"
-	play_button.text = "TIẾP TỤC" if mode == "paused" else "MÀN TIẾP THEO" if mode == "result" and won and has_next else "CHƠI LẠI" if mode == "result" else "▶  CHƠI NGAY"
-	levels_button.visible = mode == "menu"
-	styles_button.visible = mode == "menu"
-	shop_button.visible = mode == "menu"
+	var next_level: bool = mode == "result" and won and has_next
+	play_button.text = I18n.t("resume") if mode == "paused" else I18n.t("next_city") if next_level else I18n.t("replay") if mode == "result" else I18n.t("play")
+	play_button.icon = UiStyle.icon("next" if next_level else "replay" if mode == "result" else "play")
+	menu_button.text = I18n.t("home")
+	levels_button.text = I18n.t("map")
+	shop_button.text = I18n.t("upgrades")
+	styles_button.text = I18n.t("wardrobe")
+	daily_button.text = I18n.t("daily") + (" ★" if daily_won else "")
+	endless_button.text = I18n.t("endless") + (" · %d" % endless_best if endless_best > 0 else "")
+	for button in [daily_button, endless_button, levels_button, styles_button, shop_button, help_button, language_button]:
+		button.visible = mode == "menu"
 	menu_button.visible = mode in ["paused", "result"]
 	pause_button.visible = mode == "playing"
 	queue_redraw()
 
 func panel(rect: Rect2, color: Color, radius: int = 20) -> void:
-	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	style.set_border_width_all(1)
-	style.border_color = Color("527288")
-	style.shadow_color = Color(0.02,0.05,0.1,0.35)
-	style.shadow_size = 10
-	style.corner_radius_top_left = radius
-	style.corner_radius_top_right = radius
-	style.corner_radius_bottom_left = radius
-	style.corner_radius_bottom_right = radius
-	draw_style_box(style, rect)
+	UiStyle.card(self, rect, color, radius)
 
-func text_at(text: String, pos: Vector2, font_size: int, color: Color, centered := false) -> void:
-	if centered: pos.x -= font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x / 2.0
-	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
+func text_at(text: String, pos: Vector2, font_size: int, color: Color, centered := false, outline := 0) -> void:
+	UiStyle.text(self, text, pos, font_size, color, centered, outline, font)
 
 func _draw() -> void:
 	var w := size.x
@@ -150,91 +181,182 @@ func _draw() -> void:
 	if w > h and mode in ["paused", "result"]:
 		draw_landscape_result()
 		return
-	if mode == "menu":
-		panel(Rect2(w/2-128, 54, 256, 30), Color("2b2350"), 15)
-		text_at("CUỘC XÂM LĂNG TRÁI ĐẤT", Vector2(w/2, 75), 13, Color("9ff0d8"), true)
-		panel(Rect2(w-118, 12, 100, 34), Color("223649e6"), 16)
-		text_at("XU %d" % coins, Vector2(w-68, 35), 15, Color("f6cb70"), true)
-		var title_width := font.get_string_size("HOLE MUNCH", HORIZONTAL_ALIGNMENT_LEFT, -1, 52).x
-		draw_string_outline(font, Vector2(w/2-title_width/2, 153), "HOLE MUNCH", HORIZONTAL_ALIGNMENT_LEFT, -1, 52, 5, Color("223649"))
-		text_at("HOLE MUNCH", Vector2(w/2, 153), 52, LIGHT, true)
-		panel(Rect2(w/2-173, 165, 346, 36), Color("223649dc"), 16)
-		text_at(level_title, Vector2(w/2, 189), 18, LIGHT, true)
-		panel(Rect2(24, h-276, w-48, 250), Color("223649f5"), 28)
-		text_at(region_title, Vector2(w/2, h-240), 15, Color("f6cb70"), true)
-		text_at("%s · %d giây · Map %s" % [weather_title, int(seconds), map_title], Vector2(w/2, h-214), 15, MUTED, true)
-		text_at(("Nuốt thành phố, rồi chiếm " if landmark else "Nuốt thành phố, rồi hạ ") + boss_title.to_lower(), Vector2(w/2, h-188), 15, LIGHT, true)
-	elif mode == "playing":
-		panel(Rect2(24, 36, 126, 68), Color("223649ed"), 20)
-		text_at("ĐIỂM", Vector2(42, 60), 12, MUTED)
-		text_at(str(score), Vector2(42, 88), 26, LIGHT)
-		panel(Rect2(w/2-98, 36, 108, 68), Color("223649ed"), 20)
-		panel(Rect2(w-172, 36, 80, 68), Color("223649ed"), 20)
-		text_at("DỌN", Vector2(w-132, 60), 12, MUTED, true)
-		text_at("%d%%" % int(completion*100), Vector2(w-132, 88), 22, LIGHT, true)
-		if combo >= 2: draw_combo()
-		draw_floaters()
-		text_at("%d:%02d" % [int(ceil(seconds))/60, int(ceil(seconds))%60], Vector2(w/2-44, 82), 28, Color("ffad94") if seconds<15 else LIGHT, true)
-		panel(Rect2(24, h-115, w-48, 88), Color("223649ed"), 20)
-		text_at(("CHIẾM " if landmark else "HẠ ") + boss_title, Vector2(44, h-82), 16, LIGHT)
-		text_at("%d%%" % int(growth*100), Vector2(w-86, h-82), 17, Color("f6cb70"))
-		panel(Rect2(44, h-63, w-88, 9), Color("465d6b"), 4)
-		panel(Rect2(44, h-63, maxf(8, (w-88)*growth), 9), Color("b7a2f1"), 4)
-		if waiting:
-			panel(Rect2(w/2-166, h/2+88, 332, 45), Color("223649df"), 18)
-			text_at("Kéo một ngón để bắt đầu", Vector2(w/2, h/2+117), 18, LIGHT, true)
-		elif note != "":
-			text_at(note, Vector2(w/2, 186), 18, INK, true)
-		if stick_active:
-			draw_circle(stick_origin, 54, Color(1,1,1,0.13))
-			draw_arc(stick_origin, 54, 0, TAU, 32, Color(1,1,1,0.65), 2, true)
-			draw_circle(stick_origin+stick_delta.limit_length(54), 22, Color("fff9edb0"))
-	else:
-		draw_rect(Rect2(Vector2.ZERO, size), Color("172b4180"))
-		panel(Rect2(24, h-440, w-48, 414), Color("223649f5"), 28)
-		if mode == "result":
-			for i in range(3): draw_star(Vector2(w/2+(i-1)*62, h-390), 24, i < stars)
-		var title := "TẠM DỪNG" if mode == "paused" else ("ĐÃ CHIẾM %s!" % city.to_upper()) if won else "BỊ ĐẨY LÙI!"
-		text_at(title, Vector2(w/2, h-320), 32, Color("f6cb70"), true)
-		text_at("%s điểm  ·  %s món đã nuốt" % [score, eaten], Vector2(w/2, h-280), 19, LIGHT, true)
-		text_at("Dọn sạch %d%%  ·  Combo tốt nhất %d" % [int(completion*100), best_combo], Vector2(w/2, h-252), 16, LIGHT, true)
-		if mode == "result": text_at("+%d xu  ·  Tổng %d xu" % [reward, coins], Vector2(w/2, h-222), 16, Color("f6cb70"), true)
-		var sub := "Thành phố sẽ chờ bạn." if mode == "paused" else "Trái Đất đã thuộc về bạn!" if won and not has_next else "Thành phố tiếp theo đã mở!" if won else "Nuốt đồ nhỏ trước · Mua nâng cấp để mạnh hơn"
-		if mode == "result" and won and playtest: sub = "TEST · Bạn có thể chọn bất kỳ màn nào."
-		text_at(sub, Vector2(w/2, h-194), 15, MUTED, true)
+	if mode == "menu": draw_portrait_menu()
+	elif mode == "playing": draw_playing()
+	else: draw_portrait_result()
+
+func draw_coins(right: float, top: float) -> void:
+	var label := str(coins)
+	var width := UiStyle.text_width(label, 20, title_font) + 64
+	panel(Rect2(right - width, top, width, 44), Color("1b3048ee"), 22)
+	UiStyle.draw_icon(self, "coin", Vector2(right - width + 24, top + 22), 34)
+	UiStyle.text(self, label, Vector2(right - width + 46, top + 31), 20, GOLD, false, 0, title_font)
+
+func draw_title(pos: Vector2, font_size: int, centered := false) -> void:
+	UiStyle.text(self, "HOLE MUNCH", pos + Vector2(0, 4), font_size, Color(0.02, 0.06, 0.12, 0.5), centered, 0, title_font)
+	UiStyle.text(self, "HOLE MUNCH", pos, font_size, LIGHT, centered, 6, title_font)
+
+func level_line() -> String:
+	return I18n.t("level_line", [weather_title, int(seconds), map_title])
 
 func draw_landscape_menu() -> void:
 	var h := size.y
-	panel(Rect2(20,24,400,h-48),Color("152a40f2"),24)
-	text_at("CUỘC XÂM LĂNG TRÁI ĐẤT",Vector2(36,60),15,Color("9ff0d8"))
-	text_at("HOLE MUNCH",Vector2(36,112),42,LIGHT)
-	text_at(level_title,Vector2(36,153),20,Color("f6cb70"))
-	text_at(region_title,Vector2(36,190),17,LIGHT)
-	text_at("%s · %d giây · Map %s" % [weather_title,int(seconds),map_title],Vector2(36,219),15,MUTED)
-	text_at(("CHIẾM " if landmark else "HẠ ")+boss_title,Vector2(36,255),16,LIGHT)
-	text_at("Kéo để di chuyển · Nuốt đồ nhỏ để lớn lên",Vector2(36,290),15,MUTED)
-	panel(Rect2(size.x-156,28,128,40),Color("223649ed"),16)
-	text_at("XU %d" % coins,Vector2(size.x-92,55),18,Color("f6cb70"),true)
+	panel(Rect2(20, 24, 400, h-48), Color("142840f2"), 26)
+	text_at(I18n.t("tagline"), Vector2(38, 62), 15, UiStyle.MINT)
+	draw_title(Vector2(36, 112), 46)
+	text_at(level_title, Vector2(38, 150), 21, GOLD, false, 0)
+	text_at(region_title, Vector2(38, 180), 16, LIGHT)
+	UiStyle.draw_icon(self, WEATHER_ICONS.get(weather_kind, "sun"), Vector2(50, 204), 26)
+	UiStyle.text(self, level_line(), Vector2(68, 210), 15, MUTED, false, 0, body_font)
+	var target := I18n.t("take_target", boss_title.to_upper()) + (I18n.t("with_rival") if rival_growth >= 0 else "")
+	UiStyle.draw_icon(self, "flag", Vector2(50, 234), 26)
+	UiStyle.text(self, target, Vector2(68, 240), 15, LIGHT, false, 0, body_font)
+	draw_goals(Vector2(38, 268), 14, false, 364)
+	if gate_note != "" and has_next == false and not last_city: UiStyle.text(self, gate_note, Vector2(38, 290), 13, Color("ffb3a6"), false, 0, body_font)
+	draw_coins(size.x - 28, 28)
+
+func draw_portrait_menu() -> void:
+	var w := size.x
+	var h := size.y
+	text_at(I18n.t("tagline"), Vector2(w/2, 75), 14, UiStyle.MINT, true)
+	draw_coins(w - 18, 12)
+	draw_title(Vector2(w/2, 153), 52, true)
+	panel(Rect2(w/2-173, 165, 346, 36), Color("223649dc"), 16)
+	text_at(level_title, Vector2(w/2, 190), 18, LIGHT, true)
+	panel(Rect2(24, h-276, w-48, 250), Color("223649f5"), 28)
+	text_at(region_title, Vector2(w/2, h-240), 15, GOLD, true)
+	UiStyle.text(self, level_line(), Vector2(w/2, h-214), 15, MUTED, true, 0, body_font)
+	UiStyle.text(self, I18n.t("eat_then_take", boss_title), Vector2(w/2, h-188), 15, LIGHT, true, 0, body_font)
+
+func draw_playing() -> void:
+	var w := size.x
+	var h := size.y
+	for strike in strike_shapes:
+		draw_colored_polygon(strike.points, Color(1.0,0.16,0.12,0.16+strike.progress*0.28))
+		var outline: PackedVector2Array = strike.points.duplicate()
+		outline.append(outline[0])
+		draw_polyline(outline, Color("ff7866"), 3.0, true)
+	panel(Rect2(w/2+24, 36, 230, 40), Color("3b2836ed"), 14)
+	text_at(defense_status, Vector2(w/2+139, 62), 15, Color("ffbb9c"), true)
+	panel(Rect2(24, 36, 132, 68), Color("1b3048ed"), 20)
+	text_at(I18n.t("score"), Vector2(42, 58), 13, MUTED)
+	UiStyle.text(self, str(score), Vector2(42, 92), 28, LIGHT, false, 0, title_font)
+	panel(Rect2(w/2-104, 36, 116, 68), Color("1b3048ed"), 20)
+	UiStyle.draw_icon(self, "clock", Vector2(w/2-80, 70), 30)
+	UiStyle.text(self, "%d:%02d" % [int(ceil(seconds))/60, int(ceil(seconds))%60], Vector2(w/2-26, 82), 28, Color("ffad94") if seconds < 15 else LIGHT, true, 0, title_font)
+	panel(Rect2(w-176, 36, 84, 68), Color("1b3048ed"), 20)
+	text_at(I18n.t("cleared"), Vector2(w-134, 58), 13, MUTED, true)
+	UiStyle.text(self, "%d%%" % int(completion*100), Vector2(w-134, 90), 23, LIGHT, true, 0, title_font)
+	if combo >= 2: draw_combo()
+	draw_floaters()
+	panel(Rect2(24, h-115, w-48, 88), Color("1b3048ed"), 20)
+	UiStyle.draw_icon(self, "flag", Vector2(58, h-88), 30)
+	text_at(I18n.t("take_target", boss_title.to_upper()), Vector2(80, h-80), 17, LIGHT)
+	UiStyle.text(self, "%d%%" % int(growth*100), Vector2(w-92, h-80), 19, GOLD, false, 0, title_font)
+	panel(Rect2(44, h-63, w-88, 10), Color("465d6b"), 5)
+	panel(Rect2(44, h-63, maxf(10, (w-88)*growth), 10), Color("b7a2f1"), 5)
+	if rival_growth >= 0:
+		panel(Rect2(44, h-47, maxf(8, (w-88)*rival_growth), 6), Color("ff5a4e"), 3)
+		text_at(I18n.t("rival_pct", int(rival_growth*100)), Vector2(w-110, h-34), 12, Color("ffb3a6"))
+	var run_label := run_title()
+	if run_label != "": text_at(run_label, Vector2(w/2-44, 126), 15, UiStyle.MINT, true, 4)
+	if waiting:
+		panel(Rect2(w/2-176, h/2+88, 352, 48), Color("1b3048df"), 20)
+		text_at(I18n.t("drag_to_start"), Vector2(w/2, h/2+119), 19, LIGHT, true)
+	elif note != "":
+		text_at(note, Vector2(w/2, 186), 20, LIGHT, true, 6)
+	if stick_active:
+		draw_circle(stick_origin, 54, Color(1,1,1,0.13))
+		draw_arc(stick_origin, 54, 0, TAU, 32, Color(1,1,1,0.65), 2, true)
+		draw_circle(stick_origin+stick_delta.limit_length(54), 22, Color("fff9edb0"))
+
+func draw_portrait_result() -> void:
+	var w := size.x
+	var h := size.y
+	draw_rect(Rect2(Vector2.ZERO, size), Color("172b4180"))
+	panel(Rect2(24, h-440, w-48, 414), Color("1b3048f5"), 28)
+	if mode == "result":
+		for i in range(3): draw_star(Vector2(w/2+(i-1)*62, h-390), 26, i < stars)
+	UiStyle.text(self, result_title(), Vector2(w/2, h-320), 32, GOLD, true, 5, title_font)
+	UiStyle.text(self, I18n.t("result_line", [score, eaten, int(completion*100), best_combo]), Vector2(w/2, h-280), 16, LIGHT, true, 0, body_font)
+	draw_goals(Vector2(w/2, h-252), 15)
+	if mode == "result": text_at(I18n.t("coins_line", [reward, coins]), Vector2(w/2, h-222), 17, GOLD, true)
+	UiStyle.text(self, result_sub(), Vector2(w/2, h-194), 15, MUTED, true, 0, body_font)
 
 func draw_landscape_result() -> void:
 	var w := size.x
 	var h := size.y
-	draw_rect(Rect2(Vector2.ZERO,size),Color("172b4180"))
-	panel(Rect2(w/2-300,24,600,h-48),Color("223649f5"),24)
+	draw_rect(Rect2(Vector2.ZERO, size), Color("0f1e3080"))
+	panel(Rect2(w/2-300, 24, 600, h-48), Color("1b3048f5"), 26)
 	if mode == "result":
-		for i in 3: draw_star(Vector2(w/2+(i-1)*62,72),22,i<stars)
-	var title := "TẠM DỪNG" if mode == "paused" else ("ĐÃ CHIẾM %s!" % city.to_upper()) if won else "BỊ ĐẨY LÙI!"
-	text_at(title,Vector2(w/2,130),28,Color("f6cb70"),true)
-	text_at("%s điểm · %s món đã nuốt" % [score,eaten],Vector2(w/2,172),19,LIGHT,true)
-	text_at("Dọn sạch %d%% · Combo tốt nhất %d" % [int(completion*100),best_combo],Vector2(w/2,205),17,LIGHT,true)
-	if mode == "result": text_at("+%d xu · Tổng %d xu" % [reward,coins],Vector2(w/2,240),18,Color("f6cb70"),true)
-	text_at("Thành phố sẽ chờ bạn." if mode == "paused" else "TEST · Bạn có thể chọn bất kỳ màn nào." if playtest else "Tiếp tục hành trình chinh phục!",Vector2(w/2,280),16,MUTED,true)
+		for i in 3: draw_star(Vector2(w/2+(i-1)*70, 76), 30, i < stars)
+	UiStyle.text(self, result_title(), Vector2(w/2, 142), 32, GOLD, true, 6, title_font)
+	UiStyle.text(self, I18n.t("result_line", [score, eaten, int(completion*100), best_combo]), Vector2(w/2, 176), 17, LIGHT, true, 0, body_font)
+	draw_goals(Vector2(w/2, 206), 16)
+	if mode == "result":
+		var line := I18n.t("coins_line", [reward, coins])
+		var width := UiStyle.text_width(line, 19, font)
+		UiStyle.draw_icon(self, "coin", Vector2(w/2 - width/2 - 20, 237), 30)
+		text_at(line, Vector2(w/2 + 6, 244), 19, GOLD, true)
+	UiStyle.text(self, result_sub(), Vector2(w/2, 276), 15, MUTED, true, 0, body_font)
+	if mode == "result" and gate_note != "" and run_kind == "campaign" and won and not has_next and not last_city:
+		UiStyle.text(self, gate_note, Vector2(w/2, 300), 15, Color("ffb3a6"), true, 0, body_font)
+
+func run_title() -> String:
+	if run_kind == "daily": return I18n.t("daily")
+	if run_kind == "endless": return I18n.t("endless_city", stage+1)
+	return ""
+
+func result_title() -> String:
+	if mode == "paused": return I18n.t("paused")
+	if lose_reason == "eaten": return I18n.t("eaten_by_rival")
+	if lose_reason == "rival": return I18n.t("rival_took", city.to_upper())
+	if run_kind == "endless": return I18n.t("time_up_cities", stage)
+	return I18n.t("conquered", city.to_upper()) if won else I18n.t("pushed_back")
+
+func result_sub() -> String:
+	if mode == "paused": return I18n.t("sub_paused")
+	if record_note != "": return record_note
+	if won and last_city: return I18n.t("sub_earth")
+	if won and playtest: return I18n.t("sub_test")
+	if won and has_next: return I18n.t("sub_next_open")
+	if won: return I18n.t("sub_need_stars")
+	if lose_reason != "": return I18n.t("sub_rival_tip")
+	return I18n.t("sub_tip")
+
+# Goal list: a gold star and gold text when met, muted otherwise.
+func draw_goals(pos: Vector2, font_size: int, centered := true, max_width := 560.0) -> void:
+	var parts: Array = []
+	for i in goal_labels.size():
+		parts.append({"text":str(goal_labels[i]), "done":goal_mask & (1 << i) != 0})
+	var gap := font_size*1.9
+	var icon := font_size*1.3
+	var total := goals_width(parts, font_size)
+	# Long goal names in some languages: shrink until the row fits.
+	while total - gap > max_width and font_size > 10:
+		font_size -= 1
+		gap = font_size*1.2
+		icon = font_size*1.3
+		total = goals_width(parts, font_size, gap)
+	var x := pos.x - (total - gap)/2 if centered else pos.x
+	for part in parts:
+		UiStyle.draw_icon(self, "star", Vector2(x + icon/2, pos.y - font_size*0.35), icon, Color.WHITE if part.done else Color(0.3, 0.38, 0.46, 0.9))
+		x += icon + 4
+		UiStyle.text(self, part.text, Vector2(x, pos.y), font_size, GOLD if part.done else MUTED, false, 0, body_font)
+		x += body_font.get_string_size(part.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x + gap
+
+func goals_width(parts: Array, font_size: int, gap := -1.0) -> float:
+	if gap < 0: gap = font_size*1.9
+	var total := 0.0
+	for part in parts: total += font_size*1.3 + 4 + body_font.get_string_size(part.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x + gap
+	return total
 
 func draw_combo() -> void:
-	panel(Rect2(24, 112, 152, 36), Color("f6cb70"), 16)
-	var label := "COMBO %d" % combo
+	panel(Rect2(24, 112, 160, 38), GOLD, 18)
+	UiStyle.draw_icon(self, "fire", Vector2(46, 131), 28)
+	var label := I18n.t("combo", combo)
 	if multiplier > 1.0: label += "  ×%s" % ("%.1f" % multiplier).trim_suffix(".0")
-	text_at(label, Vector2(100, 137), 17, INK, true)
+	UiStyle.text(self, label, Vector2(114, 139), 18, INK, true, 0, title_font)
 
 # Score popups rise and fade above the swallowed object.
 func draw_floaters() -> void:
@@ -242,17 +364,9 @@ func draw_floaters() -> void:
 		var t: float = floater.t
 		var font_size := 30 if floater.big else 20
 		var pos: Vector2 = floater.screen - Vector2(0, t*46)
-		var color := Color("f6cb70") if floater.big else LIGHT
+		var color := GOLD if floater.big else LIGHT
 		color.a = 1.0 - t*t
-		var outline := Color(INK, color.a)
-		var width := font.get_string_size(floater.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-		draw_string_outline(font, pos - Vector2(width/2, 0), floater.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, 5, outline)
-		text_at(floater.text, pos, font_size, color, true)
+		UiStyle.text(self, floater.text, pos, font_size, color, true, 6, title_font)
 
 func draw_star(center: Vector2, radius: float, filled: bool) -> void:
-	var points := PackedVector2Array()
-	for i in range(10):
-		var r := radius if i % 2 == 0 else radius*0.45
-		var angle := -PI/2 + i*PI/5
-		points.append(center + Vector2(cos(angle), sin(angle))*r)
-	draw_colored_polygon(points, Color("f6cb70") if filled else Color("465d6b"))
+	UiStyle.draw_icon(self, "star", center, radius*2.3, Color.WHITE if filled else Color(0.24, 0.31, 0.38, 0.95))

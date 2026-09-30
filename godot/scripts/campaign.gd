@@ -1,42 +1,67 @@
 extends RefCounted
+const Challenges = preload("res://scripts/challenges.gd")
+const I18n = preload("res://scripts/i18n.gd")
 
-# Alien invasion campaign: six continents, eight cities each. Odd city slots end
-# with a landmark to swallow; even slots with an Earth defence unit, and every
-# continent closes with a giant titan. Weather is visual only.
+# All 48 city objectives are landmarks; military units are independent defenders.
 const REGIONS = [
 	{"id":"asia", "name":"CHÂU Á",
 		"palette":["7c9c8c", "5d6970", "ddd3b3", "a9c48f", "e9a3bd", "c9e0dd", "c4574b", "3f8f86"],
 		"weather":["clear", "rain", "fog", "sun", "clear", "wind", "snow", "storm"],
-		"cities":[["Hà Nội", "onepillar"], ["Seoul", "tank"], ["Hà Nội", "khuevan"], ["Bangkok", "heli"],
-			["Agra", "taj"], ["Thượng Hải", "mech"], ["Shizuoka", "fuji"], ["Tokyo", "titan"]]},
+		"cities":[["Hà Nội", "onepillar"], ["Seoul", "namsan"], ["Hà Nội", "khuevan"], ["Bangkok", "watarun"],
+			["Agra", "taj"], ["Thượng Hải", "pearl"], ["Shizuoka", "fuji"], ["Tokyo", "tokyotower"]]},
 	{"id":"europe", "name":"CHÂU ÂU",
 		"palette":["8f9a8c", "666d77", "e3d6bf", "b3c490", "7fae78", "c6d8e6", "c9674f", "3e6f95"],
 		"weather":["clear", "wind", "rain", "fog", "sun", "rain", "clear", "snow"],
-		"cities":[["Paris", "eiffel"], ["Berlin", "tank"], ["London", "bigben"], ["Madrid", "heli"],
-			["Pisa", "pisa"], ["Amsterdam", "mech"], ["Rome", "colosseum"], ["Moskva", "titan"]]},
+		"cities":[["Paris", "eiffel"], ["Berlin", "brandenburg"], ["London", "bigben"], ["Madrid", "alcala"],
+			["Pisa", "pisa"], ["Amsterdam", "royalpalace"], ["Rome", "colosseum"], ["Moskva", "stbasils"]]},
 	{"id":"africa", "name":"CHÂU PHI",
 		"palette":["c9ae7b", "8c7f70", "e8cf9c", "d6c07f", "8fa65c", "f0dcb0", "c27a4a", "e0b35e"],
 		"weather":["sun", "clear", "wind", "sun", "clear", "storm", "sun", "wind"],
-		"cities":[["Giza", "pyramid"], ["Cairo", "tank"], ["Giza", "sphinx"], ["Nairobi", "heli"],
-			["Djenné", "djenne"], ["Lagos", "mech"], ["Madagascar", "baobab"], ["Cape Town", "titan"]]},
+		"cities":[["Giza", "pyramid"], ["Cairo", "cairotower"], ["Giza", "sphinx"], ["Nairobi", "kicc"],
+			["Djenné", "djenne"], ["Lagos", "nationaltheatre"], ["Madagascar", "baobab"], ["Cape Town", "tablemountain"]]},
 	{"id":"namerica", "name":"BẮC MỸ",
 		"palette":["8e9c9a", "5f6773", "dfdad0", "a8bf94", "6f9f6b", "bcd6ea", "d06a5b", "5b86b5"],
 		"weather":["clear", "snow", "wind", "rain", "fog", "sun", "clear", "storm"],
-		"cities":[["New York", "liberty"], ["Chicago", "tank"], ["New York", "empire"], ["Toronto", "heli"],
-			["Seattle", "needle"], ["Los Angeles", "mech"], ["Mexico", "chichen"], ["Washington", "titan"]]},
+		"cities":[["New York", "liberty"], ["Chicago", "willis"], ["New York", "empire"], ["Toronto", "cntower"],
+			["Seattle", "needle"], ["Los Angeles", "hollywood"], ["Mexico", "chichen"], ["Washington", "capitol"]]},
 	{"id":"samerica", "name":"NAM MỸ",
 		"palette":["7fa386", "5f6b6a", "e6d9b5", "9cc47d", "4f9b5c", "c3e3dc", "e0704f", "f0b843"],
 		"weather":["sun", "rain", "fog", "clear", "wind", "storm", "sun", "rain"],
-		"cities":[["Rio", "christ"], ["São Paulo", "tank"], ["Cusco", "machu"], ["Lima", "heli"],
-			["Buenos Aires", "obelisco"], ["Bogotá", "mech"], ["Rio", "sugarloaf"], ["Santiago", "titan"]]},
+		"cities":[["Rio", "christ"], ["São Paulo", "masp"], ["Cusco", "machu"], ["Lima", "limacathedral"],
+			["Buenos Aires", "obelisco"], ["Bogotá", "monserrate"], ["Rio", "sugarloaf"], ["Santiago", "costanera"]]},
 	{"id":"oceania", "name":"CHÂU ĐẠI DƯƠNG",
 		"palette":["81b7c5", "6c8591", "eadfbd", "b9c7a4", "5ea77d", "b4dce7", "e38a64", "4aa0b8"],
 		"weather":["clear", "wind", "sun", "rain", "clear", "storm", "fog", "sun"],
-		"cities":[["Sydney", "sydney"], ["Melbourne", "tank"], ["Uluru", "uluru"], ["Perth", "heli"],
-			["Auckland", "skytower"], ["Fiji", "mech"], ["Rapa Nui", "moai"], ["Canberra", "titan"]]},
+		"cities":[["Sydney", "sydney"], ["Melbourne", "flinders"], ["Uluru", "uluru"], ["Perth", "belltower"],
+			["Auckland", "skytower"], ["Fiji", "fijitemple"], ["Rapa Nui", "moai"], ["Canberra", "parliament"]]},
 ]
 const CITIES_PER_REGION := 8
-const LANDMARKS = {"onepillar":"CHÙA MỘT CỘT", "khuevan":"KHUÊ VĂN CÁC", "taj":"TAJ MAHAL", "fuji":"NÚI PHÚ SĨ",
+const LANDMARKS = {
+	"namsan":"THÁP NAMSAN",
+	"watarun":"CHÙA WAT ARUN",
+	"pearl":"THÁP ĐÔNG PHƯƠNG",
+	"tokyotower":"THÁP TOKYO",
+	"brandenburg":"CỔNG BRANDENBURG",
+	"alcala":"CỔNG ALCALÁ",
+	"royalpalace":"CUNG ĐIỆN HOÀNG GIA",
+	"stbasils":"NHÀ THỜ THÁNH BASIL",
+	"cairotower":"THÁP CAIRO",
+	"kicc":"THÁP KICC",
+	"nationaltheatre":"NHÀ HÁT QUỐC GIA",
+	"tablemountain":"NÚI BÀN",
+	"willis":"THÁP WILLIS",
+	"cntower":"THÁP CN",
+	"hollywood":"BIỂN HOLLYWOOD",
+	"capitol":"ĐIỆN CAPITOL",
+	"masp":"BẢO TÀNG MASP",
+	"limacathedral":"NHÀ THỜ LIMA",
+	"monserrate":"ĐỒI MONSERRATE",
+	"costanera":"THÁP COSTANERA",
+	"flinders":"GA FLINDERS",
+	"belltower":"THÁP CHUÔNG PERTH",
+	"fijitemple":"ĐỀN SRI SIVA",
+	"parliament":"NHÀ QUỐC HỘI",
+"onepillar":"CHÙA MỘT CỘT", "khuevan":"KHUÊ VĂN CÁC", "taj":"TAJ MAHAL", "fuji":"NÚI PHÚ SĨ",
 	"eiffel":"THÁP EIFFEL", "bigben":"BIG BEN", "pisa":"THÁP NGHIÊNG PISA", "colosseum":"ĐẤU TRƯỜNG LA MÃ",
 	"pyramid":"KIM TỰ THÁP", "sphinx":"TƯỢNG NHÂN SƯ", "djenne":"ĐẠI THÁNH ĐƯỜNG", "baobab":"CÂY BAOBAB",
 	"liberty":"TƯỢNG NỮ THẦN TỰ DO", "empire":"TÒA NHÀ EMPIRE STATE", "needle":"THÁP SPACE NEEDLE", "chichen":"KIM TỰ THÁP MAYA",
@@ -53,6 +78,9 @@ const SKINS = [
 	["Dung nham", "ff6538", "ffd45b"], ["Băng giá", "78cde3", "efffff"],
 	["Thiên hà", "7770d6", "eb98dd"], ["Neon", "62ead3", "e7ff9d"],
 	["Vàng kim", "e6b95a", "fff2ba"], ["Cầu vồng", "eaa0cd", "93dfcc"],
+	# Decorated skins from the 2D game (scripts/hole_style.gd adds the ornaments).
+	["Giáng sinh", "2f7d46", "e8423f"], ["La bàn", "27857d", "f2d68a"],
+	["Vương miện", "8d6533", "ffd76a"], ["Sao chổi", "6651a9", "9fe8ff"],
 ]
 const EFFECTS = ["Bụi mềm", "Giấy màu", "Tinh thể", "Đốm lửa"]
 const TRAILS = ["Không vệt", "Bong bóng", "Lấp lánh", "Cầu vồng"]
@@ -60,11 +88,14 @@ const TRAILS = ["Không vệt", "Bong bóng", "Lấp lánh", "Cầu vồng"]
 const UPGRADES = [
 	["size", "KÍCH THƯỚC", "+0,08 bán kính khởi đầu", 80, 8],
 	["speed", "TỐC ĐỘ", "+5% tốc độ di chuyển", 70, 10],
-	["time", "THỜI GIAN", "+4 giây mỗi màn", 100, 10],
+	["time", "THỜI GIAN", "+2,5 giây mỗi màn", 100, 8],
 	["magnet", "LỰC HÚT", "Hút đồ nhỏ về phía hố", 150, 5],
 	["greed", "THU XU", "+10% xu nhận được", 120, 10],
 ]
 const COST_GROWTH := 1.6
+const TIME_PER_UPGRADE := 2.5
+# Best combo raises the coin reward by 1% per bite, up to +60%.
+const COMBO_COIN_CAP := 60
 const START_RADIUS := 0.86
 
 var selected := 0
@@ -77,13 +108,44 @@ var trail := 0
 var best := 0
 var coins := 0
 var upgrades := {}
+# Per-level bitmask of met goals (see challenges.gd); medals are their counts.
+var goals: Array[int] = []
+# Today's challenge: {"date":"YYYY-MM-DD", "best":score, "won":bool}.
+var daily := {}
+# Endless survival records.
+var endless := {"best":0, "stage":0}
+# Intro pages and feature tips already shown (see intro.gd), and the UI language.
+var seen: Array[String] = []
+var lang := ""
 var unlock_all_for_testing := bool(ProjectSettings.get_setting("application_custom/testing/unlock_all_levels", false))
 
 static func level_count() -> int:
 	return REGIONS.size()*CITIES_PER_REGION
 
+# Display names follow the chosen language (i18n_strings.gd); the Vietnamese
+# tables above stay as the source of ids.
 static func boss_name(id: String) -> String:
-	return LANDMARKS.get(id, DEFENSES.get(id, id))
+	if LANDMARKS.has(id): return I18n.t("lm_" + id)
+	if DEFENSES.has(id): return I18n.t("def_" + id)
+	return id
+
+static func city_name(boss: String, fallback: String) -> String:
+	return I18n.t("c_" + boss) if I18n.has("c_" + boss) else fallback
+
+static func region_name(region_index: int) -> String:
+	return I18n.t("reg_" + str(REGIONS[region_index].id))
+
+static func weather_name(kind: String) -> String:
+	return I18n.t("w_" + kind)
+
+static func skin_name(index: int) -> String:
+	return I18n.t("skin%d" % index)
+
+static func effect_name(index: int) -> String:
+	return I18n.t("fx%d" % index)
+
+static func trail_name(index: int) -> String:
+	return I18n.t("trail%d" % index)
 
 # Everything a level needs, derived from its place in the campaign.
 static func level_info(index: int) -> Dictionary:
@@ -96,30 +158,66 @@ static func level_info(index: int) -> Dictionary:
 	var tier := mini(GRIDS.size()-1, mini(2, index/12) + (1 if slot == CITIES_PER_REGION-1 else 0))
 	var grid: Array = GRIDS[tier]
 	var blocks: int = grid[0]*grid[1]
-	return {"index":index, "region":region_index, "slot":slot, "city":city[0], "boss":city[1],
-		"title":"%s · %s" % [city[0], boss_name(city[1]).capitalize()],
+	var city_label := city_name(city[1], city[0])
+	return {"index":index, "region":region_index, "slot":slot, "city":city_label, "boss":city[1],
+		"title":"%s · %s" % [city_label, boss_name(city[1])],
 		"weather":region.weather[slot], "palette":region.palette, "style":region.id,
 		"cols":grid[0], "rows":grid[1],
 		"seconds":level_seconds(index, blocks, progress),
-		# Share of the map's food the hole must eat before the boss fits.
-		"share":lerpf(0.18, 0.45, progress)}
+		"rival":has_rival(index),
+		# Share of the map's food the hole must eat before the boss fits. Dense
+		# street fronts hold about four times the food of the old detached houses.
+		"share":lerpf(0.07, 0.15, progress)}
 
-# Par times: how long the deterministic greedy test route needs per city. The
+# Par times: how long the real-time greedy test route (smoke.gd) needs per city.
 # timer gives generous slack early and less later; regenerate with --campaign-smoke
 # (it prints each route) after changing map contents.
-const PAR_SECONDS: Array[int] = [68, 64, 61, 69, 70, 65, 68, 101, 66, 62, 68, 62, 104, 96, 101, 122, 102, 98, 91, 102, 107, 97, 104, 105, 100, 105, 106, 110, 106, 104, 103, 109, 97, 103, 110, 99, 105, 105, 101, 110, 106, 98, 104, 101, 117, 114, 102, 108]
+const PAR_SECONDS: Array[int] = [11, 13, 11, 10, 13, 11, 11, 16, 13, 11, 14, 13, 13, 12, 14, 14, 14, 14, 15, 19, 15, 14, 24, 23, 12, 19, 18, 12, 20, 21, 20, 20, 16, 13, 25, 18, 17, 16, 16, 24, 15, 20, 21, 24, 14, 18, 24, 20]
+
+# Timer = par × slack, never below a floor. The par route plays like a sharp
+# player, so the slack covers steering, dodging and learning the map; combo
+# milestones add time on top, so fast play earns the margin.
+const TIME_SLACK_START := 2.6
+const TIME_SLACK_END := 1.9
+const TIME_FLOOR_START := 50.0
+const TIME_FLOOR_END := 36.0
 
 static func level_seconds(index: int, blocks: int, progress: float) -> float:
 	if index >= PAR_SECONDS.size(): return 35.0 + blocks*20.0
-	return ceilf(PAR_SECONDS[index]*lerpf(1.8, 1.35, progress)/5.0)*5.0
+	var timer := maxf(lerpf(TIME_FLOOR_START, TIME_FLOOR_END, progress), PAR_SECONDS[index]*lerpf(TIME_SLACK_START, TIME_SLACK_END, progress))
+	return ceilf(timer/5.0)*5.0
+
+# A rival hole races the player from the second continent: in every third city
+# at first, then in every city of the last two continents.
+const RIVAL_FROM := 9
+const RIVAL_EVERYWHERE := 32
+
+static func has_rival(index: int) -> bool:
+	return index >= RIVAL_EVERYWHERE or (index >= RIVAL_FROM and index%CITIES_PER_REGION%3 == 1)
+
+# Stars needed (in total) to enter each continent after the first.
+const REGION_STAR_GATE := 14
+
+static func stars_needed(region_index: int) -> int:
+	return region_index*REGION_STAR_GATE
 
 func _init() -> void:
 	medals.resize(level_count())
 	medals.fill(0)
+	goals.resize(level_count())
+	goals.fill(0)
 	for u in UPGRADES: upgrades[u[0]] = 0
 
+func total_stars() -> int:
+	var total := 0
+	for stars in medals: total += stars
+	return total
+
+func region_open(region_index: int) -> bool:
+	return unlock_all_for_testing or total_stars() >= stars_needed(region_index)
+
 func can_select(index: int) -> bool:
-	return index >= 0 and index < level_count() and (unlock_all_for_testing or index <= unlocked)
+	return index >= 0 and index < level_count() and (unlock_all_for_testing or (index <= unlocked and region_open(index/CITIES_PER_REGION)))
 
 func upgrade_cost(id: String) -> int:
 	for u in UPGRADES:
@@ -142,19 +240,22 @@ func buy(id: String) -> bool:
 # Small per-level effects help without trivialising the boss, as in 2D.
 func stats() -> Dictionary:
 	return {"start_radius":START_RADIUS + upgrades.size*0.08, "speed":1.0 + upgrades.speed*0.05,
-		"bonus_time":upgrades.time*4.0, "magnet":upgrades.magnet, "coin_mul":1.0 + upgrades.greed*0.1}
+		"bonus_time":upgrades.time*TIME_PER_UPGRADE, "magnet":upgrades.magnet, "coin_mul":1.0 + upgrades.greed*0.1}
 
-func reward(won: bool, stars: int, eaten_points: int) -> int:
+func reward(won: bool, stars: int, eaten_points: int, best_combo := 0) -> int:
 	var base := eaten_points/40.0 + stars*15 + 10 + selected*2 if won else eaten_points/100.0
-	return roundi(base*stats().coin_mul)
+	var combo_mul := 1.0 + mini(best_combo, COMBO_COIN_CAP)/100.0
+	return roundi(base*combo_mul*stats().coin_mul)
 
 func data() -> Dictionary:
 	# A temporary preview selection must not become a permanent unlock.
-	return {"version":4, "selected":mini(selected,unlocked), "unlocked":unlocked, "medals":medals,
-		"craft":craft, "skin":skin, "effect":effect, "trail":trail, "best":best, "coins":coins, "upgrades":upgrades.duplicate()}
+	return {"version":5, "selected":mini(selected,unlocked), "unlocked":unlocked, "medals":medals, "goals":goals,
+		"craft":craft, "skin":skin, "effect":effect, "trail":trail, "best":best, "coins":coins, "upgrades":upgrades.duplicate(),
+		"daily":daily.duplicate(), "endless":endless.duplicate(), "seen":seen.duplicate(), "lang":lang}
 
 func restore(value: Variant) -> void:
 	if not value is Dictionary: return
+	restore_settings(value)
 	# Never trust a partially written or manually edited save.
 	for field in ["craft", "skin", "effect", "trail", "best", "coins"]:
 		if value.get(field) is float or value.get(field) is int:
@@ -179,18 +280,91 @@ func restore(value: Variant) -> void:
 	if saved is Array:
 		for i in mini(saved.size(), medals.size()):
 			if saved[i] is float or saved[i] is int: medals[i] = clampi(int(saved[i]), 0, 3)
+	# Version 4 kept star counts only; they become the first goals of each city.
+	var saved_goals = value.get("goals", [])
+	for i in medals.size():
+		goals[i] = (1 << medals[i]) - 1
+		if saved_goals is Array and i < saved_goals.size() and (saved_goals[i] is float or saved_goals[i] is int):
+			goals[i] = clampi(int(saved_goals[i]), 0, 7)
+		medals[i] = Challenges.count(goals[i])
 	var saved_upgrades = value.get("upgrades", {})
 	if saved_upgrades is Dictionary:
 		for u in UPGRADES:
 			var level = saved_upgrades.get(u[0], 0)
 			if level is float or level is int: upgrades[u[0]] = clampi(int(level), 0, u[4])
+	restore_records(value)
 
+# Language and seen tips survive every save version, including migrations.
+func restore_settings(value: Dictionary) -> void:
+	if value.get("lang") is String and value.lang in I18n.LANGS: lang = value.lang
+	var saved_seen = value.get("seen", [])
+	if not saved_seen is Array: return
+	for id in saved_seen:
+		if id is String and id.length() <= 32 and id not in seen: seen.append(id)
+
+func restore_records(value: Dictionary) -> void:
+	var saved_daily = value.get("daily", {})
+	if saved_daily is Dictionary and saved_daily.get("date") is String:
+		var daily_best = saved_daily.get("best", 0)
+		daily = {"date":saved_daily.date, "best":maxi(0, int(daily_best)) if daily_best is float or daily_best is int else 0,
+			"won":saved_daily.get("won", false) == true}
+	var saved_endless = value.get("endless", {})
+	if saved_endless is Dictionary:
+		for field in ["best", "stage"]:
+			if saved_endless.get(field) is float or saved_endless.get(field) is int:
+				endless[field] = maxi(0, int(saved_endless[field]))
+
+# Legacy entry point: the first `stars` goals were met.
 func complete(stars: int, score: int) -> void:
+	complete_goals((1 << clampi(stars, 0, 3)) - 1, score)
+
+# Stars are kept per goal, so different replays can collect different stars.
+func complete_goals(mask: int, score: int) -> void:
 	best = maxi(best, score)
 	if selected > unlocked: return
-	if stars <= 0: return
-	medals[selected] = maxi(medals[selected], stars)
+	if mask & 1 == 0: return
+	goals[selected] |= mask & 7
+	medals[selected] = Challenges.count(goals[selected])
 	unlocked = maxi(unlocked, mini(selected+1, level_count()-1))
+
+# --- Daily challenge -------------------------------------------------------------
+# One city per calendar day, the same for everyone, with a rival and a tougher
+# defence. The first win of the day pays a bonus.
+const DAILY_COIN_BONUS := 1.5
+
+static func today() -> String:
+	return Time.get_date_string_from_system()
+
+static func daily_level(date: String) -> int:
+	return absi(hash("hole-munch-" + date)) % level_count()
+
+func daily_record(date: String) -> Dictionary:
+	return daily if daily.get("date", "") == date else {"date":date, "best":0, "won":false}
+
+# Returns true for the first win of that day.
+func record_daily(date: String, score: int, won: bool) -> bool:
+	var record := daily_record(date)
+	var first_win: bool = won and not record.won
+	daily = {"date":date, "best":maxi(int(record.best), score), "won":record.won or won}
+	return first_win
+
+# --- Endless survival -----------------------------------------------------------
+# Each conquered city leads to a random city one step harder.
+const ENDLESS_START_SECONDS := 60.0
+const ENDLESS_STAGE_SECONDS := 30.0
+
+static func endless_level(stage: int, rng: RandomNumberGenerator) -> int:
+	var region := mini(stage/2, REGIONS.size()-1)
+	return region*CITIES_PER_REGION + rng.randi_range(0, CITIES_PER_REGION-2)
+
+# Returns true when this run beats the saved record.
+func record_endless(score: int, stage: int) -> bool:
+	var record: bool = score > int(endless.best)
+	endless = {"best":maxi(int(endless.best), score), "stage":maxi(int(endless.stage), stage)}
+	return record
+
+func endless_reward(score: int, stage: int) -> int:
+	return roundi((score/120.0 + stage*20)*stats().coin_mul)
 
 func region_progress(region_index: int) -> int:
 	var count := 0

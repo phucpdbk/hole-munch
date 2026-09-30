@@ -6,11 +6,17 @@ extends RefCounted
 var shapes: Dictionary = {}
 var cache: Dictionary = {}
 var material: Material
+var snow_material: ShaderMaterial
+# Carries the texture of the level's Meshy landmark (one landmark per level).
+var landmark_material: ShaderMaterial
 const ROOFS = [Color("ec8777"), Color("81b7cb"), Color("e7be78"), Color("a999cc")]
 var roofs: Array = ROOFS.duplicate()
 var foliage := Color("75ab87")
 var boss_style := "eiffel"
 var region_style := "europe"
+const CityProfiles = preload("res://scripts/city_profiles.gd")
+const StreetModels = preload("res://scripts/street_models.gd")
+var city_profile: Dictionary = CityProfiles.profile(CityProfiles.DEFAULT)
 const Landmarks = preload("res://scripts/landmarks.gd")
 const RegionModels = preload("res://scripts/region_models.gd")
 const Campaign = preload("res://scripts/campaign.gd")
@@ -68,6 +74,8 @@ func _init() -> void:
 	shapes.frustum = frustum
 	material = ShaderMaterial.new()
 	material.shader = load("res://shaders/objects.gdshader")
+	snow_material = material.duplicate()
+	landmark_material = material.duplicate()
 
 func piece(shape: String, pos: Vector3, size: Vector3, color: Color, rotation := Vector3.ZERO) -> Dictionary:
 	# Scale in the primitive's local axes before rotating (slanted tower beams,
@@ -106,21 +114,51 @@ func toy(kind: String, variant: int = 0) -> ArrayMesh:
 	var key := kind + str(variant)
 	if cache.has(key):
 		return cache[key]
+	if kind in ["house","tree","car","person"]:
+		var id := kind+str(variant % (3 if kind in ["house","person"] else 2))
+		var path := "res://assets/synty/"+id+".res"
+		if ResourceLoader.exists(path):
+			var mesh: ArrayMesh = load(path).duplicate()
+			mesh.surface_set_material(0,snow_material if kind in ["house","tree"] else material)
+			cache[key] = mesh
+			return mesh
 	var parts: Array = []
 	var color: Color = roofs[variant % roofs.size()]
 	if kind.begins_with("farm_"):
 		cache[key] = farm_mesh(kind.trim_prefix("farm_"))
 		return cache[key]
+	if kind in ["shop", "tower"]:
+		var street = StreetModels.new(self)
+		cache[key] = bake(street.shop(city_profile, variant) if kind == "shop" else street.tower(city_profile, variant), snow_material)
+		return cache[key]
 	var region = RegionModels.new(self)
 	match kind:
+		"patrol_tank":
+			cache[key] = fit_footprint(bake(region.boss("tank")), 1.5)
+			return cache[key]
 		"boss":
 			# Landmarks and defence units are scaled to the level radius at runtime.
+			var baked := meshy_landmark(boss_style)
+			if baked:
+				cache[key] = baked
+				return baked
 			var boss_parts: Array = Landmarks.new().build(self, boss_style) if Campaign.LANDMARKS.has(boss_style) else region.boss(boss_style)
 			cache[key] = fit_footprint(bake(boss_parts), 2.8)
 			return cache[key]
 		"saucer":
 			cache[key] = bake(region.saucer())
 			return cache[key]
+		"pylon":
+			# Shield generator: eat all of them before the landmark can fall.
+			parts.append(piece("box", Vector3(0, 0.15, 0), Vector3(1.2, 0.3, 1.2), Color("46566b")))
+			parts.append(piece("cyl", Vector3(0, 1.0, 0), Vector3(0.28, 1.5, 0.28), Color("d9e4ee")))
+			parts.append(piece("ring", Vector3(0, 1.2, 0), Vector3(0.55, 0.3, 0.55), Color("5fd0ff")))
+			parts.append(piece("ball", Vector3(0, 1.95, 0), Vector3.ONE*0.42, Color("8fe6ff")))
+		"bomb":
+			# Gas canister: red drum, yellow hazard band, dark fuse cap.
+			parts.append(piece("cyl", Vector3(0, 0.4, 0), Vector3(0.36, 0.72, 0.36), Color("d8453b")))
+			parts.append(piece("cyl", Vector3(0, 0.45, 0), Vector3(0.38, 0.14, 0.38), Color("ffd24a")))
+			parts.append(piece("cyl", Vector3(0, 0.83, 0), Vector3(0.12, 0.12, 0.12), Color("2d2d33")))
 		"soldier": parts = region.soldier()
 		"drone": parts = region.drone()
 		"house": parts = region.house(region_style, color, variant)
@@ -151,9 +189,20 @@ func toy(kind: String, variant: int = 0) -> ArrayMesh:
 			parts.append(piece("box", Vector3(0, 1.42, 0), Vector3(0.3, 0.42, 0.26), Color("2d3b48")))
 			parts.append(piece("box", Vector3(0, 0.03, 0), Vector3(0.3, 0.06, 0.3), Color("5d6f7c")))
 	cache[key] = bake(parts)
+	if kind in ["house","tree"]: cache[key].surface_set_material(0,snow_material)
 	return cache[key]
 
 # Shrink a baked mesh so its ground footprint fits the swallow radius.
+# Baked by tools/bake_landmarks.gd from Meshy GLBs; null falls back to primitives.
+func meshy_landmark(id: String) -> ArrayMesh:
+	var path := "res://assets/landmarks/" + id + ".res"
+	var texture_path := "res://assets/landmarks/" + id + "_albedo.res"
+	if not ResourceLoader.exists(path) or not ResourceLoader.exists(texture_path): return null
+	var mesh: ArrayMesh = load(path).duplicate()
+	landmark_material.set_shader_parameter("albedo_tex", load(texture_path))
+	mesh.surface_set_material(0, landmark_material)
+	return mesh
+
 func fit_footprint(mesh: ArrayMesh, limit: float) -> ArrayMesh:
 	var arrays := mesh.surface_get_arrays(0)
 	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]

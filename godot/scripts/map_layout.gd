@@ -35,6 +35,34 @@ static func make(cols_value: int, rows_value: int) -> RefCounted:
 	layout.move_z = layout.half_z - 2.0
 	return layout
 
+# Unequal city blocks, with the central plaza/spawn streets kept at ±9.
+# Traffic and defence share these exact road coordinates.
+func vary_districts(seed_value: int) -> void:
+	streets_x = district_streets(cols,seed_value)
+	streets_z = district_streets(rows,seed_value+3)
+	blocks_x.clear()
+	blocks_z.clear()
+	for i in cols: blocks_x.append((streets_x[i]+streets_x[i+1])*0.5)
+	for i in rows: blocks_z.append((streets_z[i]+streets_z[i+1])*0.5)
+	crossings_x.assign(streets_x.slice(1,streets_x.size()-1))
+	crossings_z.assign(streets_z.slice(1,streets_z.size()-1))
+	half_x = maxf(absf(streets_x[0]),streets_x[-1])+1.0
+	half_z = maxf(absf(streets_z[0]),streets_z[-1])+1.0
+	move_x = half_x-2
+	move_z = half_z-2
+
+static func district_streets(count: int, seed_value: int) -> Array[float]:
+	var result: Array[float] = [-9.0,9.0]
+	for i in count/2:
+		result.push_front(result[0]-[20.0,26.0,32.0][(seed_value+i)%3])
+		result.append(result[-1]+[20.0,26.0,32.0][(seed_value+i+1)%3])
+	return result
+
+func block_size(x: float, z: float) -> Vector2:
+	var ix := blocks_x.find(x)
+	var iz := blocks_z.find(z)
+	return Vector2(streets_x[ix+1]-streets_x[ix]-3.2,streets_z[iz+1]-streets_z[iz]-3.2)
+
 static func axis_blocks(count: int) -> Array[float]:
 	var result: Array[float] = []
 	for i in count: result.append((i - (count-1)/2.0) * BLOCK_STEP)
@@ -49,4 +77,4 @@ func block_count() -> int:
 	return cols*rows
 
 func is_edge_block(x: float, z: float) -> bool:
-	return absf(x) == blocks_x.back() or absf(z) == blocks_z.back()
+	return x == blocks_x[0] or x == blocks_x[-1] or z == blocks_z[0] or z == blocks_z[-1]

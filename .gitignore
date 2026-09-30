@@ -16,3 +16,12 @@ godot/.export_credentials
 *.pfx
 *.mobileprovision
 .DS_Store
+godot/assets/local_source/
+godot/assets/synty/*.res
+
+# Raw Meshy downloads (images, GLBs, manifest); baked meshes live in godot/assets/landmarks.
+godot/assets/landmarks_src/
+
+# Icons rendered from the licensed POLYGON Icons pack (godot/tools/bake_icons.gd).
+godot/assets/icons/*.png
+godot/assets/icons/*.png.import
