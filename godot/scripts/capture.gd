@@ -163,6 +163,10 @@ func ui_preview() -> void:
 	await frames(20)
 	await snapshot("ui-%s-tip" % lang)
 	g.intro.close()
+	g.intro.open([g.Intro.tip_page("lm_onepillar")])
+	await frames(20)
+	await snapshot("ui-%s-landmark" % lang)
+	g.intro.close()
 	g.open_panel("levels")
 	for region in g.Campaign.REGIONS.size():
 		g.wardrobe.turn_page(region - g.wardrobe.page)

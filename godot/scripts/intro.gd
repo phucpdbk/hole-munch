@@ -15,8 +15,10 @@ const FEATURE_ICON := {"pickup":"magnet", "bomb":"bomb", "hunger":"food", "count
 	"rival":"skull", "finale":"crown", "region":"globe"}
 const WEATHER_TIPS := ["rain", "snow", "fog", "wind", "storm"]
 const MAX_TIPS := 2
+const CARD_DIR := "res://assets/landmark_cards/"
 
 var pages: Array = []
+var pictures := {}
 var index := 0
 var done_callback := Callable()
 var story := false
@@ -82,7 +84,11 @@ static func tip_page(id: String) -> Dictionary:
 		for region in Campaign.REGIONS:
 			for entry in region.cities:
 				if entry[1] == boss: city = entry[0]
-		return {"tag":Campaign.city_name(boss, city), "icon":"flag", "title":Campaign.boss_name(boss), "body":I18n.t("lmfun_" + boss)}
+		var page := {"tag":Campaign.city_name(boss, city), "icon":"flag", "title":Campaign.boss_name(boss), "body":I18n.t("lmfun_" + boss)}
+		# Meshy concept art (tools/make-landmark-cards.mjs); the flag icon stands in until it exists.
+		var picture := CARD_DIR + boss + ".png"
+		if ResourceLoader.exists(picture): page.picture = picture
+		return page
 	var page := {"tag":I18n.t("new_tag")}
 	if id.begins_with("weather_"):
 		var kind := id.trim_prefix("weather_")
@@ -174,7 +180,13 @@ func _draw() -> void:
 	draw_circle(art_center, art*0.42, Color("2c4f73"))
 	draw_arc(art_center, art*0.5, 0, TAU, 48, Color(UiStyle.MINT, 0.35), 3, true)
 	var bob := sin(clock*2.6)*6
-	UiStyle.draw_icon(self, page.icon, art_center + Vector2(0, bob), art*0.62*(0.8 + 0.2*ease_in))
+	if page.has("picture"):
+		# Keep a reference: a texture freed right after _draw renders as a white box.
+		if not pictures.has(page.picture): pictures[page.picture] = load(page.picture)
+		var picture_size := art*1.12*(0.8 + 0.2*ease_in)
+		draw_texture_rect(pictures[page.picture], Rect2(art_center + Vector2(0, bob) - Vector2.ONE*picture_size/2, Vector2.ONE*picture_size), false)
+	else:
+		UiStyle.draw_icon(self, page.icon, art_center + Vector2(0, bob), art*0.62*(0.8 + 0.2*ease_in))
 	var left := card.position.x + art + 44
 	var tag: String = page.get("tag", "%d / %d" % [index+1, pages.size()])
 	var tag_width := UiStyle.text_width(tag, 15) + 28
