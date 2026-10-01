@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Hole Munch</title>
+  <meta name="description" content="Start small. Swallow the world. Explore 90 levels, 16 playful bosses and 24 iconic landmarks in Hole Munch." />
+  <meta property="og:title" content="Hole Munch — Swallow the World" />
+  <meta property="og:description" content="Grow your hole, gulp giant bosses, and explore 90 levels around the world." />
+  <meta property="og:image" content="assets/hole-munch-cover.png" />
+  <script src="https://www.youtube.com/game_api/v1"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="menu" class="screen hidden">
+    <div class="cover-art" aria-hidden="true"><img src="assets/hole-munch-cover.webp" alt="" fetchpriority="high" /></div>
+    <label class="lang-picker">
+      <span aria-hidden="true">🌐</span>
+      <select id="lang-select" aria-label="Language"></select>
+    </label>
+    <div class="menu-content">
+    <p class="eyebrow" data-i18n="worldTour"></p>
+    <h1 class="title">HOLE<br /><span>MUNCH</span></h1>
+    <p class="subtitle" data-i18n="coverPitch"></p>
+    <p id="campaign-info" class="campaign-info"></p>
+    <div class="menu-stats">
+      <span id="menu-level"></span>
+      <span id="menu-coins" class="coins"></span>
+    </div>
+    <button id="btn-play" class="btn big" data-i18n="play"></button>
+    <button id="btn-levels" class="btn" data-i18n="travelMap"></button>
+    <button id="btn-shop" class="btn" data-i18n="upgrades"></button>
+    <button id="btn-reset" class="btn ghost hidden" data-i18n="resetProgress"></button>
+    </div>
+  </div>
+
+  <div id="continue" class="screen hidden">
+    <h2 data-i18n="timeUp"></h2>
+    <p id="continue-text" class="subtitle"></p>
+    <button id="btn-continue-ad" class="btn big reward"></button>
+    <button id="btn-continue-no" class="btn ghost" data-i18n="noThanks"></button>
+  </div>
+
+  <div id="confirm" class="screen hidden">
+    <h2 data-i18n="resetProgress"></h2>
+    <p class="subtitle" data-i18n="resetConfirm"></p>
+    <button id="btn-reset-yes" class="btn danger" data-i18n="resetYes"></button>
+    <button id="btn-reset-no" class="btn" data-i18n="resetNo"></button>
+  </div>
+
+  <div id="levels" class="screen hidden">
+    <h2 data-i18n="travelMap"></h2>
+    <p id="journey-total" class="subtitle"></p>
+    <div id="journey-tabs" class="tabs"></div>
+    <p id="next-reward" class="next-reward"></p>
+    <div id="journey-content" class="journey-content"></div>
+    <button id="btn-levels-back" class="btn" data-i18n="back"></button>
+  </div>
+
+  <div id="shop" class="screen hidden">
+    <h2 data-i18n="upgrades"></h2>
+    <div id="shop-coins" class="coins"></div>
+    <div id="shop-tabs" class="tabs"></div>
+    <div id="shop-list" class="shop-list"></div>
+    <button id="btn-shop-back" class="btn" data-i18n="back"></button>
+  </div>
+
+  <div id="result" class="screen hidden">
+    <p id="result-level" class="subtitle"></p>
+    <h2 id="result-title"></h2>
+    <div id="result-stars" class="stars"></div>
+    <p id="result-twist" class="twist"></p>
+    <p id="result-discoveries" class="discoveries"></p>
+    <div class="result-rows">
+      <div><span data-i18n="score"></span><b id="result-score"></b></div>
+      <div><span data-i18n="eaten"></span><b id="result-eaten"></b></div>
+      <div><span data-i18n="bestCombo"></span><b id="result-combo"></b></div>
+      <div><span data-i18n="challengeResult"></span><b id="result-challenge"></b></div>
+      <div><span data-i18n="runMedals"></span><b id="result-medals"></b></div>
+      <div><span data-i18n="coinsEarned"></span><b id="result-coins" class="coins"></b></div>
+    </div>
+    <button id="btn-double" class="btn reward hidden" data-i18n="adDouble"></button>
+    <button id="btn-next" class="btn big"></button>
+    <button id="btn-result-shop" class="btn" data-i18n="upgrades"></button>
+    <button id="btn-result-journey" class="btn ghost" data-i18n="resultJourney"></button>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
