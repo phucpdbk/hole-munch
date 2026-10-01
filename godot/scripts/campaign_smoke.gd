@@ -83,22 +83,26 @@ func check_progress() -> void:
 	progress.complete(1, 100)
 	check(progress.unlocked == 1 and progress.medals[0] == 3, "win unlocks next; replay retains best stars")
 	# Upgrades: cost growth, coin checks, caps and their effect on stats.
-	progress.coins = 80
+	progress.coins = 160
 	check(progress.buy("size") and progress.coins == 0 and progress.upgrades.size == 1, "buying an upgrade spends coins")
 	check(not progress.buy("size"), "cannot buy without enough coins")
-	check(progress.upgrade_cost("size") == 128, "upgrade cost grows by 1.6x")
+	check(progress.upgrade_cost("size") == 280, "upgrade cost grows by 1.75x")
 	progress.coins = 999999
 	for i in 20: progress.buy("magnet")
 	check(progress.upgrades.magnet == 5, "upgrades stop at their maximum")
 	var stats: Dictionary = progress.stats()
-	check(is_equal_approx(stats.start_radius, Campaign.START_RADIUS+0.08) and stats.magnet == 5, "upgrades change round stats")
+	check(is_equal_approx(stats.start_radius, Campaign.START_RADIUS+Campaign.SIZE_PER_UPGRADE) and stats.magnet == 5, "upgrades change round stats")
 	check(progress.reward(true, 3, 400) > progress.reward(false, 0, 400), "winning pays more coins than losing")
+	# A maxed size upgrade must not let the starting hole eat a street building.
+	var maxed := Campaign.START_RADIUS + Campaign.SIZE_PER_UPGRADE*progress.upgrade_max("size")
+	var smallest_shop: float = 0.95 + 0.07
+	check(maxed*0.85 < smallest_shop, "a maxed size upgrade (%.2f) cannot eat a shop from the start" % maxed)
 	progress.skin = 7; progress.effect = 3; progress.trail = 3
 	var restored = Campaign.new()
 	restored.restore(JSON.parse_string(JSON.stringify(progress.data())))
 	check(restored.data() == progress.data(), "save round trip preserves progress, coins and upgrades")
 	restored.restore({"version":4, "selected":999, "unlocked":999, "skin":999, "trail":-3, "effect":"bad", "medals":[null,99], "upgrades":{"size":99, "speed":"x"}})
-	check(restored.selected == count-1 and restored.skin == Campaign.SKINS.size()-1 and restored.trail == 0 and restored.medals[1] == 3 and restored.upgrades.size == 8, "malformed save fields are bounded")
+	check(restored.selected == count-1 and restored.skin == Campaign.SKINS.size()-1 and restored.trail == 0 and restored.medals[1] == 3 and restored.upgrades.size == restored.upgrade_max("size"), "malformed save fields are bounded")
 	var sizes: Array = []
 	for i in count:
 		var info := Campaign.level_info(i)
@@ -324,13 +328,14 @@ func check_panels(g) -> void:
 	check(g.wardrobe.page == 5 and g.wardrobe.journey.stops.size() == 8 and g.wardrobe.controls.size() == 1, "last continent map shows eight 3D stops with bounded controls")
 	g.wardrobe.choose_level(6)
 	check(g.campaign.selected == 6 and g.mode == "menu", "level selection loads chosen map")
-	g.campaign.coins = 100
 	g.open_panel("shop")
 	var speed_before: int = g.campaign.upgrades.speed
+	var speed_cost: int = g.campaign.upgrade_cost("speed")
+	g.campaign.coins = speed_cost + 30
 	g.wardrobe.buy("speed")
 	check(g.campaign.upgrades.speed == speed_before+1 and g.campaign.coins == 30, "shop buys an upgrade")
 	g.close_panel()
-	check(is_equal_approx(g.stats.speed, 1.0 + g.campaign.upgrades.speed*0.05), "closing the shop applies upgrades")
+	check(is_equal_approx(g.stats.speed, 1.0 + g.campaign.upgrades.speed*Campaign.SPEED_PER_UPGRADE), "closing the shop applies upgrades")
 	for skin in Campaign.SKINS.size():
 		g.campaign.skin = skin
 		g.campaign.effect = skin%4

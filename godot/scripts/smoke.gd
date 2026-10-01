@@ -84,6 +84,8 @@ func run(game) -> void:
 	for i in range(60): g.step(0.02,Vector2.ZERO)
 	check(g.mode=="result" and g.hud.won and g.remaining > 20,"clearing the map ends the round early")
 	check_mechanics()
+	check_ads()
+	check_updates()
 	if failures > 0:
 		push_error("%d GODOT CHECKS FAILED" % failures)
 		g.get_tree().quit(1)
@@ -200,6 +202,9 @@ func check_growth_route() -> void:
 	# Par measures pure eating time: no shots and no rival.
 	g.defense.grace = INF
 	g.rival.active = false
+	# Measure the true par without the clock ending it, then compare with the timer.
+	var timer: float = g.remaining
+	g.remaining = ROUTE_LIMIT
 	route_seconds = 0.0
 	var boss: Dictionary = g.items[g.boss_index]
 	while g.playing and not g.boss_down and route_seconds < ROUTE_LIMIT:
@@ -210,7 +215,49 @@ func check_growth_route() -> void:
 			g.hole_position += offset.limit_length(speed*ROUTE_STEP)
 		g.step(ROUTE_STEP,Vector2.ZERO)
 		route_seconds += ROUTE_STEP
+	g.remaining = timer - route_seconds
 	check(g.boss_down and g.remaining > 0,"growth route reaches and swallows the boss within the timer")
+
+# Rewarded-ad rescue and coin doubling, plus the interstitial pacing (scripts/ads.gd).
+func check_ads() -> void:
+	var ads = g.ads
+	g.reset_round()
+	g.playing=true; g.mode="playing"; g.started=true; g.remaining=0.01
+	g.step(0.02,Vector2.ZERO)
+	check(g.mode=="result" and not g.hud.won, "a small hole that runs out of time gets no revive offer")
+	g.reset_round()
+	g.playing=true; g.mode="playing"; g.started=true; g.remaining=0.01
+	var start: float = g.stats.start_radius
+	g.radius = start + 0.8*(g.boss_radius/g.EAT_RATIO - start)
+	g.target_radius = g.radius
+	g.hole_position = Vector3(0, 0, 30)
+	g.step(0.02,Vector2.ZERO)
+	check(g.mode=="revive" and not g.playing, "running out of time near the landmark offers a revive")
+	g.accept_revive()
+	check(g.mode=="playing" and g.revive_used and absf(g.remaining-ads.REVIVE_SECONDS) < 0.1, "watching the ad adds %d seconds" % int(ads.REVIVE_SECONDS))
+	g.remaining = 0.01
+	g.step(0.02,Vector2.ZERO)
+	check(g.mode=="result" and not g.hud.won, "the revive is offered only once per round")
+	g.reward = 10
+	var coins: int = g.campaign.coins
+	check(g.can_double(), "a result with coins offers doubling")
+	g.double_reward()
+	check(g.campaign.coins == coins+10 and g.reward == 20 and not g.can_double(), "doubling pays once")
+	ads.round_ends = ads.INTERSTITIAL_EVERY
+	var later: int = Time.get_ticks_msec() + ads.REWARDED_QUIET_MS + ads.INTERSTITIAL_GAP_MS
+	check(not ads.interstitial_due(0, later) and not ads.interstitial_due(ads.INTERSTITIAL_FROM_LEVEL, Time.get_ticks_msec()), "no interstitial in early cities or right after a rewarded ad")
+	check(ads.interstitial_due(ads.INTERSTITIAL_FROM_LEVEL, later), "interstitial allowed after several rounds")
+	g.go_menu()
+
+# version.json parsing (scripts/update_check.gd): only newer builds with safe links.
+func check_updates() -> void:
+	var U = g.UpdateCheck
+	var newer: Dictionary = U.parse('{"version_code": 13, "version_name": "0.6", "url": "https://example.org/a.apk"}', 12)
+	check(newer.code == 13 and newer.url.begins_with("https://"), "a newer build is offered")
+	check(U.parse('{"version_code": 12, "url": "https://example.org"}', 12).is_empty(), "the same build is not offered")
+	check(U.parse('{"version_code": 99, "url": "javascript:alert(1)"}', 12).is_empty() and U.parse('not json', 12).is_empty() \
+		and U.parse('{"version_code": "13", "url": "https://x"}', 12).is_empty(), "bad or unsafe version files are ignored")
+	check(U.current_code() > 0, "the build code is set in project settings")
 
 # Shield pylons, bombs, hunger and pickups (scripts/mechanics.gd).
 func check_mechanics() -> void:
@@ -259,6 +306,17 @@ func check_mechanics() -> void:
 	g.hole_position = mech.pickup.position
 	mech.update_pickup(g, 0.02)
 	check(mech.pickup.is_empty() and (kind != "time" or g.remaining == before+mech.TIME_PICKUP), "touching a pickup collects it (%s)" % kind)
+	var kinds := {}
+	for i in 40:
+		mech.spawn_pickup(g)
+		kinds[mech.pickup.kind] = true
+		mech.clear_pickup()
+	check(g.run_kind == "campaign" and not kinds.has("time") and kinds.size() >= 2, "campaign pickups never add time")
+	before = g.remaining
+	g.combo = 7
+	var food: Dictionary = g.items.filter(func(item): return not item.eaten and not item.get("is_boss", false) and not item.get("bomb", false))[0]
+	g.swallow(food)
+	check(g.combo == 8 and g.remaining == before, "campaign combos never add time")
 	mech.weather = "wind"
 	var drift: Vector3 = mech.steer(Vector3.ZERO, 0.02, 0.0)
 	for i in 200: drift = mech.steer(Vector3.ZERO, 0.02, 0.0)

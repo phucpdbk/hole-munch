@@ -10,13 +10,26 @@ signal daily_requested
 signal endless_requested
 signal help_requested
 signal language_requested
+signal revive_requested
+signal give_up_requested
+signal double_requested
+signal update_requested
 const UiStyle = preload("res://scripts/ui_style.gd")
 const UiButton = preload("res://scripts/ui_button.gd")
 const I18n = preload("res://scripts/i18n.gd")
+const Ads = preload("res://scripts/ads.gd")
 var daily_button: BaseButton
 var endless_button: BaseButton
 var help_button: BaseButton
 var language_button: BaseButton
+var revive_button: BaseButton
+var give_up_button: BaseButton
+var double_button: BaseButton
+var revive_left := 0.0
+var revive_seconds := 15
+var can_double := false
+var update_button: BaseButton
+var update_ready := false
 var last_city := false
 var run_kind := "campaign"
 var stage := 0
@@ -102,6 +115,14 @@ func _ready() -> void:
 	help_button.pressed.connect(func(): help_requested.emit())
 	language_button = make_button("language", Color("35546d"))
 	language_button.pressed.connect(func(): language_requested.emit())
+	revive_button = make_button("clock", Color("f6cb70"), true)
+	revive_button.pressed.connect(func(): revive_requested.emit())
+	give_up_button = make_button("close", Color("35546d"))
+	give_up_button.pressed.connect(func(): give_up_requested.emit())
+	double_button = make_button("coin", Color("6a55a8"))
+	double_button.pressed.connect(func(): double_requested.emit())
+	update_button = make_button("megaphone", Color("2f9e5b"))
+	update_button.pressed.connect(func(): update_requested.emit())
 	resized.connect(layout)
 	layout()
 
@@ -126,6 +147,12 @@ func layout() -> void:
 	place(pause_button, Rect2(w - 84, 36, 58, 58))
 	place(help_button, Rect2(w - 296, 26, 50, 50))
 	place(language_button, Rect2(w - 238, 26, 50, 50))
+	place(update_button, Rect2(w - 474, 26, 170, 50), 14)
+	var offer_width := minf(440.0, w-48)
+	place(revive_button, Rect2(w/2-offer_width/2, h/2+10, offer_width, 64), 22)
+	place(give_up_button, Rect2(w/2-110, h/2+88, 220, 48), 16)
+	if w > h: place(double_button, Rect2(w/2-210, h-232, 420, 52), 17)
+	else: place(double_button, Rect2(44, h-500, w-88, 52), 16)
 	if w > h:
 		var left := 36.0 if mode == "menu" else w/2-264
 		var width := 364.0 if mode == "menu" else 528.0
@@ -148,7 +175,15 @@ func sync() -> void:
 	if last_layout_mode != mode:
 		layout()
 		last_layout_mode = mode
-	play_button.visible = mode != "playing"
+	play_button.visible = mode not in ["playing", "revive"]
+	revive_button.visible = mode == "revive"
+	give_up_button.visible = mode == "revive"
+	double_button.visible = can_double
+	update_button.visible = mode == "menu" and update_ready
+	update_button.text = I18n.t("update_ready")
+	revive_button.text = I18n.t("ad_revive", revive_seconds)
+	give_up_button.text = I18n.t("ad_give_up")
+	double_button.text = I18n.t("ad_double", reward)
 	var next_level: bool = mode == "result" and won and has_next
 	play_button.text = I18n.t("resume") if mode == "paused" else I18n.t("next_city") if next_level else I18n.t("replay") if mode == "result" else I18n.t("play")
 	play_button.icon = UiStyle.icon("next" if next_level else "replay" if mode == "result" else "play")
@@ -175,6 +210,9 @@ func _draw() -> void:
 	var h := size.y
 	# White flash when the boss is swallowed.
 	if flash > 0: draw_rect(Rect2(Vector2.ZERO, size), Color(1, 1, 1, flash*0.55))
+	if mode == "revive":
+		draw_revive()
+		return
 	if w > h and mode == "menu":
 		draw_landscape_menu()
 		return
@@ -301,6 +339,22 @@ func draw_landscape_result() -> void:
 	UiStyle.text(self, result_sub(), Vector2(w/2, 276), 15, MUTED, true, 0, body_font)
 	if mode == "result" and gate_note != "" and run_kind == "campaign" and won and not has_next and not last_city:
 		UiStyle.text(self, gate_note, Vector2(w/2, 300), 15, Color("ffb3a6"), true, 0, body_font)
+
+# Time ran out near the landmark: one rewarded-ad rescue with a short countdown.
+func draw_revive() -> void:
+	var w := size.x
+	var h := size.y
+	draw_rect(Rect2(Vector2.ZERO, size), Color("0f1e30a0"))
+	var width := minf(520.0, w-32)
+	panel(Rect2(w/2-width/2, h/2-150, width, 310), Color("1b3048f5"), 26)
+	UiStyle.draw_icon(self, "clock", Vector2(w/2, h/2-108), 54)
+	UiStyle.text(self, I18n.t("ad_revive_t"), Vector2(w/2, h/2-50), 30, GOLD, true, 6, title_font)
+	var growth_label := "%s · %d%%" % [I18n.t("take_target", boss_title.to_upper()), int(growth*100)]
+	UiStyle.text(self, growth_label, Vector2(w/2, h/2-20), 16, LIGHT, true, 0, body_font)
+	# Countdown ring around the clock icon.
+	var share := clampf(revive_left/Ads.REVIVE_WINDOW, 0, 1)
+	draw_arc(Vector2(w/2, h/2-108), 34, -PI/2, -PI/2 + TAU*share, 40, GOLD, 4, true)
+	UiStyle.text(self, I18n.t("ad_revive_sub", int(ceil(revive_left))), Vector2(w/2, h/2+150), 13, MUTED, true, 0, body_font)
 
 func run_title() -> String:
 	if run_kind == "daily": return I18n.t("daily")

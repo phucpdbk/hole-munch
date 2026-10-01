@@ -210,7 +210,8 @@ func spawn_pickup(game) -> void:
 	for attempt in 8:
 		at = Vector3(xs[rng.randi()%xs.size()], 0.16, zs[rng.randi()%zs.size()])
 		if Vector2(at.x-game.hole_position.x, at.z-game.hole_position.z).length() > 4.0: break
-	var kind: String = PICKUPS.keys()[rng.randi()%PICKUPS.size()]
+	var kinds: Array = PICKUPS.keys().filter(func(k): return k != "time" or game.clock_can_grow())
+	var kind: String = kinds[rng.randi()%kinds.size()]
 	pickup = {"kind":kind, "position":at, "life":PICKUP_LIFE}
 	var color: Color = PICKUPS[kind][1]
 	orb_material.albedo_color = color

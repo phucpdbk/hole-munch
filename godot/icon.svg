@@ -1,1 +1,75 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><rect width="256" height="256" rx="58" fill="#192637"/><ellipse cx="128" cy="154" rx="88" ry="54" fill="#9b8bff"/><ellipse cx="128" cy="148" rx="73" ry="41" fill="#080f1c"/><path d="M92 104V57h51v47" fill="#ffce76"/><path d="m83 58 34-26 35 26" fill="#f5827c"/><path d="M112 103V80h14v23" fill="#283b50"/><circle cx="178" cy="98" r="16" fill="#a8d69a"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="60 60 312 312">
+  <defs>
+    <radialGradient id="sky" cx="0.5" cy="0.42" r="0.72">
+      <stop offset="0" stop-color="#7ff0ff"/>
+      <stop offset="0.5" stop-color="#2fb8ff"/>
+      <stop offset="1" stop-color="#1665e0"/>
+    </radialGradient>
+  </defs>
+  <rect width="432" height="432" fill="url(#sky)"/>
+  <g fill="#ffffff" opacity="0.16">
+    <path d="M216 200 L176 0 H256 Z"/><path d="M216 200 L432 60 V170 Z"/><path d="M216 200 L432 300 V432 H380 Z"/>
+    <path d="M216 200 L0 60 V170 Z"/><path d="M216 200 L0 300 V432 H52 Z"/><path d="M216 200 L140 432 H292 Z"/>
+  </g>
+<g transform="translate(216 222) scale(0.86) translate(-216 -232)">
+  <defs>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d9b8ff"/><stop offset="0.45" stop-color="#9a5cff"/><stop offset="1" stop-color="#5a23c8"/>
+    </linearGradient>
+    <radialGradient id="pit" cx="0.5" cy="0.2" r="0.9">
+      <stop offset="0" stop-color="#4a2490"/><stop offset="0.6" stop-color="#1c0b40"/><stop offset="1" stop-color="#0b0420"/>
+    </radialGradient>
+    <radialGradient id="eye" cx="0.38" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="0.7" stop-color="#f1ecff"/><stop offset="1" stop-color="#c9bdf0"/>
+    </radialGradient>
+    <radialGradient id="pupil" cx="0.4" cy="0.35" r="0.7">
+      <stop offset="0" stop-color="#3b2a66"/><stop offset="1" stop-color="#0d0620"/>
+    </radialGradient>
+    <linearGradient id="tongue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff8fbf"/><stop offset="1" stop-color="#e2407f"/>
+    </linearGradient>
+    <linearGradient id="tower" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffd76a"/><stop offset="1" stop-color="#e59a2a"/>
+    </linearGradient>
+    <radialGradient id="shadow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#062a66" stop-opacity="0.45"/><stop offset="1" stop-color="#062a66" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- soft ground shadow -->
+  <ellipse cx="216" cy="318" rx="150" ry="40" fill="url(#shadow)"/>
+  <!-- rim body with outline -->
+  <ellipse cx="216" cy="262" rx="140" ry="88" fill="#2a1052"/>
+  <ellipse cx="216" cy="256" rx="132" ry="80" fill="url(#rim)"/>
+  <!-- pit -->
+  <ellipse cx="216" cy="266" rx="100" ry="52" fill="url(#pit)" stroke="#2a1052" stroke-width="7"/>
+  <!-- a little house tumbling in -->
+  <g transform="translate(266 262) rotate(22)" stroke="#2a1052" stroke-width="6" stroke-linejoin="round">
+    <rect x="-28" y="-14" width="56" height="58" rx="5" fill="#fff4dc"/>
+    <path d="M-38 -10 L0 -48 L38 -10 Z" fill="#ff5a52"/>
+    <path d="M-30 -14 L0 -42 L30 -14" fill="none" stroke="#ff9a8f" stroke-width="4" opacity="0.8"/>
+    <rect x="-10" y="10" width="20" height="34" rx="3" fill="#3fa2ff"/>
+  </g>
+  <path d="M160 300 Q196 262 236 296 Q200 318 160 300 Z" fill="url(#tongue)" stroke="#2a1052" stroke-width="5"/>
+  <!-- front lip covers what sinks -->
+  <path d="M84 256 A132 80 0 0 0 348 256 L316 266 A100 52 0 0 1 116 266 Z" fill="url(#rim)"/>
+  <path d="M116 266 A100 52 0 0 0 316 266" fill="none" stroke="#2a1052" stroke-width="7"/>
+  <path d="M76 262 A140 88 0 0 0 356 262" fill="none" stroke="#2a1052" stroke-width="8"/>
+  <!-- glossy highlight on the rim -->
+  <path d="M112 214 Q216 170 320 214" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" opacity="0.55"/>
+  <!-- blush -->
+  <ellipse cx="110" cy="290" rx="16" ry="9" fill="#ff8fc0" opacity="0.85"/>
+  <ellipse cx="322" cy="290" rx="16" ry="9" fill="#ff8fc0" opacity="0.85"/>
+  <!-- big glossy eyes -->
+  <g stroke="#2a1052" stroke-width="8">
+    <circle cx="170" cy="166" r="46" fill="url(#eye)"/>
+    <circle cx="262" cy="166" r="46" fill="url(#eye)"/>
+  </g>
+  <circle cx="182" cy="178" r="22" fill="url(#pupil)"/>
+  <circle cx="274" cy="178" r="22" fill="url(#pupil)"/>
+  <circle cx="190" cy="168" r="8" fill="#fff"/><circle cx="282" cy="168" r="8" fill="#fff"/>
+  <circle cx="176" cy="188" r="3.5" fill="#fff" opacity="0.8"/><circle cx="268" cy="188" r="3.5" fill="#fff" opacity="0.8"/>
+  <!-- sparkles -->
+  <path d="M104 132 l6 -16 l6 16 l16 6 l-16 6 l-6 16 l-6 -16 l-16 -6 z" fill="#fff6a8" stroke="#2a1052" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M334 118 l4 -11 l4 11 l11 4 l-11 4 l-4 11 l-4 -11 l-11 -4 z" fill="#fff" />
+</g>
+</svg>

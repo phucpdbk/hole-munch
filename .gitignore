@@ -25,3 +25,8 @@ godot/assets/landmarks_src/
 # Icons rendered from the licensed POLYGON Icons pack (godot/tools/bake_icons.gd).
 godot/assets/icons/*.png
 godot/assets/icons/*.png.import
+godot/android/build/build/
+godot/android/build/.gradle/
+godot/android/build/assetPackInstallTime/
+godot/android/build/libs/
+godot/android/build/src/main/assets/

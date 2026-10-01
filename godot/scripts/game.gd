@@ -23,6 +23,8 @@ const Rival = preload("res://scripts/rival.gd")
 const I18n = preload("res://scripts/i18n.gd")
 const UiStyle = preload("res://scripts/ui_style.gd")
 const Intro = preload("res://scripts/intro.gd")
+const Ads = preload("res://scripts/ads.gd")
+const UpdateCheck = preload("res://scripts/update_check.gd")
 const START_RADIUS := Campaign.START_RADIUS
 const MAX_RADIUS := 8.5
 const MIN_BOSS := 3.0
@@ -34,8 +36,9 @@ const BOSS_HOME := Vector3(0, 0.16, -1.8)
 const EAT_RATIO := 0.85
 const GROWTH := 0.65
 const COMBO_WINDOW := 1.0
-# Combo milestones buy time: [bites, seconds]. Past the last one, every
-# COMBO_REPEAT more bites adds COMBO_REPEAT_SECONDS.
+# Combo milestones buy time in endless only: [bites, seconds]. Past the last
+# one, every COMBO_REPEAT more bites adds COMBO_REPEAT_SECONDS. Campaign and
+# daily clocks never grow, so the timer is a real limit.
 const COMBO_TIME = [[8, 2.0], [16, 3.0], [30, 5.0]]
 const COMBO_REPEAT := 15
 const COMBO_REPEAT_SECONDS := 3.0
@@ -164,6 +167,14 @@ var bite_time := 0.0
 var test_mode := false
 var capture_mode := false
 var smoke: RefCounted
+# Rewarded-ad rescue and coin doubling (scripts/ads.gd), each once per round.
+var ads: Ads
+var revive_used := false
+var revive_left := 0.0
+var doubled := false
+# Link to a newer build found by scripts/update_check.gd, empty when up to date.
+var updates: UpdateCheck
+var update_url := ""
 var camera_target := Vector3.ZERO
 
 func _ready() -> void:
@@ -207,6 +218,15 @@ func _ready() -> void:
 	wardrobe = Wardrobe.new()
 	wardrobe.game = self
 	layer.add_child(wardrobe)
+	ads = Ads.new()
+	add_child(ads)
+	hud.revive_requested.connect(accept_revive)
+	hud.give_up_requested.connect(decline_revive)
+	hud.double_requested.connect(double_reward)
+	updates = UpdateCheck.new()
+	add_child(updates)
+	updates.update_available.connect(func(info: Dictionary): update_url = info.url)
+	hud.update_requested.connect(open_update)
 	intro = Intro.new()
 	layer.add_child(intro)
 	apply_style()
@@ -702,6 +722,9 @@ func reset_stats() -> void:
 	boss_down = false
 	lose_reason = ""
 	record_note = ""
+	revive_used = false
+	revive_left = 0.0
+	doubled = false
 	reset_hazards()
 	mechanics.reset(level.weather, 991 + campaign.selected*31)
 	if fx: fx.clear()
@@ -739,6 +762,7 @@ func on_play() -> void:
 		mode = "menu"
 		stats = campaign.stats()
 	if mode in ["menu", "result"] and offer_tips(): return
+	if mode == "result": ads.maybe_interstitial(campaign.selected)
 	if mode == "paused":
 		paused = false
 	elif mode == "menu":
@@ -776,6 +800,7 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		if is_instance_valid(wardrobe) and wardrobe.visible: close_panel()
 		elif mode == "playing": toggle_pause()
+		elif mode == "revive": decline_revive()
 		elif mode in ["paused", "result"]: go_menu()
 		else: get_tree().quit()
 
@@ -820,6 +845,9 @@ func _process(delta: float) -> void:
 		slowmo -= dt
 		dt *= SLOWMO_RATE
 	if endless_advance and playing and not paused and slowmo <= 0: advance_endless()
+	if mode == "revive" and not ads.showing:
+		revive_left -= delta
+		if revive_left <= 0: decline_revive()
 	if playing and not paused:
 		step(dt, move_direction())
 	elif mode in ["menu", "result"]:
@@ -878,7 +906,9 @@ func step(dt: float, input: Vector2) -> void:
 	if not playing: return
 	if boss_down and map_cleared(): finish(true)
 	# A boss already sinking wins even if the clock runs out during its fall.
-	elif remaining <= 0 and (boss_down or items[boss_index].fall < 0): finish(boss_down)
+	elif remaining <= 0 and (boss_down or items[boss_index].fall < 0):
+		if not boss_down and can_offer_revive(): offer_revive()
+		else: finish(boss_down)
 
 # Every piece of original map food is gone (bonus minions and reinforcements aside).
 func map_cleared() -> bool:
@@ -1025,7 +1055,7 @@ func swallow(item: Dictionary) -> void:
 	combo += 1
 	combo_time = COMBO_WINDOW
 	best_combo = maxi(best_combo, combo)
-	var extra := combo_seconds(combo)
+	var extra := combo_seconds(combo) if clock_can_grow() else 0.0
 	if extra > 0:
 		remaining += extra
 		bonus_seconds += extra
@@ -1049,6 +1079,10 @@ func grow(bite_radius: float) -> void:
 		growth_milestone = target_radius/START_RADIUS
 		add_floater(hole_position, I18n.t("bigger"), true)
 		fx.ripple(hole_position, target_radius, Color("b7a2f1"))
+
+# Only endless survival earns time back; everywhere else the clock only falls.
+func clock_can_grow() -> bool:
+	return run_kind == "endless"
 
 static func combo_seconds(count: int) -> float:
 	for milestone in COMBO_TIME:
@@ -1112,7 +1146,60 @@ func finish(won: bool) -> void:
 		reward += extra
 		if record_note == "": record_note = I18n.t("early_clear", extra)
 	campaign.coins += reward
+	ads.round_ended()
 	persist()
+
+# --- Rewarded ads (scripts/ads.gd) -----------------------------------------------
+# Time ran out close to the landmark: offer one ad for extra seconds.
+func can_offer_revive() -> bool:
+	return run_kind == "campaign" and not revive_used and Ads.revive_worth_offering(growth()) and ads.rewarded_ready()
+
+func offer_revive() -> void:
+	playing = false
+	mode = "revive"
+	revive_left = Ads.REVIVE_WINDOW
+	clear_drag()
+
+func accept_revive() -> void:
+	if mode != "revive" or ads.showing: return
+	ads.show_rewarded(func(granted: bool):
+		if mode != "revive": return
+		if not granted:
+			decline_revive()
+			return
+		revive_used = true
+		remaining += Ads.REVIVE_SECONDS
+		last_tick = 0
+		playing = true
+		mode = "playing"
+		add_floater(hole_position, I18n.t("ad_revived", int(Ads.REVIVE_SECONDS)), true)
+		sfx.play("grow"))
+
+func decline_revive() -> void:
+	if mode != "revive" or ads.showing: return
+	revive_used = true
+	finish(false)
+
+func can_double() -> bool:
+	return mode == "result" and reward > 0 and not doubled and ads.rewarded_ready()
+
+func double_reward() -> void:
+	if not can_double(): return
+	ads.show_rewarded(func(granted: bool):
+		if not granted or doubled or mode != "result": return
+		doubled = true
+		campaign.coins += reward
+		reward *= 2
+		record_note = I18n.t("ad_doubled")
+		persist())
+
+# The menu button opens the newer build's page (a vetted https/market link).
+func open_update() -> void:
+	if update_url != "": OS.shell_open(update_url)
+
+# How far the hole has grown toward swallowing the landmark, 0..1.
+func growth() -> float:
+	return clampf((radius-float(stats.start_radius))/(boss_radius/EAT_RATIO-float(stats.start_radius)),0,1)
 
 func run_summary(won: bool) -> Dictionary:
 	return {"won":won, "completion":completion(), "best_combo":best_combo, "remaining":remaining,
@@ -1221,7 +1308,11 @@ func update_hud() -> void:
 	hud.seconds = remaining
 	hud.eaten = eaten
 	hud.waiting = not started
-	hud.growth = clampf((radius-float(stats.start_radius))/(boss_radius/EAT_RATIO-float(stats.start_radius)),0,1)
+	hud.growth = growth()
+	hud.revive_left = revive_left
+	hud.revive_seconds = int(Ads.REVIVE_SECONDS)
+	hud.can_double = can_double()
+	hud.update_ready = update_url != ""
 	hud.stick_active = dragging
 	hud.stick_origin = drag_origin
 	hud.stick_delta = drag_delta

@@ -86,14 +86,14 @@ const EFFECTS = ["Bụi mềm", "Giấy màu", "Tinh thể", "Đốm lửa"]
 const TRAILS = ["Không vệt", "Bong bóng", "Lấp lánh", "Cầu vồng"]
 # [id, name, effect, base cost, max level], ported from the 2D stat upgrades.
 const UPGRADES = [
-	["size", "KÍCH THƯỚC", "+0,08 bán kính khởi đầu", 80, 8],
-	["speed", "TỐC ĐỘ", "+5% tốc độ di chuyển", 70, 10],
-	["time", "THỜI GIAN", "+2,5 giây mỗi màn", 100, 8],
-	["magnet", "LỰC HÚT", "Hút đồ nhỏ về phía hố", 150, 5],
-	["greed", "THU XU", "+10% xu nhận được", 120, 10],
+	["size", "KÍCH THƯỚC", "+0,05 bán kính khởi đầu", 160, 6],
+	["speed", "TỐC ĐỘ", "+4% tốc độ di chuyển", 140, 8],
+	["time", "THỜI GIAN", "+1 giây mỗi màn", 200, 5],
+	["magnet", "LỰC HÚT", "Hút đồ nhỏ về phía hố", 300, 5],
+	["greed", "THU XU", "+8% xu nhận được", 240, 8],
 ]
-const COST_GROWTH := 1.6
-const TIME_PER_UPGRADE := 2.5
+const COST_GROWTH := 1.75
+const TIME_PER_UPGRADE := 1.0
 # Best combo raises the coin reward by 1% per bite, up to +60%.
 const COMBO_COIN_CAP := 60
 const START_RADIUS := 0.86
@@ -172,15 +172,15 @@ static func level_info(index: int) -> Dictionary:
 # Par times: how long the real-time greedy test route (smoke.gd) needs per city.
 # timer gives generous slack early and less later; regenerate with --campaign-smoke
 # (it prints each route) after changing map contents.
-const PAR_SECONDS: Array[int] = [11, 13, 11, 10, 13, 11, 11, 16, 13, 11, 14, 13, 13, 12, 14, 14, 14, 14, 15, 19, 15, 14, 24, 23, 12, 19, 18, 12, 20, 21, 20, 20, 16, 13, 25, 18, 17, 16, 16, 24, 15, 20, 21, 24, 14, 18, 24, 20]
+const PAR_SECONDS: Array[int] = [14, 58, 42, 17, 47, 14, 32, 95, 17, 37, 60, 45, 57, 67, 71, 130, 98, 77, 42, 91, 75, 69, 58, 135, 138, 183, 25, 156, 123, 84, 113, 177, 104, 167, 194, 117, 167, 202, 18, 206, 15, 128, 105, 45, 122, 117, 110, 177]
 
 # Timer = par × slack, never below a floor. The par route plays like a sharp
-# player, so the slack covers steering, dodging and learning the map; combo
-# milestones add time on top, so fast play earns the margin.
-const TIME_SLACK_START := 2.6
-const TIME_SLACK_END := 1.9
-const TIME_FLOOR_START := 50.0
-const TIME_FLOOR_END := 36.0
+# player, so the slack covers steering, dodging and learning the map. Nothing
+# adds time in campaign or daily rounds, so this is the whole budget.
+const TIME_SLACK_START := 2.3
+const TIME_SLACK_END := 1.55
+const TIME_FLOOR_START := 45.0
+const TIME_FLOOR_END := 30.0
 
 static func level_seconds(index: int, blocks: int, progress: float) -> float:
 	if index >= PAR_SECONDS.size(): return 35.0 + blocks*20.0
@@ -237,13 +237,22 @@ func buy(id: String) -> bool:
 	upgrades[id] += 1
 	return true
 
-# Small per-level effects help without trivialising the boss, as in 2D.
+# Small per-level effects help without trivialising the boss: a fully grown
+# size upgrade (+0.30) still cannot eat street buildings from the start.
+const SIZE_PER_UPGRADE := 0.05
+const SPEED_PER_UPGRADE := 0.04
+const GREED_PER_UPGRADE := 0.08
+# Map food pays coins per this many points; stars and the win itself pay the rest,
+# so good play earns upgrades faster than grinding the same city.
+const POINTS_PER_COIN_WIN := 80.0
+const POINTS_PER_COIN_LOSS := 200.0
+
 func stats() -> Dictionary:
-	return {"start_radius":START_RADIUS + upgrades.size*0.08, "speed":1.0 + upgrades.speed*0.05,
-		"bonus_time":upgrades.time*TIME_PER_UPGRADE, "magnet":upgrades.magnet, "coin_mul":1.0 + upgrades.greed*0.1}
+	return {"start_radius":START_RADIUS + upgrades.size*SIZE_PER_UPGRADE, "speed":1.0 + upgrades.speed*SPEED_PER_UPGRADE,
+		"bonus_time":upgrades.time*TIME_PER_UPGRADE, "magnet":upgrades.magnet, "coin_mul":1.0 + upgrades.greed*GREED_PER_UPGRADE}
 
 func reward(won: bool, stars: int, eaten_points: int, best_combo := 0) -> int:
-	var base := eaten_points/40.0 + stars*15 + 10 + selected*2 if won else eaten_points/100.0
+	var base := eaten_points/POINTS_PER_COIN_WIN + stars*15 + 10 + selected*2 if won else eaten_points/POINTS_PER_COIN_LOSS
 	var combo_mul := 1.0 + mini(best_combo, COMBO_COIN_CAP)/100.0
 	return roundi(base*combo_mul*stats().coin_mul)
 
