@@ -115,8 +115,11 @@ var coins := 0
 var upgrades := {}
 # Per-level bitmask of met goals (see challenges.gd); medals are their counts.
 var goals: Array[int] = []
-# Today's challenge: {"date":"YYYY-MM-DD", "best":score, "won":bool}.
+# Today's challenge: {"date":"YYYY-MM-DD", "type":mini-game, "attempts":used,
+# "best":score, "won":bool}.
 var daily := {}
+# Carry-in powers won in daily mini-games, used up at the next campaign round.
+var items := {"magnet":0, "speed":0, "time":0}
 # Endless survival records.
 var endless := {"best":0, "stage":0}
 # Intro pages and feature tips already shown (see intro.gd), and the UI language.
@@ -298,9 +301,9 @@ func reward(won: bool, stars: int, eaten_points: int, best_combo := 0) -> int:
 
 func data() -> Dictionary:
 	# A temporary preview selection must not become a permanent unlock.
-	return {"version":6, "selected":mini(selected,unlocked), "unlocked":unlocked, "medals":medals, "goals":goals,
+	return {"version":7, "selected":mini(selected,unlocked), "unlocked":unlocked, "medals":medals, "goals":goals,
 		"craft":craft, "skin":skin, "effect":effect, "trail":trail, "owned":owned.duplicate(true), "best":best, "coins":coins, "upgrades":upgrades.duplicate(),
-		"daily":daily.duplicate(), "endless":endless.duplicate(), "seen":seen.duplicate(), "lang":lang}
+		"daily":daily.duplicate(), "items":items.duplicate(), "endless":endless.duplicate(), "seen":seen.duplicate(), "lang":lang}
 
 func restore(value: Variant) -> void:
 	if not value is Dictionary: return
@@ -377,10 +380,19 @@ func restore_settings(value: Dictionary) -> void:
 
 func restore_records(value: Dictionary) -> void:
 	var saved_daily = value.get("daily", {})
-	if saved_daily is Dictionary and saved_daily.get("date") is String:
-		var daily_best = saved_daily.get("best", 0)
-		daily = {"date":saved_daily.date, "best":maxi(0, int(daily_best)) if daily_best is float or daily_best is int else 0,
+	if saved_daily is Dictionary and saved_daily.get("date") is String and saved_daily.date.length() <= 10:
+		var record := {"date":saved_daily.date, "type":daily_type(saved_daily.date), "attempts":0, "best":0,
 			"won":saved_daily.get("won", false) == true}
+		for field in ["best", "attempts"]:
+			var number = saved_daily.get(field, 0)
+			if number is float or number is int: record[field] = maxi(0, int(number))
+		record.attempts = mini(record.attempts, DAILY_ATTEMPTS)
+		daily = record
+	var saved_items = value.get("items", {})
+	if saved_items is Dictionary:
+		for kind in items:
+			var count = saved_items.get(kind, 0)
+			if count is float or count is int: items[kind] = clampi(int(count), 0, MAX_ITEMS)
 	var saved_endless = value.get("endless", {})
 	if saved_endless is Dictionary:
 		for field in ["best", "stage"]:
@@ -401,9 +413,14 @@ func complete_goals(mask: int, score: int) -> void:
 	unlocked = maxi(unlocked, mini(selected+1, level_count()-1))
 
 # --- Daily challenge -------------------------------------------------------------
-# One city per calendar day, the same for everyone, with a rival and a tougher
-# defence. The first win of the day pays a bonus.
+# One city and one mini-game per calendar day, the same for everyone, three tries.
+# Reaching the mini-game's target the first time that day pays a bonus and a
+# carry-in power for the campaign (daily_games.gd has the games themselves).
 const DAILY_COIN_BONUS := 1.5
+const DAILY_TYPES := ["stampede", "coinrain", "goldrush"]
+const DAILY_ATTEMPTS := 3
+const MAX_ITEMS := 9
+const POWER_KINDS := ["magnet", "speed", "time"]
 
 static func today() -> String:
 	return Time.get_date_string_from_system()
@@ -411,15 +428,46 @@ static func today() -> String:
 static func daily_level(date: String) -> int:
 	return absi(hash("hole-munch-" + date)) % level_count()
 
-func daily_record(date: String) -> Dictionary:
-	return daily if daily.get("date", "") == date else {"date":date, "best":0, "won":false}
+static func daily_type(date: String) -> String:
+	return DAILY_TYPES[absi(hash("type-" + date)) % DAILY_TYPES.size()]
 
-# Returns true for the first win of that day.
+# The power a first daily win hands out, also fixed per day.
+static func daily_power(date: String) -> String:
+	return POWER_KINDS[absi(hash("power-" + date)) % POWER_KINDS.size()]
+
+func daily_record(date: String) -> Dictionary:
+	if daily.get("date", "") == date: return daily
+	return {"date":date, "type":daily_type(date), "attempts":0, "best":0, "won":false}
+
+func daily_attempts_left(date: String) -> int:
+	return maxi(0, DAILY_ATTEMPTS - int(daily_record(date).attempts))
+
+# Spends one of today's tries; false when none are left.
+func use_daily_attempt(date: String) -> bool:
+	if daily_attempts_left(date) <= 0: return false
+	var record := daily_record(date).duplicate()
+	record.attempts = int(record.attempts) + 1
+	daily = record
+	return true
+
+# Returns true for the first win of that day, which also grants the day's power.
 func record_daily(date: String, score: int, won: bool) -> bool:
 	var record := daily_record(date)
 	var first_win: bool = won and not record.won
-	daily = {"date":date, "best":maxi(int(record.best), score), "won":record.won or won}
+	daily = {"date":date, "type":record.type, "attempts":record.attempts, "best":maxi(int(record.best), score), "won":record.won or won}
+	if first_win:
+		var power := daily_power(date)
+		items[power] = mini(MAX_ITEMS, int(items[power]) + 1)
 	return first_win
+
+# Takes one of each carry-in power for a campaign round; returns the kinds used.
+func use_items() -> Array:
+	var used: Array = []
+	for kind in POWER_KINDS:
+		if int(items[kind]) > 0:
+			items[kind] = int(items[kind]) - 1
+			used.append(kind)
+	return used
 
 # --- Endless survival -----------------------------------------------------------
 # Each conquered city leads to a random city one step harder.

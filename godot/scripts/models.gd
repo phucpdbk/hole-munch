@@ -159,6 +159,45 @@ func toy(kind: String, variant: int = 0) -> ArrayMesh:
 			parts.append(piece("cyl", Vector3(0, 0.4, 0), Vector3(0.36, 0.72, 0.36), Color("d8453b")))
 			parts.append(piece("cyl", Vector3(0, 0.45, 0), Vector3(0.38, 0.14, 0.38), Color("ffd24a")))
 			parts.append(piece("cyl", Vector3(0, 0.83, 0), Vector3(0.12, 0.12, 0.12), Color("2d2d33")))
+		"duck":
+			# Daily stampede: a chunky yellow duck that faces +z.
+			parts.append(piece("ball", Vector3(0, 0.32, -0.05), Vector3(0.36, 0.28, 0.44), Color("ffd84a")))
+			parts.append(piece("ball", Vector3(0, 0.64, 0.24), Vector3.ONE*0.2, Color("ffe066")))
+			parts.append(piece("box", Vector3(0, 0.6, 0.47), Vector3(0.16, 0.06, 0.16), Color("ff9a3c")))
+			parts.append(piece("ball", Vector3(0, 0.38, -0.46), Vector3(0.14, 0.12, 0.14), Color("f2c230")))
+			for x in [-0.08, 0.08]:
+				parts.append(piece("ball", Vector3(x, 0.7, 0.4), Vector3.ONE*0.035, Color("1d2430")))
+				parts.append(piece("box", Vector3(x*1.4, 0.04, 0.05), Vector3(0.12, 0.06, 0.18), Color("ff9a3c")))
+		"coin":
+			# Daily coin rain: a standing gold coin with a darker rim.
+			parts.append(piece("cyl", Vector3(0, 0.42, 0), Vector3(0.36, 0.08, 0.36), Color("e0a526"), Vector3(PI/2, 0, 0)))
+			parts.append(piece("cyl", Vector3(0, 0.42, 0), Vector3(0.27, 0.1, 0.27), Color("ffd95a"), Vector3(PI/2, 0, 0)))
+		"gold":
+			# Daily gold rush: bars, a treasure chest and a golden statue.
+			match variant:
+				0:
+					parts.append(piece("frustum", Vector3(0, 0.14, 0), Vector3(0.36, 0.28, 0.22), Color("f2c23a"), Vector3(0, PI/4, 0)))
+					parts.append(piece("frustum", Vector3(0.05, 0.4, 0), Vector3(0.3, 0.24, 0.18), Color("ffd95a"), Vector3(0, PI/4, 0)))
+				1:
+					parts.append(piece("box", Vector3(0, 0.35, 0), Vector3(1.3, 0.7, 0.85), Color("8a5a2b")))
+					parts.append(piece("cyl", Vector3(0, 0.72, 0), Vector3(0.43, 1.3, 0.43), Color("a06a34"), Vector3(0, 0, PI/2)))
+					parts.append(piece("box", Vector3(0, 0.45, 0), Vector3(1.34, 0.12, 0.9), Color("ffd24a")))
+					parts.append(piece("box", Vector3(0, 0.5, 0.44), Vector3(0.22, 0.26, 0.06), Color("ffe58a")))
+					for i in 5: parts.append(piece("ball", Vector3(-0.4 + i*0.2, 0.98, 0.05*(i%2)), Vector3.ONE*0.14, Color("ffd95a")))
+				_:
+					parts.append(piece("cyl", Vector3(0, 0.25, 0), Vector3(1.1, 0.5, 1.1), Color("c79a3a")))
+					parts.append(piece("ball", Vector3(0, 1.3, 0), Vector3(0.62, 0.85, 0.5), Color("f2c23a")))
+					parts.append(piece("ball", Vector3(0, 2.35, 0), Vector3.ONE*0.42, Color("ffd95a")))
+					parts.append(piece("roof", Vector3(0, 2.95, 0), Vector3(0.4, 0.5, 0.4), Color("ffe58a")))
+					for x in [-0.7, 0.7]: parts.append(piece("ball", Vector3(x, 1.75, 0), Vector3(0.18, 0.5, 0.18), Color("f2c23a"), Vector3(0, 0, -x)))
+		"barrier":
+			# Roadblock: striped concrete barriers and a warning sign.
+			for x in [-1.2, 0.0, 1.2]:
+				parts.append(piece("frustum", Vector3(x, 0.4, 0), Vector3(0.62, 0.8, 0.5), Color("d8d6cf"), Vector3(0, PI/4, 0)))
+				parts.append(piece("box", Vector3(x, 0.55, 0), Vector3(0.9, 0.16, 0.66), Color("e8553d")))
+			parts.append(piece("cylinder", Vector3(0, 1.3, -0.1), Vector3(0.05, 1.0, 0.05), Color("5d6f7c")))
+			parts.append(piece("box", Vector3(0, 1.75, -0.1), Vector3(1.0, 0.5, 0.06), Color("ffcf3a")))
+			parts.append(piece("box", Vector3(0, 1.75, -0.07), Vector3(0.8, 0.1, 0.04), Color("2d2d33")))
 		"soldier": parts = region.soldier()
 		"drone": parts = region.drone()
 		"house": parts = region.house(region_style, color, variant)

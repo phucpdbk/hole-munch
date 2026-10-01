@@ -25,6 +25,10 @@ const UiStyle = preload("res://scripts/ui_style.gd")
 const Intro = preload("res://scripts/intro.gd")
 const Ads = preload("res://scripts/ads.gd")
 const UpdateCheck = preload("res://scripts/update_check.gd")
+const DailyGames = preload("res://scripts/daily_games.gd")
+# Seconds a carry-in power from the daily mini-game lasts (time adds seconds).
+const CARRY_SECONDS := 12.0
+const CARRY_TIME := 10.0
 const START_RADIUS := Campaign.START_RADIUS
 const MAX_RADIUS := 8.5
 const MIN_BOSS := 3.0
@@ -100,6 +104,10 @@ var campaign_level := 0
 var endless_stage := 0
 var endless_rng := RandomNumberGenerator.new()
 var endless_advance := false
+# Today's daily mini-game (scripts/daily_games.gd); tests may force a type.
+var daily: Node3D
+var daily_kind := "stampede"
+var daily_override := ""
 var goal_list: Array = []
 var goal_mask := 0
 var defenders_eaten := 0
@@ -196,6 +204,8 @@ func _ready() -> void:
 	mechanics = Mechanics.new()
 	add_child(mechanics)
 	add_child(defense_visual)
+	daily = DailyGames.new()
+	add_child(daily)
 	fx = Fx.new()
 	add_child(fx)
 	sfx = Sfx.new()
@@ -284,7 +294,9 @@ func is_landmark() -> bool:
 func load_level(index: int) -> void:
 	campaign.selected = clampi(index, 0, Campaign.level_count()-1)
 	level = Campaign.level_info(campaign.selected)
-	if run_kind == "daily": level.rival = true
+	if run_kind == "daily":
+		level.rival = daily_kind == "goldrush"
+		level.seconds = DailyGames.SECONDS[daily_kind]
 	goal_list = Challenges.goals(level)
 	layout = MapLayout.make(level.cols, level.rows)
 	layout.vary_districts(campaign.selected)
@@ -308,6 +320,7 @@ func load_level(index: int) -> void:
 	total_points = 0
 	make_ground()
 	make_city()
+	if run_kind == "daily": daily.build(self, daily_kind, 7177 + campaign.selected*53)
 	make_batches()
 	weather.configure(level.weather, sky_environment, sunlight, Color(palette[5]))
 	reset_round()
@@ -690,6 +703,7 @@ func reset_round() -> void:
 			item.hidden = true
 			item.home = item.origin
 	duck.reset(items[boss_index])
+	if run_kind == "daily": daily.reset(self)
 	animate_world(0.0)
 	for item in items: set_item_transform(item)
 
@@ -763,6 +777,7 @@ func on_play() -> void:
 		stats = campaign.stats()
 	if mode in ["menu", "result"] and offer_tips(): return
 	if mode == "result": ads.maybe_interstitial(campaign.selected)
+	var fresh := mode != "paused"
 	if mode == "paused":
 		paused = false
 	elif mode == "menu":
@@ -772,6 +787,16 @@ func on_play() -> void:
 		reset_round()
 	playing = true
 	mode = "playing"
+	if fresh: use_carry_in()
+
+# Powers won in the daily mini-game kick in at the start of a campaign round.
+func use_carry_in() -> void:
+	if run_kind != "campaign": return
+	var used: Array = campaign.use_items()
+	if used.is_empty(): return
+	for kind in used:
+		mechanics.grant(self, kind, CARRY_TIME if kind == "time" else CARRY_SECONDS)
+	persist()
 
 func go_menu() -> void:
 	if run_kind != "campaign":
@@ -894,6 +919,7 @@ func step(dt: float, input: Vector2) -> void:
 	update_floaters(dt)
 	update_boss(dt)
 	mechanics.update(self, dt)
+	if run_kind == "daily": daily.update(self, dt)
 	for unit in defense.units:
 		if Traffic.is_active(unit.item): set_item_transform(unit.item)
 	advance_falls(dt)
@@ -908,6 +934,9 @@ func step(dt: float, input: Vector2) -> void:
 	update_counter()
 	update_rival(dt)
 	if not playing: return
+	if run_kind == "daily":
+		if remaining <= 0 or daily.done(): finish(daily.reached())
+		return
 	if boss_down and map_cleared(): finish(true)
 	# A boss already sinking wins even if the clock runs out during its fall.
 	elif remaining <= 0 and (boss_down or items[boss_index].fall < 0):
@@ -924,7 +953,7 @@ func magnet_level() -> int:
 # Near the end of a landmark city the landmark fights back: volleys of blasts
 # around the hole and a reinforcement squad from the map edge.
 func update_counter() -> void:
-	if counter_started or campaign.selected < COUNTER_FROM or not is_landmark(): return
+	if counter_started or run_kind == "daily" or campaign.selected < COUNTER_FROM or not is_landmark(): return
 	if target_radius*EAT_RATIO < boss_radius*COUNTER_AT: return
 	counter_started = true
 	var boss: Dictionary = items[boss_index]
@@ -1048,6 +1077,7 @@ func swallow(item: Dictionary) -> void:
 	if item.get("bomb", false):
 		mechanics.explode(self, item)
 		return
+	if run_kind == "daily": daily.caught(self, item)
 	fx.puff(item.position, item.radius, radius)
 	if is_boss:
 		score += BOSS_BONUS
@@ -1134,10 +1164,16 @@ func finish(won: bool) -> void:
 	# Coins pay for upgrades; only original map food counts, not combo points.
 	match run_kind:
 		"daily":
-			reward = campaign.reward(won, hud.stars, eaten_points, best_combo)
-			var first_win: bool = campaign.record_daily(Campaign.today(), score, won)
-			if first_win: reward = roundi(reward*Campaign.DAILY_COIN_BONUS)
-			record_note = I18n.t("daily_first") if first_win else I18n.t("daily_best", int(campaign.daily.best))
+			# Mini-game stars and coins come from catches, not from the city goals.
+			hud.stars = daily.stars()
+			goal_mask = (1 << hud.stars) - 1
+			reward = daily.reward(float(stats.coin_mul))
+			var date := Campaign.today()
+			var first_win: bool = campaign.record_daily(date, daily.count, won)
+			if first_win:
+				reward = roundi(reward*Campaign.DAILY_COIN_BONUS)
+				record_note = I18n.t("daily_power", I18n.t("item_" + Campaign.daily_power(date)))
+			else: record_note = I18n.t("daily_best", int(campaign.daily.best))
 		"endless":
 			reward = campaign.endless_reward(score, endless_stage)
 			record_note = (I18n.t("new_record") if campaign.record_endless(score, endless_stage) else I18n.t("record", int(campaign.endless.best))) + I18n.t("cities_taken", endless_stage)
@@ -1145,7 +1181,7 @@ func finish(won: bool) -> void:
 			reward = campaign.reward(won, hud.stars, eaten_points, best_combo)
 			campaign.complete_goals(goal_mask, score)
 	# Clearing the whole map early pays for every second left on the clock.
-	if won and run_kind != "endless" and map_cleared():
+	if won and run_kind == "campaign" and map_cleared():
 		var extra := int(remaining)*CLEAR_COINS
 		reward += extra
 		if record_note == "": record_note = I18n.t("early_clear", extra)
@@ -1205,10 +1241,12 @@ func open_update() -> void:
 # What the HUD minimap shows: roads, hole, landmark, rival and sky drops.
 func minimap_data() -> Dictionary:
 	if layout == null or boss_index < 0 or boss_index >= items.size(): return {}
+	var boss: Dictionary = items[boss_index]
 	var data := {"half":Vector2(layout.half_x, layout.half_z), "streets_x":layout.streets_x, "streets_z":layout.streets_z,
 		"hole":Vector2(hole_position.x, hole_position.z), "radius":radius,
-		"boss":Vector2(items[boss_index].position.x, items[boss_index].position.z),
-		"open":not items[boss_index].get("shielded", false), "bombs":[]}
+		"open":not boss.get("shielded", false), "bombs":[]}
+	if not boss.get("hidden", false): data.boss = Vector2(boss.position.x, boss.position.z)
+	if run_kind == "daily": data.dots = daily.dots()
 	for bomb in mechanics.bombs:
 		if not bomb.eaten and not bomb.hidden: data.bombs.append(Vector2(bomb.origin.x, bomb.origin.z))
 	if not mechanics.pickup.is_empty(): data.pickup = Vector2(mechanics.pickup.position.x, mechanics.pickup.position.z)
@@ -1234,9 +1272,27 @@ func begin_special(kind: String, index: int) -> void:
 	playing = true
 	mode = "playing"
 
+# Three tries a day; a mini-game's first try opens its tip card.
 func start_daily() -> void:
-	if mode not in ["menu", "result"]: return
-	begin_special("daily", Campaign.daily_level(Campaign.today()))
+	if mode not in ["menu", "result"] or intro.visible: return
+	var date := Campaign.today()
+	if campaign.daily_attempts_left(date) <= 0:
+		if mode == "result": go_menu()
+		return
+	daily_kind = daily_override if daily_override != "" else Campaign.daily_type(date)
+	var tip := "daily_" + daily_kind
+	if not test_mode and not capture_mode and tip not in campaign.seen:
+		clear_drag()
+		mark_seen([tip])
+		intro.open([Intro.tip_page(tip)], begin_daily)
+		return
+	begin_daily()
+
+func begin_daily() -> void:
+	var date := Campaign.today()
+	if mode not in ["menu", "result"] or not campaign.use_daily_attempt(date): return
+	persist()
+	begin_special("daily", Campaign.daily_level(date))
 
 func start_endless() -> void:
 	if mode not in ["menu", "result"]: return
@@ -1313,7 +1369,7 @@ func update_view(dt: float) -> void:
 
 func update_hud() -> void:
 	defense_visual.update(defense,mode in ["playing","paused"])
-	hud.defense_status = I18n.t("def_hit") if defense.slow > 0 else I18n.t("def_dodge") if not defense.strikes.is_empty() else I18n.t("def_count", defense.active_count())
+	hud.defense_status = "" if run_kind == "daily" else I18n.t("def_hit") if defense.slow > 0 else I18n.t("def_dodge") if not defense.strikes.is_empty() else I18n.t("def_count", defense.active_count())
 	hud.strike_shapes.clear()
 	if mode == "playing":
 		for strike in defense.strikes:
@@ -1340,6 +1396,7 @@ func update_hud() -> void:
 	mechanics.sync_shield(self)
 	if not started and mechanics.weather_note() != "": hud.note = mechanics.weather_note()
 	elif mechanics.hungry: hud.note = I18n.t("hungry")
+	elif run_kind == "daily": hud.note = ""
 	elif boss_down: hud.note = I18n.t("boss_down", [target_name, roundi((1.0-completion())*100)])
 	elif mechanics.shield_up() and radius*EAT_RATIO >= boss_radius: hud.note = I18n.t("break_pylons", mechanics.pylons.filter(func(p): return not p.eaten).size())
 	else: hud.note = I18n.t("big_enough", target_name) if radius*EAT_RATIO >= boss_radius else ""
@@ -1362,7 +1419,15 @@ func update_hud() -> void:
 	hud.stage = endless_stage
 	hud.lose_reason = lose_reason
 	hud.record_note = record_note
-	hud.goal_labels = goal_list.map(func(goal): return Challenges.label(goal))
+	hud.goal_labels = daily.goal_labels() if run_kind == "daily" else goal_list.map(func(goal): return Challenges.label(goal))
+	var today := campaign.daily_record(Campaign.today())
+	hud.daily_left = campaign.daily_attempts_left(today.date)
+	hud.daily_title = DailyGames.title(daily_kind if run_kind == "daily" else str(today.type))
+	hud.daily_goal = DailyGames.goal_line(daily_kind) if run_kind == "daily" else ""
+	hud.daily_icon = DailyGames.ICON.get(daily_kind if run_kind == "daily" else str(today.type), "daily")
+	hud.daily_count = daily.count
+	hud.daily_target = daily.target()
+	hud.items = campaign.items
 	hud.goal_mask = goal_mask if mode == "result" else campaign.goals[campaign.selected] if run_kind == "campaign" else 0
 	hud.rival_growth = clampf(rival.radius*EAT_RATIO/boss_radius, 0, 1) if rival.active else -1.0
 	hud.daily_won = campaign.daily_record(Campaign.today()).won

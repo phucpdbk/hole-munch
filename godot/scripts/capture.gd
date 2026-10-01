@@ -59,6 +59,10 @@ func run(game, campaign_mode: bool) -> void:
 		await challenge_preview()
 		g.get_tree().quit()
 		return
+	if "--daily-capture" in OS.get_cmdline_user_args():
+		await daily_preview()
+		g.get_tree().quit()
+		return
 	if "--defense-capture" in OS.get_cmdline_user_args():
 		await defense_preview()
 		g.get_tree().quit()
@@ -110,6 +114,37 @@ func challenge_preview() -> void:
 	g.go_menu()
 	await frames(20)
 	await snapshot("challenge-menu-after")
+
+# Each daily mini-game mid-round, then a result (`--capture --daily-capture`).
+func daily_preview() -> void:
+	g.go_menu()
+	await frames(30)
+	await snapshot("daily-menu")
+	for type in g.Campaign.DAILY_TYPES:
+		g.campaign.daily = {}
+		g.daily_override = type
+		g.start_daily()
+		g.started = true
+		g.defense.grace = INF
+		g.target_radius = 1.6
+		for i in 150:
+			g.hole_position.x = lerpf(g.hole_position.x, -6.0, 0.02)
+			await g.get_tree().process_frame
+		await snapshot("daily-" + type)
+		g.go_menu()
+	g.daily.count = 99
+	g.campaign.daily = {}
+	g.daily_override = "stampede"
+	g.start_daily()
+	g.daily.count = 18
+	g.started = true
+	g.remaining = 0.05
+	while g.mode != "result": await g.get_tree().process_frame
+	await frames(3)
+	await snapshot("daily-result")
+	g.go_menu()
+	await frames(20)
+	await snapshot("daily-menu-after")
 
 func defense_preview() -> void:
 	g.load_level(1)

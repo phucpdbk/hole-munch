@@ -18,9 +18,11 @@ static func draw(canvas: CanvasItem, top_right: Vector2, data: Dictionary) -> vo
 		canvas.draw_line(to_map(rect, half, scale, Vector2(x, -half.y)), to_map(rect, half, scale, Vector2(x, half.y)), Color("3c4650"), 3.0)
 	for z in data.streets_z:
 		canvas.draw_line(to_map(rect, half, scale, Vector2(-half.x, z)), to_map(rect, half, scale, Vector2(half.x, z)), Color("3c4650"), 3.0)
-	var boss := to_map(rect, half, scale, data.boss)
-	canvas.draw_circle(boss, 6.0, UiStyle.GOLD if data.open else Color("9fdcff"))
-	canvas.draw_arc(boss, 7.5, 0, TAU, 16, UiStyle.INK, 1.5, true)
+	for dot in data.get("dots", []): canvas.draw_circle(to_map(rect, half, scale, dot), 2.5, UiStyle.GOLD)
+	if data.has("boss"):
+		var boss := to_map(rect, half, scale, data.boss)
+		canvas.draw_circle(boss, 6.0, UiStyle.GOLD if data.open else Color("9fdcff"))
+		canvas.draw_arc(boss, 7.5, 0, TAU, 16, UiStyle.INK, 1.5, true)
 	for bomb in data.bombs: canvas.draw_circle(to_map(rect, half, scale, bomb), 3.0, Color("ff5a4e"))
 	if data.has("pickup"): canvas.draw_circle(to_map(rect, half, scale, data.pickup), 3.5, Color("c69bff"))
 	if data.has("rival"):

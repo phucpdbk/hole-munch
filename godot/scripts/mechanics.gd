@@ -305,16 +305,26 @@ func spawn_pickup(game) -> void:
 
 func collect(game) -> void:
 	var kind: String = pickup.kind
-	match kind:
-		"time":
-			game.remaining += TIME_PICKUP
-			game.bonus_seconds += TIME_PICKUP
-		"magnet", "speed": powers[kind] = POWER_TIME
-		"freeze": game.defense.grace = maxf(game.defense.grace, FREEZE_TIME)
+	apply(game, kind, TIME_PICKUP if kind == "time" else FREEZE_TIME if kind == "freeze" else POWER_TIME)
 	game.add_floater(pickup.position, I18n.t(PICKUPS[kind][0]) + "!", true)
 	game.fx.ripple(pickup.position, 1.2, PICKUPS[kind][1])
 	game.sfx.play("grow")
 	clear_pickup()
+
+func apply(game, kind: String, amount: float) -> void:
+	match kind:
+		"time":
+			game.remaining += amount
+			game.bonus_seconds += amount
+		"magnet", "speed": powers[kind] = maxf(powers[kind], amount)
+		"freeze": game.defense.grace = maxf(game.defense.grace, amount)
+
+# A carry-in power from the daily mini-game, used at the start of a round.
+func grant(game, kind: String, amount: float) -> void:
+	apply(game, kind, amount)
+	game.add_floater(game.hole_position, I18n.t("item_used", I18n.t("item_" + kind)), true)
+	game.fx.ripple(game.hole_position, 1.6, PICKUPS[kind][1])
+	game.sfx.play("grow")
 
 func clear_pickup() -> void:
 	pickup = {}

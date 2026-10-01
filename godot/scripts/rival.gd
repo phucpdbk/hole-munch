@@ -11,6 +11,7 @@ const GROWTH := 0.45
 const MAX_RADIUS := 8.5
 const RETARGET := 0.35
 const HUNT_RANGE := 9.0
+const GOLD_PULL := 2.5
 const FLEE_RANGE := 7.0
 # The rival stops to chew after each bite, longer for bigger food.
 const DIGEST_PER_RADIUS := 0.5
@@ -124,6 +125,8 @@ static func best_target(items: Array, boss: Dictionary, from: Vector3, hole_radi
 		if item.get("falling", 0.0) > 0 or (item.get("bomb", false) and hole_radius < Mechanics.BOMB_SAFE): continue
 		var distance := Vector2(item.position.x-from.x, item.position.z-from.z).length()
 		var value: float = item.radius*item.radius/(distance + 3.0)
+		# Golden food (gold districts, gold-rush treasure) is worth a detour.
+		if item.get("gold", false): value *= GOLD_PULL
 		if value > best_value:
 			best_value = value
 			best = item

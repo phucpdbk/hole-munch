@@ -16,7 +16,8 @@ func run(g) -> void:
 		return
 	check_progress()
 	check_goals_and_modes()
-	check_levels(g)
+	# `--quick` skips the slow 48-city sweep while iterating on other checks.
+	if "--quick" not in OS.get_cmdline_user_args(): check_levels(g)
 	check_challenge_systems(g)
 	check_rival(g)
 	check_special_runs(g)
@@ -303,8 +304,7 @@ func check_rival(g) -> void:
 func check_special_runs(g) -> void:
 	g.load_level(5)
 	g.go_menu()
-	g.start_daily()
-	check(g.run_kind == "daily" and g.mode == "playing" and g.rival.active and g.campaign.selected == Campaign.daily_level(Campaign.today()), "daily challenge starts with a rival")
+	check_daily_games(g)
 	g.go_menu()
 	check(g.run_kind == "campaign" and g.campaign.selected == 5, "leaving the daily returns to the campaign city")
 	g.start_endless()
@@ -331,6 +331,86 @@ func check_special_runs(g) -> void:
 	check(g.mode == "result" and g.campaign.endless.stage >= 1,"endless ends on timeout and records the run")
 	g.go_menu()
 	check(g.run_kind == "campaign" and g.campaign.selected == 5, "leaving endless returns to the campaign city")
+
+# Daily mini-games (daily_games.gd): setup, scoring, three tries a day and the
+# carry-in power a first win pays.
+func check_daily_games(g) -> void:
+	var date := Campaign.today()
+	check(Campaign.daily_type(date) == Campaign.daily_type(date) and Campaign.daily_type(date) in Campaign.DAILY_TYPES, "daily mini-game is deterministic per day")
+	var types := {}
+	for day in 30: types[Campaign.daily_type("2026-11-%02d" % (day+1))] = true
+	check(types.size() == Campaign.DAILY_TYPES.size(), "every mini-game comes up within a month")
+	g.campaign.daily = {}
+	g.campaign.items = {"magnet":0, "speed":0, "time":0}
+	g.daily_override = "goldrush"
+	g.start_daily()
+	var boss: Dictionary = g.items[g.boss_index]
+	check(g.run_kind == "daily" and g.mode == "playing" and g.rival.active and g.campaign.selected == Campaign.daily_level(date), "gold rush starts with a rival in today's city")
+	check(boss.hidden and g.items.filter(func(item): return item.get("defender", false) and not item.hidden).is_empty(), "the landmark and its defenders sit out the mini-game")
+	check(is_equal_approx(g.remaining, g.DailyGames.SECONDS.goldrush + float(g.stats.bonus_time)) and g.campaign.daily_attempts_left(date) == 2, "a daily try is spent and the mini-game clock is set")
+	var chest: Dictionary = g.items.filter(func(item): return item.kind == "gold" and item.variant == 1)[0]
+	g.started = true
+	g.swallow(chest)
+	var food: Dictionary = g.items.filter(func(item): return item.kind == "cone")[0]
+	g.swallow(food)
+	check(g.daily.count == 3, "only golden treasure scores (a chest is worth 3)")
+	g.go_menu()
+	g.daily_override = "stampede"
+	g.start_daily()
+	var ducks: Array = g.items.filter(func(item): return item.kind == "duck")
+	check(ducks.size() == g.DailyGames.DUCKS and not g.rival.active and g.daily.count == 0, "duck stampede fills the city with ducks")
+	g.started = true
+	g.defense.grace = INF
+	var duck: Dictionary = ducks[0]
+	var start: Vector3 = duck.position
+	g.hole_position = start + Vector3(2.5, 0, 0)
+	g.hole_position.y = 0
+	for frame in 150: g.step(0.02, Vector2.ZERO)
+	check(duck.position.distance_to(start) > 1.0 and duck.position.distance_to(g.hole_position) > 2.5, "ducks sprint away from the hole")
+	g.hole_position = Vector3(duck.position.x, 0, duck.position.z)
+	for frame in 3: g.step(0.02, Vector2.ZERO)
+	check(g.daily.count >= 1, "swallowing a duck scores")
+	g.daily.count = g.daily.target()
+	g.remaining = 0.01
+	g.step(0.02, Vector2.ZERO)
+	var power := Campaign.daily_power(date)
+	check(g.mode == "result" and g.hud.won and g.reward > 0 and g.hud.stars == 2 and g.campaign.items[power] == 1, "reaching the target wins coins and a carry-in power (%s)" % power)
+	g.on_play()
+	check(g.run_kind == "daily" and g.mode == "playing" and g.campaign.daily_attempts_left(date) == 0, "replay from the result spends the third try")
+	g.daily_override = "coinrain"
+	g.started = true
+	g.remaining = 0.01
+	g.step(0.02, Vector2.ZERO)
+	check(g.mode == "result" and g.campaign.items[power] == 1, "a second win the same day pays no second power")
+	g.on_play()
+	check(g.run_kind == "campaign" and g.mode == "menu", "with no tries left the daily goes home")
+	g.start_daily()
+	check(g.run_kind == "campaign" and g.mode == "menu", "the daily is locked after three tries")
+	g.campaign.daily = {}
+	g.start_daily()
+	check(g.items.filter(func(item): return item.kind == "coin").size() == g.DailyGames.COINS, "coin rain keeps a pool of coins in the sky")
+	g.started = true
+	g.defense.grace = INF
+	for frame in 150: g.step(0.02, Vector2.ZERO)
+	var landed: Array = g.items.filter(func(item): return item.kind == "coin" and not item.hidden and item.falling <= 0 and item.fall < 0)
+	check(not landed.is_empty() and landed.all(func(c): return absf(c.position.y - 0.16) < 0.01), "coins fall from the sky and land")
+	g.hole_position = Vector3(landed[0].position.x, 0, landed[0].position.z)
+	for frame in 3: g.step(0.02, Vector2.ZERO)
+	check(g.daily.count >= 1, "catching a coin scores")
+	for frame in 40: g.step(0.02, Vector2.ZERO)
+	check(g.items.filter(func(item): return item.kind == "coin" and not item.hidden and item.eaten).is_empty(), "caught coins go back to the sky pool")
+	g.go_menu()
+	g.daily_override = ""
+	var saved = Campaign.new()
+	saved.daily = {"date":date, "type":"coinrain", "attempts":9, "best":-4, "won":true}
+	saved.items = {"magnet":2, "speed":0, "time":1}
+	var restored = Campaign.new()
+	restored.restore(JSON.parse_string(JSON.stringify(saved.data())))
+	check(restored.daily.attempts == Campaign.DAILY_ATTEMPTS and restored.daily.best == 0 and restored.items.magnet == 2 and restored.items.time == 1, "daily tries and carry-in powers survive a save, bounded")
+	g.campaign.items = {"magnet":1, "speed":1, "time":0}
+	g.on_play()
+	check(g.mechanics.powers.magnet > 0 and g.mechanics.powers.speed > 0 and g.campaign.items.magnet == 0, "carry-in powers start the next campaign round")
+	g.go_menu()
 
 # Tuning aid (`-- --campaign-smoke --rival-bench`): seconds an unopposed rival
 # needs to swallow each landmark, next to the level timer.

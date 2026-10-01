@@ -41,6 +41,15 @@ var goal_labels: Array = []
 var goal_mask := 0
 var rival_growth := -1.0
 var daily_won := false
+var daily_left := 3
+var daily_title := ""
+var daily_goal := ""
+var daily_icon := "daily"
+var daily_count := 0
+var daily_target := 1
+# Carry-in powers from the daily mini-game: {"magnet":n, "speed":n, "time":n}.
+var items := {}
+const ITEM_ICONS := {"magnet":"magnet", "speed":"bolt", "time":"clock"}
 var endless_best := 0
 var gate_note := ""
 var level_title := ""
@@ -177,7 +186,8 @@ func sync() -> void:
 	if last_layout_mode != mode:
 		layout()
 		last_layout_mode = mode
-	play_button.visible = mode not in ["playing", "revive"]
+	# A daily result with no tries left only goes home.
+	play_button.visible = mode not in ["playing", "revive"] and not (mode == "result" and run_kind == "daily" and daily_left <= 0)
 	revive_button.visible = mode == "revive"
 	give_up_button.visible = mode == "revive"
 	double_button.visible = can_double
@@ -188,12 +198,14 @@ func sync() -> void:
 	double_button.text = I18n.t("ad_double", reward)
 	var next_level: bool = mode == "result" and won and has_next
 	play_button.text = I18n.t("resume") if mode == "paused" else I18n.t("next_city") if next_level else I18n.t("replay") if mode == "result" else I18n.t("play")
+	if mode == "result" and run_kind == "daily": play_button.text = I18n.t("replay_left", daily_left)
 	play_button.icon = UiStyle.icon("next" if next_level else "replay" if mode == "result" else "play")
 	menu_button.text = I18n.t("home")
 	levels_button.text = I18n.t("map")
 	shop_button.text = I18n.t("upgrades")
 	styles_button.text = I18n.t("wardrobe")
-	daily_button.text = I18n.t("daily") + (" ★" if daily_won else "")
+	daily_button.text = I18n.t("daily") + (" ★" if daily_won else "") + " %d/3" % daily_left
+	daily_button.disabled = daily_left <= 0
 	endless_button.text = I18n.t("endless") + (" · %d" % endless_best if endless_best > 0 else "")
 	for button in [daily_button, endless_button, levels_button, styles_button, shop_button, help_button, language_button]:
 		button.visible = mode == "menu"
@@ -254,12 +266,33 @@ func draw_landscape_menu() -> void:
 	draw_goals(Vector2(38, 268), 14, false, 364)
 	if gate_note != "" and has_next == false and not last_city: UiStyle.text(self, gate_note, Vector2(38, 290), 13, Color("ffb3a6"), false, 0, body_font)
 	draw_coins(size.x - 28, 28)
+	draw_items(size.x - 28, 80)
+	draw_daily_caption()
+
+# Today's mini-game, written just above the daily button.
+func draw_daily_caption() -> void:
+	var at := daily_button.position + Vector2(4, -8)
+	UiStyle.draw_icon(self, daily_icon if daily_left > 0 else "lock", at + Vector2(9, -6), 20)
+	UiStyle.text(self, daily_title, at + Vector2(24, 0), 13, UiStyle.MINT if daily_left > 0 else MUTED, false, 4, body_font)
+
+# Carry-in powers waiting for the next campaign round.
+func draw_items(right: float, top: float) -> void:
+	var owned: Array = ITEM_ICONS.keys().filter(func(kind): return int(items.get(kind, 0)) > 0)
+	if owned.is_empty(): return
+	var width := owned.size()*62.0 + 8
+	panel(Rect2(right - width, top, width, 40), Color("1b3048ee"), 20)
+	for i in owned.size():
+		var x := right - width + 8 + i*62
+		UiStyle.draw_icon(self, ITEM_ICONS[owned[i]], Vector2(x + 16, top + 20), 28)
+		UiStyle.text(self, "×%d" % int(items[owned[i]]), Vector2(x + 32, top + 27), 16, LIGHT, false, 0, title_font)
 
 func draw_portrait_menu() -> void:
 	var w := size.x
 	var h := size.y
 	text_at(I18n.t("tagline"), Vector2(w/2, 75), 14, UiStyle.MINT, true)
 	draw_coins(w - 18, 12)
+	draw_items(w - 18, 62)
+	draw_daily_caption()
 	draw_title(Vector2(w/2, 153), 52, true)
 	panel(Rect2(w/2-173, 165, 346, 36), Color("223649dc"), 16)
 	text_at(level_title, Vector2(w/2, 190), 18, LIGHT, true)
@@ -276,8 +309,9 @@ func draw_playing() -> void:
 		var outline: PackedVector2Array = strike.points.duplicate()
 		outline.append(outline[0])
 		draw_polyline(outline, Color("ff7866"), 3.0, true)
-	panel(Rect2(w/2+24, 36, 230, 40), Color("3b2836ed"), 14)
-	text_at(defense_status, Vector2(w/2+139, 62), 15, Color("ffbb9c"), true)
+	if defense_status != "":
+		panel(Rect2(w/2+24, 36, 230, 40), Color("3b2836ed"), 14)
+		text_at(defense_status, Vector2(w/2+139, 62), 15, Color("ffbb9c"), true)
 	panel(Rect2(24, 36, 132, 68), Color("1b3048ed"), 20)
 	text_at(I18n.t("score"), Vector2(42, 58), 13, MUTED)
 	UiStyle.text(self, str(score), Vector2(42, 92), 28, LIGHT, false, 0, title_font)
@@ -291,11 +325,15 @@ func draw_playing() -> void:
 	if combo >= 2: draw_combo()
 	draw_floaters()
 	panel(Rect2(24, h-115, w-48, 88), Color("1b3048ed"), 20)
-	UiStyle.draw_icon(self, "flag", Vector2(58, h-88), 30)
-	text_at(I18n.t("take_target", boss_title.to_upper()), Vector2(80, h-80), 17, LIGHT)
-	UiStyle.text(self, "%d%%" % int(growth*100), Vector2(w-92, h-80), 19, GOLD, false, 0, title_font)
+	# The daily mini-game tracks catches instead of growth toward the landmark.
+	var daily_round := run_kind == "daily"
+	var share := clampf(float(daily_count)/maxf(1.0, daily_target), 0, 1) if daily_round else growth
+	UiStyle.draw_icon(self, daily_icon if daily_round else "flag", Vector2(58, h-88), 30)
+	text_at(daily_goal if daily_round else I18n.t("take_target", boss_title.to_upper()), Vector2(80, h-80), 17, LIGHT)
+	var value := "%d/%d" % [daily_count, daily_target] if daily_round else "%d%%" % int(growth*100)
+	UiStyle.text(self, value, Vector2(w-(110 if daily_round else 92), h-80), 19, GOLD, false, 0, title_font)
 	panel(Rect2(44, h-63, w-88, 10), Color("465d6b"), 5)
-	panel(Rect2(44, h-63, maxf(10, (w-88)*growth), 10), Color("b7a2f1"), 5)
+	panel(Rect2(44, h-63, maxf(10, (w-88)*share), 10), GOLD if daily_round else Color("b7a2f1"), 5)
 	if rival_growth >= 0:
 		panel(Rect2(44, h-47, maxf(8, (w-88)*rival_growth), 6), Color("ff5a4e"), 3)
 		text_at(I18n.t("rival_pct", int(rival_growth*100)), Vector2(w-110, h-34), 12, Color("ffb3a6"))
@@ -360,7 +398,7 @@ func draw_revive() -> void:
 	UiStyle.text(self, I18n.t("ad_revive_sub", int(ceil(revive_left))), Vector2(w/2, h/2+150), 13, MUTED, true, 0, body_font)
 
 func run_title() -> String:
-	if run_kind == "daily": return I18n.t("daily")
+	if run_kind == "daily": return daily_title
 	if run_kind == "endless": return I18n.t("endless_city", stage+1)
 	return ""
 
@@ -369,6 +407,7 @@ func result_title() -> String:
 	if lose_reason == "eaten": return I18n.t("eaten_by_rival")
 	if lose_reason == "rival": return I18n.t("rival_took", city.to_upper())
 	if run_kind == "endless": return I18n.t("time_up_cities", stage)
+	if run_kind == "daily": return I18n.t("dg_won" if won else "dg_lost", [daily_count, daily_target])
 	return I18n.t("conquered", city.to_upper()) if won else I18n.t("pushed_back")
 
 func result_sub() -> String:
