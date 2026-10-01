@@ -1,5 +1,6 @@
 extends RefCounted
 const Challenges = preload("res://scripts/challenges.gd")
+const Cosmetics = preload("res://scripts/cosmetics.gd")
 const I18n = preload("res://scripts/i18n.gd")
 
 # All 48 city objectives are landmarks; military units are independent defenders.
@@ -81,9 +82,11 @@ const SKINS = [
 	# Decorated skins from the 2D game (scripts/hole_style.gd adds the ornaments).
 	["Giáng sinh", "2f7d46", "e8423f"], ["La bàn", "27857d", "f2d68a"],
 	["Vương miện", "8d6533", "ffd76a"], ["Sao chổi", "6651a9", "9fe8ff"],
+	["Chất nhờn độc", "4fd400", "b8ff5c"],
 ]
-const EFFECTS = ["Bụi mềm", "Giấy màu", "Tinh thể", "Đốm lửa"]
-const TRAILS = ["Không vệt", "Bong bóng", "Lấp lánh", "Cầu vồng"]
+# Same order as the 2D shop; prices and rewards live in cosmetics.gd.
+const EFFECTS = ["Bụi", "Pháo giấy", "Trái tim", "Ngôi sao", "Mưa xu", "Pixel", "Bông tuyết"]
+const TRAILS = ["Không", "Bong bóng", "Lấp lánh", "Tuyết", "Lửa", "Cầu vồng"]
 # [id, name, effect, base cost, max level], ported from the 2D stat upgrades.
 const UPGRADES = [
 	["size", "KÍCH THƯỚC", "+0,05 bán kính khởi đầu", 160, 6],
@@ -105,6 +108,8 @@ var craft := 0
 var skin := 0
 var effect := 0
 var trail := 0
+# Bought looks per slot (indices); journey rewards are owned without being listed.
+var owned := {"skins":[0], "effects":[0], "trails":[0]}
 var best := 0
 var coins := 0
 var upgrades := {}
@@ -237,6 +242,41 @@ func buy(id: String) -> bool:
 	upgrades[id] += 1
 	return true
 
+# --- Cosmetic shop (cosmetics.gd) --------------------------------------------
+func cities_taken() -> int:
+	var total := 0
+	for i in goals.size():
+		if i < unlocked or goals[i] != 0: total += 1
+	return total
+
+func reward_progress(track: String) -> int:
+	return total_stars() if track == "stars" else cities_taken()
+
+func reward_earned(slot: String, index: int) -> bool:
+	var reward := Cosmetics.reward_for(slot, index)
+	return not reward.is_empty() and reward_progress(reward[2]) >= int(reward[3])
+
+func owns(slot: String, index: int) -> bool:
+	return index in owned[slot] or reward_earned(slot, index)
+
+func buy_look(slot: String, index: int) -> bool:
+	if owns(slot, index) or Cosmetics.reward_only(slot, index): return false
+	var cost := Cosmetics.price(slot, index)
+	if coins < cost: return false
+	coins -= cost
+	owned[slot] = owned[slot] + [index]
+	return true
+
+func equipped(slot: String) -> int:
+	return skin if slot == "skins" else effect if slot == "effects" else trail
+
+func equip(slot: String, index: int) -> bool:
+	if index < 0 or index >= Cosmetics.count(slot) or not owns(slot, index): return false
+	if slot == "skins": skin = index
+	elif slot == "effects": effect = index
+	else: trail = index
+	return true
+
 # Small per-level effects help without trivialising the boss: a fully grown
 # size upgrade (+0.30) still cannot eat street buildings from the start.
 const SIZE_PER_UPGRADE := 0.05
@@ -258,8 +298,8 @@ func reward(won: bool, stars: int, eaten_points: int, best_combo := 0) -> int:
 
 func data() -> Dictionary:
 	# A temporary preview selection must not become a permanent unlock.
-	return {"version":5, "selected":mini(selected,unlocked), "unlocked":unlocked, "medals":medals, "goals":goals,
-		"craft":craft, "skin":skin, "effect":effect, "trail":trail, "best":best, "coins":coins, "upgrades":upgrades.duplicate(),
+	return {"version":6, "selected":mini(selected,unlocked), "unlocked":unlocked, "medals":medals, "goals":goals,
+		"craft":craft, "skin":skin, "effect":effect, "trail":trail, "owned":owned.duplicate(true), "best":best, "coins":coins, "upgrades":upgrades.duplicate(),
 		"daily":daily.duplicate(), "endless":endless.duplicate(), "seen":seen.duplicate(), "lang":lang}
 
 func restore(value: Variant) -> void:
@@ -273,6 +313,7 @@ func restore(value: Variant) -> void:
 	skin = mini(skin, SKINS.size()-1)
 	effect = mini(effect, EFFECTS.size()-1)
 	trail = mini(trail, TRAILS.size()-1)
+	restore_owned(value)
 	var saved = value.get("medals", [])
 	if int(value.get("version", 0)) < 4:
 		# The invasion campaign replaces the old city/landmark/farm levels. Earlier
@@ -302,6 +343,29 @@ func restore(value: Variant) -> void:
 			var level = saved_upgrades.get(u[0], 0)
 			if level is float or level is int: upgrades[u[0]] = clampi(int(level), 0, u[4])
 	restore_records(value)
+	# Rewards depend on progress, so equipped looks are checked once it is loaded.
+	for slot in Cosmetics.SLOTS:
+		if not owns(slot, equipped(slot)): equip(slot, 0)
+
+# Every look was free before version 6: keep what was equipped as owned. Later
+# saves list bought indices, which must be in range and are never duplicated.
+func restore_owned(value: Dictionary) -> void:
+	if int(value.get("version", 0)) < 6:
+		effect = Cosmetics.OLD_EFFECTS[mini(effect, Cosmetics.OLD_EFFECTS.size()-1)]
+		trail = Cosmetics.OLD_TRAILS[mini(trail, Cosmetics.OLD_TRAILS.size()-1)]
+		for slot in Cosmetics.SLOTS:
+			if equipped(slot) not in owned[slot]: owned[slot] = owned[slot] + [equipped(slot)]
+		return
+	var saved = value.get("owned", {})
+	if not saved is Dictionary: return
+	for slot in Cosmetics.SLOTS:
+		var list = saved.get(slot, [])
+		if not list is Array: continue
+		for item in list:
+			if not (item is float or item is int): continue
+			var index := int(item)
+			if index >= 0 and index < Cosmetics.count(slot) and index not in owned[slot]:
+				owned[slot] = owned[slot] + [index]
 
 # Language and seen tips survive every save version, including migrations.
 func restore_settings(value: Dictionary) -> void:

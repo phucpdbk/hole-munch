@@ -9,7 +9,11 @@ const UiButton = preload("res://scripts/ui_button.gd")
 const I18n = preload("res://scripts/i18n.gd")
 const JourneyMap = preload("res://scripts/journey_map.gd")
 const Fleet = preload("res://scripts/fleet.gd")
+const Cosmetics = preload("res://scripts/cosmetics.gd")
+const LookCard = preload("res://scripts/look_card.gd")
 const WARDROBE_TABS := ["crafts", "skins", "effects", "trails"]
+const CARD_H := 130.0
+const GAP := 10.0
 const UPGRADE_ICONS := {"size":"gem", "speed":"bolt", "time":"clock", "magnet":"magnet", "greed":"coin"}
 var game
 var tab := "levels"
@@ -18,6 +22,7 @@ var preview_time := 0.0
 var font: Font = UiStyle.font(700)
 var body_font: Font = UiStyle.body_font(700)
 var page := 0
+var look_page := 0
 var journey: Control
 
 func _ready() -> void:
@@ -109,15 +114,56 @@ func build_wardrobe(w: float, h: float) -> void:
 	var area := w-left-28 if w > h else w-56
 	for i in 4:
 		var id: String = WARDROBE_TABS[i]
-		button(I18n.t("tab_" + id), Rect2(left+i*(area+8)/4,96,(area-24)/4,48), func(): tab=id; rebuild(), tab==id)
-	var count: int = Fleet.NAMES.size() if tab == "crafts" else Campaign.SKINS.size() if tab == "skins" else Campaign.EFFECTS.size() if tab == "effects" else Campaign.TRAILS.size()
-	var current: int = game.campaign.craft if tab == "crafts" else game.campaign.skin if tab == "skins" else game.campaign.effect if tab == "effects" else game.campaign.trail
-	for i in count:
-		# Twelve hole skins need three columns to stay above the bottom edge.
-		var columns := 3 if count > 8 else 2
-		var cell := (area-8*(columns-1))/columns
-		var b := button(choice_name(i), Rect2(left+(i%columns)*(cell+8),h-360+(i/columns)*62,cell,54), func(): equip(i), i==current, false, "tick" if i == current else "")
-		b.font_size = 15
+		button(I18n.t("tab_" + id), Rect2(left+i*(area+8)/4,96,(area-24)/4,48), func(): tab=id; look_page=0; rebuild(), tab==id)
+	var grid := Rect2(left, 156, area, h-156-84) if w > h else Rect2(28, h-356, w-56, 280)
+	var columns := clampi(int(grid.size.x/140), 2, 4)
+	var rows := maxi(1, int((grid.size.y+GAP)/(CARD_H+GAP)))
+	var order := look_order()
+	var per_page := columns*rows
+	var pages := ceili(order.size()/float(per_page))
+	look_page = clampi(look_page, 0, pages-1)
+	var cell := (grid.size.x-GAP*(columns-1))/columns
+	for k in mini(per_page, order.size()-look_page*per_page):
+		var i: int = order[look_page*per_page + k]
+		var card := LookCard.new()
+		card.position = grid.position + Vector2((k%columns)*(cell+GAP), (k/columns)*(CARD_H+GAP))
+		card.size = Vector2(cell, CARD_H)
+		var state := card_state(i)
+		card.setup(tab, i, choice_name(i), state.label, state.enabled, state.equipped, func(): pick_look(i), state.icon)
+		add_child(card)
+		controls.append(card)
+	if pages > 1:
+		var arrows := Vector2(grid.end.x-100, grid.end.y+12) if w > h else Vector2(grid.end.x-100, grid.position.y-56)
+		button("", Rect2(arrows, Vector2(46, 42)), func(): turn_look_page(-1), false, look_page == 0, "left")
+		button("", Rect2(arrows+Vector2(54, 0), Vector2(46, 42)), func(): turn_look_page(1), false, look_page == pages-1, "right")
+
+func look_order() -> Array:
+	return range(Fleet.NAMES.size()) if tab == "crafts" else Cosmetics.display_order(tab)
+
+func turn_look_page(delta: int) -> void:
+	look_page += delta
+	rebuild()
+
+# Button text and state for one card, following the 2D shop: Equipped, Equip,
+# a coin price, or the journey progress for reward-only looks.
+func card_state(index: int) -> Dictionary:
+	var campaign = game.campaign
+	var is_equipped: bool = index == (campaign.craft if tab == "crafts" else campaign.equipped(tab))
+	if is_equipped: return {"label":I18n.t("equipped"), "enabled":false, "equipped":true, "icon":"tick"}
+	if tab == "crafts" or campaign.owns(tab, index): return {"label":I18n.t("equip"), "enabled":true, "equipped":false, "icon":""}
+	if Cosmetics.reward_only(tab, index):
+		var reward := Cosmetics.reward_for(tab, index)
+		var label := I18n.t("reward_stars" if reward[2] == "stars" else "reward_landmarks", [campaign.reward_progress(reward[2]), reward[3]])
+		return {"label":label, "enabled":false, "equipped":false, "icon":"lock"}
+	var cost := Cosmetics.price(tab, index)
+	return {"label":str(cost), "enabled":campaign.coins >= cost, "equipped":false, "icon":"coin"}
+
+# Tapping an owned look equips it; tapping an affordable one buys and equips it.
+func pick_look(index: int) -> void:
+	if tab != "crafts" and not game.campaign.owns(tab, index):
+		if not game.campaign.buy_look(tab, index): return
+		game.sfx.play("grow")
+	equip(index)
 
 func choice_name(index: int) -> String:
 	match tab:
@@ -148,9 +194,7 @@ func buy(id: String) -> void:
 
 func equip(index: int) -> void:
 	if tab == "crafts": game.campaign.craft = index
-	elif tab == "skins": game.campaign.skin = index
-	elif tab == "effects": game.campaign.effect = index
-	else: game.campaign.trail = index
+	elif not game.campaign.equip(tab, index): return
 	game.apply_style()
 	game.persist()
 	preview_time = 1.0
@@ -183,7 +227,9 @@ func _draw() -> void:
 		var left := size.x*0.46 if size.x > size.y else 28.0
 		title_at(I18n.t("collection"), Vector2(left, 64))
 		label_at(I18n.t("tap_equip"), Vector2(left,size.y-70), 16, UiStyle.MUTED, body_font) if size.x>size.y else label_at(I18n.t("tap_equip"),Vector2(28,size.y-415),17)
-		label_at(I18n.t("all_free"), Vector2(left,size.y-40), 15, UiStyle.MINT, body_font)
+		label_at(I18n.t("looks_tip"), Vector2(left,size.y-40), 15, UiStyle.MINT, body_font)
+		UiStyle.draw_icon(self, "coin", Vector2(size.x-196, 46), 30)
+		UiStyle.text(self, str(game.campaign.coins), Vector2(size.x-176, 56), 22, UiStyle.GOLD, false, 0, UiStyle.font(800))
 
 func draw_language() -> void:
 	UiStyle.draw_icon(self, "language", Vector2(52, 62), 48)

@@ -254,6 +254,8 @@ func campaign() -> void:
 	g.load_level(0)
 	g.go_menu()
 	g.open_panel("skins")
+	# Captures never save, so owning the shown skin here is harmless.
+	g.campaign.owned.skins = g.campaign.owned.skins + [7]
 	g.wardrobe.equip(7)
 	await frames(65)
 	await snapshot("wardrobe")

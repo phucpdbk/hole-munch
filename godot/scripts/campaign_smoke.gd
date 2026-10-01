@@ -97,6 +97,8 @@ func check_progress() -> void:
 	var maxed := Campaign.START_RADIUS + Campaign.SIZE_PER_UPGRADE*progress.upgrade_max("size")
 	var smallest_shop: float = 0.95 + 0.07
 	check(maxed*0.85 < smallest_shop, "a maxed size upgrade (%.2f) cannot eat a shop from the start" % maxed)
+	check_looks()
+	progress.owned = {"skins":[0, 7], "effects":[0, 3], "trails":[0, 3]}
 	progress.skin = 7; progress.effect = 3; progress.trail = 3
 	var restored = Campaign.new()
 	restored.restore(JSON.parse_string(JSON.stringify(progress.data())))
@@ -109,6 +111,32 @@ func check_progress() -> void:
 		sizes.append(int(info.cols)*int(info.rows))
 	check(sizes[0] == 9 and sizes[count-1] == 35 and sizes[30] == 25 and sizes[23] > sizes[0], "maps grow from 3×3 to 5×7")
 	check(sizes[7] > sizes[6], "continent finale uses a bigger map")
+
+# Coin shop and journey rewards for hole looks (cosmetics.gd), as in the 2D game.
+func check_looks() -> void:
+	var Cosmetics = preload("res://scripts/cosmetics.gd")
+	var shop = Campaign.new()
+	check(Cosmetics.count("skins") == Campaign.SKINS.size() and Cosmetics.count("effects") == Campaign.EFFECTS.size() and Cosmetics.count("trails") == Campaign.TRAILS.size(), "every look has a price")
+	var order: Array = Cosmetics.SKIN_ORDER.duplicate()
+	order.sort()
+	check(order == range(Campaign.SKINS.size()), "shop order lists every skin once")
+	check(shop.owns("skins", 0) and not shop.owns("skins", 1) and not shop.equip("skins", 1), "only the free looks start owned")
+	check(not shop.buy_look("skins", 1) and shop.coins == 0, "a look cannot be bought without coins")
+	shop.coins = 350
+	check(shop.buy_look("skins", 1) and shop.coins == 50 and shop.owns("skins", 1) and shop.equip("skins", 1) and shop.skin == 1, "buying a skin spends its price and lets it be equipped")
+	check(not shop.buy_look("skins", 1) and shop.coins == 50, "an owned look is never charged twice")
+	shop.coins = 99999
+	check(not shop.buy_look("skins", 11) and not shop.owns("skins", 11), "journey skins cannot be bought")
+	for i in 6: shop.medals[i] = 3
+	check(shop.owns("skins", 11) and shop.owns("effects", 1) and not shop.owns("trails", 5), "18 stars earn the comet skin and confetti")
+	shop.unlocked = 6
+	check(shop.cities_taken() == 6 and shop.owns("skins", 9) and not shop.owns("skins", 10), "six cities earn the explorer skin")
+	var old = Campaign.new()
+	old.restore({"version":5, "skin":3, "effect":2, "trail":3})
+	check(old.skin == 3 and old.effect == 5 and old.trail == 5 and old.owns("skins", 3) and old.owns("effects", 5) and old.owns("trails", 5), "looks equipped before the shop stay owned")
+	var bad = Campaign.new()
+	bad.restore({"version":6, "skin":4, "owned":{"skins":[99, -1, "x", 3, 3], "effects":"x"}})
+	check(bad.owned.skins == [0, 3] and bad.owned.effects == [0] and bad.skin == 0, "bad owned lists are cleaned and unowned looks unequipped")
 
 func check_levels(g) -> void:
 	g.campaign.unlocked = Campaign.level_count()-1
@@ -338,8 +366,8 @@ func check_panels(g) -> void:
 	check(is_equal_approx(g.stats.speed, 1.0 + g.campaign.upgrades.speed*Campaign.SPEED_PER_UPGRADE), "closing the shop applies upgrades")
 	for skin in Campaign.SKINS.size():
 		g.campaign.skin = skin
-		g.campaign.effect = skin%4
-		g.campaign.trail = skin%4
+		g.campaign.effect = skin%Campaign.EFFECTS.size()
+		g.campaign.trail = skin%Campaign.TRAILS.size()
 		g.apply_style()
 		check(g.rim_shader.get_shader_parameter("style") == skin, "skin %d equips" % skin)
 	check(g.fx.get_child_count() == 19, "cosmetic changes reuse fixed particle pools")

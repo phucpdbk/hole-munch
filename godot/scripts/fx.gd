@@ -7,6 +7,28 @@ const PUFFS := 6
 const RINGS := 8
 const RING_TIME := 0.55
 const CONFETTI := [Color("ff595e"), Color("ffca3a"), Color("8ac926"), Color("1982c4"), Color("6a4c93"), Color("f15bb5"), Color("ffffff")]
+const RAINBOW := [Color("ff4d4d"), Color("ff9f1a"), Color("ffe14d"), Color("4dff88"), Color("4dc3ff"), Color("8a5cff"), Color("ff5cd6")]
+const ShapeTextures = preload("res://scripts/shape_textures.gd")
+# Bite effects in Campaign.EFFECTS order, after src/cosmetics.js emitEatFx:
+# [shape, colours ("palette" / "tint" / hex list), gravity, spin, lifetime, speed].
+const EFFECT_LOOKS := [
+	["dust", ["d9dade"], -1.5, false, 0.6, 1.0],
+	["confetti", "palette", -6.0, true, 0.9, 1.2],
+	["heart", ["ff4d8d", "ff8fab"], 2.0, false, 1.1, 0.6],
+	["star", ["ffd23f", "ffd23f", "ffffff"], -1.5, true, 0.8, 1.0],
+	["coin", ["ffc300"], -9.0, true, 0.9, 1.4],
+	["pixel", "tint", -4.0, true, 0.8, 1.0],
+	["flake", ["ffffff"], -0.6, true, 1.2, 0.6],
+]
+# Trails in Campaign.TRAILS order, after emitTrail: [shape, colours, gravity, lifetime].
+const TRAIL_LOOKS := [
+	[],
+	["ring", ["a0e7ff"], 0.6, 1.0],
+	["star", ["ffffff", "ffd23f"], 0.0, 0.7],
+	["circle", ["ffffff"], -0.8, 1.3],
+	["flame", ["ff6a00", "ff9d1a", "ffd23f"], 1.2, 0.6],
+	["circle", "rainbow", 0.0, 0.9],
+]
 
 var puffs: Array[CPUParticles3D] = []
 var next_puff := 0
@@ -39,26 +61,74 @@ func _ready() -> void:
 
 func configure(effect: int, trail: int, tint: Color) -> void:
 	clear()
-	trail_style = trail
+	var look: Array = EFFECT_LOOKS[clampi(effect, 0, EFFECT_LOOKS.size()-1)]
+	var mesh := look_mesh(look[0])
 	for p in puffs:
-		var mesh: Mesh
-		if effect == 0:
-			mesh = SphereMesh.new()
-			mesh.radius = 0.12; mesh.height = 0.24; mesh.radial_segments = 8; mesh.rings = 4
-		else:
-			mesh = BoxMesh.new()
-			mesh.size = Vector3(0.16,0.025,0.22) if effect == 1 else Vector3.ONE*0.12 if effect == 2 else Vector3(0.07,0.24,0.07)
-		mesh.material = particle_material(effect > 1)
 		p.mesh = mesh
-		p.color_initial_ramp = palette() if effect == 1 else null
-		p.color_ramp = fading(Color("d9dade") if effect == 0 else Color.WHITE if effect == 1 else tint if effect == 2 else Color("ffb568"))
-		p.angular_velocity_min = -180 if effect > 0 else 0
-		p.angular_velocity_max = 180 if effect > 0 else 0
-	trail_particles.color_initial_ramp = palette() if trail == 3 else null
-	trail_particles.color_ramp = fading(Color.WHITE if trail == 3 else Color("c3ecf4") if trail == 1 else tint)
-	trail_particles.scale_amount_min = 0.45 if trail == 2 else 0.8
-	trail_particles.scale_amount_max = 0.8 if trail == 2 else 1.5
+		paint(p, look[1], tint)
+		p.gravity = Vector3(0, look[2], 0)
+		p.lifetime = look[4]
+		p.set_meta("speed", look[5])
+		p.angle_min = -180 if look[3] else 0
+		p.angle_max = 180 if look[3] else 0
+		p.angular_velocity_min = -240 if look[3] else 0
+		p.angular_velocity_max = 240 if look[3] else 0
+	trail_style = clampi(trail, 0, TRAIL_LOOKS.size()-1)
+	var trail_look: Array = TRAIL_LOOKS[trail_style]
+	if not trail_look.is_empty():
+		trail_particles.mesh = look_mesh(trail_look[0])
+		paint(trail_particles, trail_look[1], tint)
+		trail_particles.gravity = Vector3(0, trail_look[2], 0)
+		trail_particles.lifetime = trail_look[3]
+		# Snow drifts down from the rim; everything else rises off it.
+		trail_particles.initial_velocity_min = 0.0 if trail_look[2] < 0 else 0.25
+		trail_particles.initial_velocity_max = 0.1 if trail_look[2] < 0 else 0.6
+		trail_particles.scale_amount_curve = growing() if trail_look[0] == "flame" else null
 	trail_particles.visible = true
+
+# Dust stays a lit sphere and confetti/pixels stay boxes; the rest are camera-facing
+# textured quads, so hearts, stars and flakes read the same as the 2D sprites.
+func look_mesh(shape: String) -> Mesh:
+	match shape:
+		"dust":
+			var sphere := SphereMesh.new()
+			sphere.radius = 0.12; sphere.height = 0.24; sphere.radial_segments = 8; sphere.rings = 4
+			sphere.material = particle_material(false)
+			return sphere
+		"confetti", "pixel":
+			var box := BoxMesh.new()
+			box.size = Vector3(0.16, 0.025, 0.22) if shape == "confetti" else Vector3.ONE*0.13
+			box.material = particle_material(shape == "pixel")
+			return box
+	var quad := QuadMesh.new()
+	quad.size = Vector2.ONE*0.3
+	var material := particle_material(true)
+	material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	material.albedo_texture = ShapeTextures.texture(shape)
+	quad.material = material
+	return quad
+
+func paint(particles: CPUParticles3D, colours, tint: Color) -> void:
+	var list: Array = CONFETTI if colours is String and colours == "palette" else RAINBOW if colours is String and colours == "rainbow" \
+		else [tint] if colours is String else colours.map(func(c): return Color(c))
+	particles.color_initial_ramp = constant_ramp(list) if list.size() > 1 else null
+	particles.color_ramp = fading(Color.WHITE if list.size() > 1 else list[0])
+
+func constant_ramp(colours: Array) -> Gradient:
+	var gradient := Gradient.new()
+	gradient.interpolation_mode = Gradient.GRADIENT_INTERPOLATE_CONSTANT
+	var offsets := PackedFloat32Array()
+	for i in colours.size(): offsets.append(float(i)/colours.size())
+	gradient.offsets = offsets
+	gradient.colors = PackedColorArray(colours)
+	return gradient
+
+func growing() -> Curve:
+	var curve := Curve.new()
+	curve.max_value = 2.5
+	curve.add_point(Vector2(0, 1.0))
+	curve.add_point(Vector2(1, 2.5))
+	return curve
 
 # The trail sheds from the whole rim, so it is as wide as the hole.
 func move_trail(at: Vector3, moving: bool, hole_radius: float) -> void:
@@ -170,13 +240,7 @@ func make_spark() -> CPUParticles3D:
 	return particles
 
 func palette() -> Gradient:
-	var gradient := Gradient.new()
-	gradient.interpolation_mode = Gradient.GRADIENT_INTERPOLATE_CONSTANT
-	var offsets := PackedFloat32Array()
-	for i in CONFETTI.size(): offsets.append(float(i) / CONFETTI.size())
-	gradient.offsets = offsets
-	gradient.colors = PackedColorArray(CONFETTI)
-	return gradient
+	return constant_ramp(CONFETTI)
 
 # Dust thrown up by a bite, scaled to both the object and the hole.
 func puff(at: Vector3, object_radius: float, hole_radius: float) -> void:
@@ -185,8 +249,9 @@ func puff(at: Vector3, object_radius: float, hole_radius: float) -> void:
 	next_puff = (next_puff + 1) % PUFFS
 	particles.position = Vector3(at.x, 0.2, at.z)
 	particles.amount = clampi(3 + int(object_radius * 8.0), 3, 10)
-	particles.initial_velocity_min = hole_radius * 1.2
-	particles.initial_velocity_max = hole_radius * 2.4
+	var speed: float = particles.get_meta("speed", 1.0)
+	particles.initial_velocity_min = hole_radius * 1.2 * speed
+	particles.initial_velocity_max = hole_radius * 2.4 * speed
 	particles.scale_amount_min = 0.5 + object_radius * 0.4
 	particles.scale_amount_max = 0.9 + object_radius * 0.8
 	particles.restart()
