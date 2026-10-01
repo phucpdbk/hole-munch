@@ -612,6 +612,7 @@ func make_batches() -> void:
 	movers = items.filter(func(item): return item.get("move", "") != "")
 	var grouped: Dictionary = {}
 	for item in items:
+		if item.has("node"): continue
 		if not grouped.has(item.batch): grouped[item.batch] = []
 		item.slot = grouped[item.batch].size()
 		grouped[item.batch].append(item)
@@ -629,12 +630,22 @@ func make_batches() -> void:
 
 func set_item_transform(item: Dictionary) -> void:
 	var scale_value := 0.0 if item.eaten or item.get("hidden", false) else Traffic.edge_scale(item)
-	if item.get("is_boss", false): scale_value *= boss_radius/MODEL_BOSS
+	scale_value *= model_scale(item)
 	var basis := Basis.from_euler(Vector3(0, item.yaw, item.roll)).scaled(Vector3.ONE*maxf(scale_value, 0.0001))
 	set_item_basis(item, basis, scale_value > 0.001)
 
+# The landmark model is built at MODEL_BOSS and the guardian mascot at one unit.
+func model_scale(item: Dictionary) -> float:
+	if item.get("is_boss", false): return boss_radius/MODEL_BOSS
+	if item.has("node"): return item.radius
+	return 1.0
+
 func set_item_basis(item: Dictionary, basis: Basis, visible := true) -> void:
 	var transform := Transform3D(basis, item.position)
+	if item.has("node"):
+		item.node.transform = transform
+		item.node.visible = visible
+		return
 	batches[item.batch].set_instance_transform(item.slot, transform)
 	if item.has("lamp"):
 		item.lamp.transform = transform * LAMP_OFFSET
@@ -912,6 +923,7 @@ func _process(delta: float) -> void:
 	elif mode in ["menu", "result"]:
 		animate_world(dt)
 		advance_falls(dt)
+	if not paused: mechanics.animate(dt)
 	fx.set_frozen(paused)
 	if not paused: fx.update(delta)
 	weather.update(delta, hole_position, paused)
@@ -1066,8 +1078,7 @@ func update_fall(item: Dictionary, dt: float) -> void:
 	var centre: Vector3 = rival.position if into_rival else hole_position
 	item.position = item.fall_start.lerp(centre, p)
 	item.position.y = item.fall_start.y - e*(item.radius*2.2+0.8)
-	var size := maxf(0.001, 1.0-e*0.94)
-	if item.get("is_boss", false): size *= boss_radius/MODEL_BOSS
+	var size := maxf(0.001, 1.0-e*0.94)*model_scale(item)
 	var wobble := sin(p*PI)
 	var to_centre := Vector3(centre.x-item.fall_start.x, 0, centre.z-item.fall_start.z)
 	var axis := Vector3.UP.cross(to_centre.normalized()) if to_centre.length() > 0.01 else Vector3.RIGHT
@@ -1431,7 +1442,7 @@ func update_hud() -> void:
 	elif mechanics.hungry: hud.note = I18n.t("hungry")
 	elif run_kind == "daily": hud.note = ""
 	elif boss_down: hud.note = I18n.t("boss_down", [target_name, roundi((1.0-completion())*100)])
-	elif mechanics.shield_up() and radius*EAT_RATIO >= boss_radius: hud.note = I18n.t("break_pylons", mechanics.pylons.filter(func(p): return not p.eaten).size())
+	elif mechanics.shield_up() and radius*EAT_RATIO >= boss_radius: hud.note = I18n.t("eat_guardian")
 	else: hud.note = I18n.t("big_enough", target_name) if radius*EAT_RATIO >= boss_radius else ""
 	var city_label: String = Campaign.city_name(level.boss, Campaign.REGIONS[level.region].cities[level.slot][0])
 	hud.level_title = "%s · %s" % [city_label, target_name]

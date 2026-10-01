@@ -81,7 +81,11 @@ func reset(enabled: bool, start: Vector3, start_radius: float, speed: float, are
 	digest_scale = chew
 	sync_view(0.0)
 
+# Set each update: the guardian is only worth a fight once the landmark fits.
+var boss_fits := false
+
 func can_eat(item: Dictionary) -> bool:
+	if item.get("guardian", false) and not boss_fits: return false
 	return Traffic.is_active(item) and item.radius <= radius*EAT_RATIO and not item.get("shielded", false)
 
 func speed() -> float:
@@ -91,6 +95,7 @@ func speed() -> float:
 func update(dt: float, items: Array, boss: Dictionary, player: Vector3, player_radius: float) -> Array:
 	if not active: return []
 	radius = lerpf(radius, target_radius, 1.0-exp(-dt*8.0))
+	boss_fits = boss.radius <= radius*EAT_RATIO
 	retarget -= dt
 	if retarget <= 0 or target.is_empty() or not can_eat(target):
 		retarget = RETARGET
@@ -112,11 +117,15 @@ func update(dt: float, items: Array, boss: Dictionary, player: Vector3, player_r
 func choose_target(items: Array, boss: Dictionary) -> Dictionary:
 	return best_target(items, boss, position, radius)
 
-# Greedy value per distance; the landmark always wins once it fits. Shared with
-# the par route in smoke.gd, so timers and the rival use the same yardstick.
+# Greedy value per distance; the landmark always wins once it fits. Its guardian
+# fights back, so it is left alone until the landmark fits, then hunted first.
+# Shared with the par route in smoke.gd, so timers and the rival use the same yardstick.
 static func best_target(items: Array, boss: Dictionary, from: Vector3, hole_radius: float) -> Dictionary:
 	var limit := hole_radius*EAT_RATIO
-	if Traffic.is_active(boss) and boss.radius <= limit and not boss.get("shielded", false): return boss
+	var fits: bool = Traffic.is_active(boss) and boss.radius <= limit
+	if fits and not boss.get("shielded", false): return boss
+	for item in items:
+		if fits and item.get("guardian", false) and Traffic.is_active(item) and item.radius <= limit: return item
 	var best: Dictionary = {}
 	var best_value := 0.0
 	for item in items:
@@ -127,6 +136,7 @@ static func best_target(items: Array, boss: Dictionary, from: Vector3, hole_radi
 		var value: float = item.radius*item.radius/(distance + 3.0)
 		# Golden food (gold districts, gold-rush treasure) is worth a detour.
 		if item.get("gold", false): value *= GOLD_PULL
+		if item.get("guardian", false): continue
 		if value > best_value:
 			best_value = value
 			best = item

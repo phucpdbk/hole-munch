@@ -103,9 +103,12 @@ static func projectile_position(strike: Dictionary) -> Vector3:
 	return strike.start.lerp(strike.target+Vector3(0,0.15,0),t)+Vector3(0,sin(t*PI)*(1.3 if strike.heavy else 0.2),0)
 
 # Queue one telegraphed blast. Returns false when the sky is already full.
-func add_strike(source: Dictionary, start: Vector3, target: Vector3, radius: float, warning: float, heavy: bool) -> bool:
+# Mascot attacks tint their shots (fire, water...); the default is the gunners' gold.
+const SHOT_COLOR := Color("ffd96a")
+
+func add_strike(source: Dictionary, start: Vector3, target: Vector3, radius: float, warning: float, heavy: bool, color := SHOT_COLOR) -> bool:
 	if strikes.size() >= MAX_STRIKES: return false
-	strikes.append({"source":source,"target":target,"radius":radius,"time":warning,"duration":warning,"flight":0.75,"start":start,"heavy":heavy})
+	strikes.append({"source":source,"target":target,"radius":radius,"time":warning,"duration":warning,"flight":0.75,"start":start,"heavy":heavy,"color":color})
 	return true
 
 # Advances shots and returns true when the hole is hit this frame.
@@ -148,7 +151,7 @@ func land_strikes(dt: float, player: Vector3) -> bool:
 		strike.time -= dt
 		if previous > strike.flight and strike.time <= strike.flight: fired = true
 		if strike.time > 0: continue
-		if impacts.size() < MAX_STRIKES: impacts.append({"position":strike.target,"radius":strike.radius,"time":0.35})
+		if impacts.size() < MAX_STRIKES: impacts.append({"position":strike.target,"radius":strike.radius,"time":0.35,"color":strike.color})
 		var distance := Vector2(player.x-strike.target.x,player.z-strike.target.z).length()
 		if distance < strike.radius and immunity <= 0:
 			hit = true

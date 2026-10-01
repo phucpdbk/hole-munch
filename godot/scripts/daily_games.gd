@@ -130,7 +130,7 @@ func reset(game) -> void:
 	next_coin = 1.0
 	next_bomb = BOMB_EVERY
 	for item in game.items:
-		if item.get("is_boss", false) or item.get("defender", false) or item.get("guardian", false) or item.get("pylon", false):
+		if item.get("is_boss", false) or item.get("defender", false) or item.get("guardian", false):
 			item.hidden = true
 			game.set_item_transform(item)
 	for duck in prey:

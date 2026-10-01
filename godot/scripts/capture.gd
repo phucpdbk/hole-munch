@@ -19,7 +19,7 @@ func run(game, campaign_mode: bool) -> void:
 			await snapshot("city-assets-%d" % index)
 		g.get_tree().quit()
 		return
-	# Decorated hole skins, the black-hole shaft, shield pylons and a pickup.
+	# Decorated hole skins, the black-hole shaft, the guardian and a pickup.
 	if "--mechanics-capture" in OS.get_cmdline_user_args():
 		g.load_level(0)
 		for skin in [8, 9, 10, 11]:
@@ -74,6 +74,26 @@ func run(game, campaign_mode: bool) -> void:
 			g.hole_position = Vector3(spots[name].x + 4.0, 0, spots[name].y + 4.0)
 			await frames(60)
 			await snapshot("map-" + name)
+		g.get_tree().quit()
+		return
+	# Guardian mascots up close: idle, winding up and attacking (`--mascot-capture`).
+	if "--mascot-capture" in OS.get_cmdline_user_args():
+		for index in [8, 0, 1, 3, 6, 10, 26, 46]:
+			g.load_level(index)
+			g.on_play()
+			g.started = true
+			g.defense.grace = INF
+			var guardian: Dictionary = g.mechanics.guardian
+			g.hole_position = guardian.position + Vector3(1.0, 0, guardian.radius + 3.0)
+			g.hole_position.y = 0
+			await frames(50)
+			await snapshot("mascot-%02d-%s-idle" % [index+1, g.level.boss])
+			g.defense.grace = 0.0
+			g.mechanics.mascot.cooldown = 0.0
+			await frames(30)
+			await snapshot("mascot-%02d-%s-windup" % [index+1, g.level.boss])
+			await frames(28)
+			await snapshot("mascot-%02d-%s-attack" % [index+1, g.level.boss])
 		g.get_tree().quit()
 		return
 	if "--daily-capture" in OS.get_cmdline_user_args():

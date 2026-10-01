@@ -180,15 +180,17 @@ static func level_info(index: int) -> Dictionary:
 # Par times: how long the real-time greedy test route (smoke.gd) needs per city.
 # timer gives generous slack early and less later; regenerate with --campaign-smoke
 # (it prints each route) after changing map contents.
-const PAR_SECONDS: Array[int] = [54, 56, 49, 20, 60, 56, 35, 64, 44, 30, 22, 27, 67, 23, 85, 107, 44, 88, 72, 36, 77, 63, 42, 126, 138, 168, 96, 146, 150, 84, 98, 194, 80, 112, 80, 90, 105, 168, 73, 174, 158, 65, 67, 68, 128, 132, 87, 115]
+const PAR_SECONDS: Array[int] = [16, 21, 15, 13, 17, 15, 17, 23, 20, 16, 15, 15, 38, 20, 23, 20, 19, 19, 16, 25, 20, 22, 22, 20, 21, 23, 18, 16, 24, 23, 16, 21, 17, 22, 29, 23, 17, 20, 29, 33, 18, 18, 36, 22, 21, 33, 20, 27]
 
 # Timer = par × slack, never below a floor. The par route plays like a sharp
-# player, so the slack covers steering, dodging and learning the map. Nothing
+# player who knows the whole map and takes the landmark the moment it fits, so
+# the slack covers steering, dodging, the guardian fight and learning the map,
+# and leaves time to keep eating after the landmark falls. Nothing
 # adds time in campaign or daily rounds, so this is the whole budget.
-const TIME_SLACK_START := 2.3
-const TIME_SLACK_END := 1.55
-const TIME_FLOOR_START := 60.0
-const TIME_FLOOR_END := 30.0
+const TIME_SLACK_START := 5.0
+const TIME_SLACK_END := 3.0
+const TIME_FLOOR_START := 75.0
+const TIME_FLOOR_END := 45.0
 
 static func level_seconds(index: int, blocks: int, progress: float) -> float:
 	if index >= PAR_SECONDS.size(): return 35.0 + blocks*20.0

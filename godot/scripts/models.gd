@@ -148,12 +148,6 @@ func toy(kind: String, variant: int = 0) -> ArrayMesh:
 		"saucer":
 			cache[key] = bake(region.saucer())
 			return cache[key]
-		"pylon":
-			# Shield generator: eat all of them before the landmark can fall.
-			parts.append(piece("box", Vector3(0, 0.15, 0), Vector3(1.2, 0.3, 1.2), Color("46566b")))
-			parts.append(piece("cyl", Vector3(0, 1.0, 0), Vector3(0.28, 1.5, 0.28), Color("d9e4ee")))
-			parts.append(piece("ring", Vector3(0, 1.2, 0), Vector3(0.55, 0.3, 0.55), Color("5fd0ff")))
-			parts.append(piece("ball", Vector3(0, 1.95, 0), Vector3.ONE*0.42, Color("8fe6ff")))
 		"bomb":
 			# Gas canister: red drum, yellow hazard band, dark fuse cap.
 			parts.append(piece("cyl", Vector3(0, 0.4, 0), Vector3(0.36, 0.72, 0.36), Color("d8453b")))

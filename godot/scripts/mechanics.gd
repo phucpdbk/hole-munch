@@ -1,13 +1,14 @@
 extends Node3D
 
-# Arcade twists on the eat-and-grow loop: shield pylons that guard the landmark,
-# timed pickups, hunger, bombs, and weather that changes handling. game.gd owns
-# the items; this node only adds pylons/bombs, draws the pickup and shield, and
-# answers questions such as "may the boss be eaten yet?".
+# Arcade twists on the eat-and-grow loop: the guardian mascot that shields the
+# landmark, timed pickups, hunger, bombs, and weather that changes handling.
+# game.gd owns the items; this node only adds the guardian/bombs, draws the pickup
+# and shield, and answers questions such as "may the boss be eaten yet?".
 const Traffic = preload("res://scripts/traffic.gd")
-const PYLONS := 4
-const PYLON_SIZE := 0.9
-const PYLON_GAP := 0.9
+const Mascot = preload("res://scripts/mascot.gd")
+const MascotSpecs = preload("res://scripts/mascot_specs.gd")
+# The guardian is about half the landmark's size, so it falls mid-way up the ladder.
+const GUARDIAN_SHARE := 0.55
 const BOMBS := 3
 const BOMB_SIZE := 0.42
 # Below this hole radius a bomb stuns you; from it up, the blast feeds you.
@@ -47,7 +48,8 @@ const FOG_VIEW := 0.8
 # Weather with a handling note (i18n keys wn_<kind>).
 const WEATHER_NOTES := ["rain", "snow", "wind", "storm", "fog"]
 
-var pylons: Array = []
+var guardian: Dictionary = {}
+var mascot: Node3D
 var bombs: Array = []
 var round_time := 0.0
 # Ground shadows: one per bomb, then one for the pickup (PICKUP_MARKER).
@@ -141,27 +143,27 @@ func show_marker(index: int, at: Vector3, size: float, k: float) -> void:
 # --- level setup (called by game.gd after the boss is sized) ---------------------
 
 func setup(game, landmark: bool, seed_value: int) -> void:
-	pylons.clear()
+	guardian = {}
+	mascot = null
 	bombs.clear()
 	boss = game.items[game.boss_index]
-	if landmark: place_pylons(game)
+	if landmark: place_guardian(game)
 	place_bombs(game, seed_value)
 
-# Shield pylons ring the landmark just outside its footprint, each with a guard.
-func place_pylons(game) -> void:
-	pylons.clear()
-	boss = game.items[game.boss_index]
-	var home: Vector3 = boss.origin
-	var ring: float = game.boss_radius + PYLON_GAP
-	for i in PYLONS:
-		var a := PI/4 + i*TAU/PYLONS
-		var at := home + Vector3(cos(a)*ring, 0, sin(a)*ring)
-		var pylon: Dictionary = game.add_item("pylon", Vector3(at.x, 0.16, at.z), PYLON_SIZE)
-		pylon.pylon = true
-		pylons.append(pylon)
-		var guard: Dictionary = game.add_item("soldier", Vector3(at.x*1.08, 0.16, at.z*1.08 + 0.6), 0.36)
-		guard.defender = true
-		game.total_points += game.base_points(pylon) + game.base_points(guard)
+# The landmark's mascot stands guard at its front corner, toward the spawn side.
+# It is drawn by its own node (mascot.gd), not by a MultiMesh batch.
+func place_guardian(game) -> void:
+	var size: float = game.boss_radius*GUARDIAN_SHARE
+	var home: Vector3 = boss.origin + Vector3(1, 0, 1).normalized()*(game.boss_radius*0.9 + size + 0.4)
+	guardian = game.add_item("mascot", Vector3(home.x, 0.16, home.z), size, 0, PI/4)
+	guardian.guardian = true
+	mascot = Mascot.new()
+	game.world.add_child(mascot)
+	mascot.build(game.models, MascotSpecs.spec(game.level.boss))
+	mascot.item = guardian
+	mascot.home = guardian.origin
+	guardian.node = mascot
+	game.total_points += game.base_points(guardian)
 
 # Bombs sit on road centre lines, away from the spawn and the landmark.
 func place_bombs(game, seed_value: int) -> void:
@@ -203,7 +205,8 @@ func reset(game, level_weather: String, seed_value: int) -> void:
 	hungry = false
 	peak_radius = 0.0
 	orb.visible = false
-	if not boss.is_empty(): boss.shielded = not pylons.is_empty()
+	if mascot: mascot.reset()
+	if not boss.is_empty(): boss.shielded = not guardian.is_empty()
 
 func weather_note() -> String:
 	return I18n.t("wn_" + weather) if weather in WEATHER_NOTES else ""
@@ -211,16 +214,17 @@ func weather_note() -> String:
 # --- per-frame rules -----------------------------------------------------------
 
 func shield_up() -> bool:
-	return pylons.any(func(pylon): return not pylon.eaten and pylon.fall < 0)
+	return not guardian.is_empty() and Traffic.is_active(guardian)
 
 func update(game, dt: float) -> void:
 	stun = maxf(0.0, stun-dt)
 	for key in powers: powers[key] = maxf(0.0, powers[key]-dt)
 	if not boss.is_empty() and boss.get("shielded", false) and not shield_up():
 		boss.shielded = false
-		game.add_floater(boss.position, I18n.t("shield_down"), true)
+		game.add_floater(boss.position, I18n.t("guardian_down"), true)
 		game.fx.ripple(boss.position, game.boss_radius*1.2, Color("9fdcff"))
 		game.sfx.play("grow")
+	if mascot: mascot.think(game, dt)
 	update_hunger(game, dt)
 	update_pickup(game, dt)
 	round_time += dt
@@ -367,6 +371,9 @@ func steer(wanted: Vector3, dt: float, clock: float) -> Vector3:
 	if weather not in WINDY or stun > 0: return glide
 	var angle := clock*0.15
 	return glide + Vector3(cos(angle), 0, sin(angle))*WIND_PUSH
+
+func animate(dt: float) -> void:
+	if is_instance_valid(mascot): mascot.animate(dt)
 
 func view_scale() -> float:
 	return FOG_VIEW if weather == "fog" else 1.0

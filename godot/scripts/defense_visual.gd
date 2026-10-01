@@ -29,7 +29,8 @@ func _ready() -> void:
 		for entry in [[shells,ball],[tails,tracer],[flashes,ball],[blasts,ring]]:
 			var mesh := MeshInstance3D.new()
 			mesh.mesh = entry[1]
-			mesh.material_override = glow
+			# Own material per slot so mascot attacks can tint their shots.
+			mesh.material_override = glow.duplicate()
 			mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			mesh.visible = false
 			add_child(mesh)
@@ -44,6 +45,7 @@ func update(defense, active: bool) -> void:
 		if shot.time > shot.flight: continue
 		var pos: Vector3 = defense.projectile_position(shot)
 		var direction: Vector3 = (pos-shot.start).normalized()
+		for pool in [shells, tails, flashes]: pool[i].material_override.albedo_color = shot.color
 		shells[i].position = pos
 		shells[i].scale = Vector3.ONE*(1.5 if shot.heavy else 1.0)
 		shells[i].show()
@@ -56,6 +58,7 @@ func update(defense, active: bool) -> void:
 			flashes[i].show()
 	for i in defense.impacts.size():
 		var impact: Dictionary = defense.impacts[i]
+		blasts[i].material_override.albedo_color = impact.color
 		blasts[i].position = impact.position+Vector3(0,0.2,0)
 		blasts[i].scale = Vector3.ONE*impact.radius*(1.0-impact.time/0.4)
 		blasts[i].show()

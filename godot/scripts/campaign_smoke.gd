@@ -58,7 +58,7 @@ func check_language_and_intro(g) -> void:
 	restored.restore({"version":5, "lang":"klingon", "seen":[3, "x".repeat(99)]})
 	check(restored.lang == "pt" and restored.seen.size() == 2, "bad language and seen entries are ignored")
 	var Intro = g.Intro
-	check(Intro.pending_tips(Campaign.level_info(0), []).is_empty(), "the first city needs no tips")
+	check(Intro.pending_tips(Campaign.level_info(0), []) == ["guardian"], "the first city introduces the landmark guardian")
 	var lines := 0
 	for id in Campaign.LANDMARKS:
 		if I18n.t("lmfun_" + id) != "lmfun_" + id: lines += 1
@@ -67,7 +67,7 @@ func check_language_and_intro(g) -> void:
 	check(Intro.tip_page("lm_eiffel").title == Campaign.boss_name("eiffel") and Intro.tip_page("lm_eiffel").tag != "", "landmark card shows name and city")
 	check(Intro.tip_page("lm_onepillar").has("picture") and load(Intro.tip_page("lm_onepillar").picture) is Texture2D, "landmark card shows its picture when one exists")
 	check(Intro.pending_tips(Campaign.level_info(1), []) == ["weather_rain", "pickup"], "city 2 introduces rain and power orbs")
-	var seen: Array = ["weather_rain", "pickup"]
+	var seen: Array = ["weather_rain", "pickup", "guardian"]
 	check(Intro.pending_tips(Campaign.level_info(1), seen).is_empty(), "seen tips are not repeated")
 	check(Intro.pending_tips(Campaign.level_info(8), seen)[0] == "region_europe", "a new continent gets a welcome card first")
 	check(Intro.pending_tips(Campaign.level_info(40), []).size() == Intro.MAX_TIPS, "tips per start are capped")
@@ -157,7 +157,7 @@ func check_levels(g) -> void:
 		g.on_play()
 		var info: Dictionary = g.level
 		check(is_equal_approx(g.remaining, float(info.seconds)) and g.boss_radius >= g.MIN_BOSS and g.boss_radius <= g.MAX_BOSS + g.FINALE_BOSS, "level %d config applied (boss %.1f, %ds)" % [i+1, g.boss_radius, info.seconds])
-		# 30 city/prop batches plus one each for shield pylons and bombs.
+		# City/prop batches plus bombs, barriers and danger-zone kinds (the guardian has its own node).
 		check(g.batches.size() <= 34, "level %d render batches bounded (%d)" % [i+1, g.batches.size()])
 		var wanted: Dictionary = g.MapFeatures.counts(i)
 		var f = g.features

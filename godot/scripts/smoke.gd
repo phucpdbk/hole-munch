@@ -219,6 +219,51 @@ func check_growth_route() -> void:
 	g.remaining = timer - route_seconds
 	check(g.boss_down and g.remaining > 0,"growth route reaches and swallows the boss within the timer")
 
+# Guardian mascots (mascot.gd): every landmark has one; each attack style fires
+# tinted strikes, a hit costs time, and an edible guardian runs instead.
+func check_guardian() -> void:
+	var Specs = g.Mechanics.MascotSpecs
+	var ids: Array = g.Campaign.LANDMARKS.keys()
+	check(ids.all(func(id): return Specs.MASCOTS.has(id)), "every landmark has a guardian mascot")
+	var styles := {}
+	for id in ids: styles[Specs.MASCOTS[id][5]] = true
+	check(styles.size() == 4, "guardians use all four attack styles")
+	for id in ["eiffel", "onepillar", "bigben", "colosseum"]:
+		var spec: Dictionary = Specs.spec(id)
+		g.reset_round()
+		g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
+		g.rival.active = false
+		var mascot = g.mechanics.mascot
+		var guardian: Dictionary = g.mechanics.guardian
+		mascot.spec = spec
+		g.defense.grace = 0.0
+		mascot.cooldown = 0.0
+		g.radius = g.stats.start_radius; g.target_radius = g.radius
+		g.hole_position = guardian.position + Vector3(0, 0, guardian.radius + 3.0)
+		g.hole_position.y = 0
+		for i in int((mascot.WINDUP + 0.1)/0.02): g.step(0.02, Vector2.ZERO)
+		var shots: Array = g.defense.strikes.filter(func(s): return s.source == guardian)
+		check(not shots.is_empty() and shots.all(func(s): return s.color == mascot.ATTACK_COLORS[spec.attack]), "%s guardian attacks with %s" % [id, spec.attack])
+		if spec.attack == "charge":
+			var start: Vector3 = guardian.position
+			for i in 10: g.step(0.02, Vector2.ZERO)
+			check(guardian.position.distance_to(start) > 0.5, "a charging guardian runs at the hole")
+		var time_before: float = g.remaining
+		for i in 120: g.step(0.02, Vector2.ZERO)
+		check(g.defense.hits > 0 and g.remaining < time_before - 2.0, "%s guardian's %s hits a hole that stands still" % [id, spec.attack])
+	g.reset_round()
+	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
+	var guardian: Dictionary = g.mechanics.guardian
+	var home: Vector3 = guardian.position
+	g.radius = guardian.radius/g.EAT_RATIO + 0.2; g.target_radius = g.radius
+	g.hole_position = home + Vector3(guardian.radius + g.radius + 1.0, 0, 0)
+	g.hole_position.y = 0
+	for i in 60: g.step(0.02, Vector2.ZERO)
+	check(g.mechanics.mascot.state.begins_with("flee") and guardian.position.x < home.x - 0.5, "an edible guardian runs from the hole")
+	g.mechanics.mascot.animate(0.1)
+	check(g.mechanics.mascot.rig.scale.y > 0.5, "the guardian animates")
+	g.load_level(0)
+
 # Gold districts, roadblocks, shortcuts and danger zones (scripts/map_features.gd).
 func check_features() -> void:
 	var F = g.MapFeatures
@@ -307,14 +352,17 @@ func check_mechanics() -> void:
 	g.rival.active = false
 	var mech = g.mechanics
 	var boss: Dictionary = g.items[g.boss_index]
-	check(mech.pylons.size() == mech.PYLONS and boss.shielded, "landmark starts behind %d shield pylons" % mech.PYLONS)
+	var guardian: Dictionary = mech.guardian
+	check(not guardian.is_empty() and boss.shielded and is_equal_approx(guardian.radius, g.boss_radius*mech.GUARDIAN_SHARE), "landmark starts shielded by its guardian mascot")
+	check(guardian.node.visible and guardian.node.get_parent() == g.world and not g.batches.has(guardian.batch), "the guardian is its own animated node, not a batch")
 	g.target_radius = g.boss_radius/g.EAT_RATIO+0.2; g.radius = g.target_radius
 	g.hole_position = Vector3(boss.position.x,0,boss.position.z)
 	for i in 10: g.step(0.02,Vector2.ZERO)
 	check(boss.fall < 0 and not boss.eaten, "shielded landmark cannot be swallowed")
-	for pylon in mech.pylons: g.swallow(pylon)
+	g.swallow(guardian)
 	for i in 40: g.step(0.02,Vector2.ZERO)
-	check(not boss.shielded and (boss.fall >= 0 or boss.eaten), "breaking every pylon drops the shield")
+	check(guardian.eaten and not guardian.node.visible and not boss.shielded and (boss.fall >= 0 or boss.eaten), "swallowing the guardian drops the shield")
+	check_guardian()
 	var bombs: Array = g.items.filter(func(item): return item.get("bomb", false))
 	check(bombs.size() == mech.BOMBS and bombs.all(func(item): return item.optional), "every map hides optional bombs")
 	g.reset_round()
