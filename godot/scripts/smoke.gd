@@ -307,7 +307,19 @@ func check_mechanics() -> void:
 	before = g.remaining
 	g.hole_position = mech.pickup.position
 	mech.update_pickup(g, 0.02)
-	check(mech.pickup.is_empty() and (kind != "time" or g.remaining == before+mech.TIME_PICKUP), "touching a pickup collects it (%s)" % kind)
+	check(not mech.pickup.is_empty() and mech.markers[mech.PICKUP_MARKER].visible, "a falling pickup casts a shadow and cannot be caught mid-air")
+	mech.update_pickup(g, mech.DROP_TIME)
+	mech.update_pickup(g, 0.02)
+	check(mech.pickup.is_empty() and (kind != "time" or g.remaining == before+mech.TIME_PICKUP), "touching a landed pickup collects it (%s)" % kind)
+	g.reset_round()
+	var sky_bomb: Dictionary = mech.bombs[0]
+	check(mech.bombs.all(func(b): return b.hidden), "bombs start in the sky")
+	mech.round_time = sky_bomb.drop_at
+	mech.update_bombs(g, 0.1)
+	check(not sky_bomb.hidden and sky_bomb.falling > 0 and sky_bomb.position.y > sky_bomb.origin.y, "a bomb drops at its scheduled moment")
+	mech.update_bombs(g, mech.DROP_TIME)
+	check(sky_bomb.falling == 0.0 and sky_bomb.position == sky_bomb.origin, "a dropped bomb lands on the road")
+	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
 	var kinds := {}
 	for i in 40:
 		mech.spawn_pickup(g)

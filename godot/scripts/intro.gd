@@ -69,7 +69,20 @@ static func pending_tips(level: Dictionary, seen: Array) -> Array:
 	if int(level.slot) == Campaign.CITIES_PER_REGION-1: ids.append("finale")
 	return ids.filter(func(id): return id not in seen).slice(0, MAX_TIPS)
 
+# A one-off card that introduces the city's landmark with a funny line; it comes
+# before the mechanic tips and does not count towards MAX_TIPS.
+static func landmark_tip(level: Dictionary, seen: Array) -> Array:
+	var id := "lm_" + str(level.boss)
+	return [] if id in seen or not I18n.has("lmfun_" + str(level.boss)) else [id]
+
 static func tip_page(id: String) -> Dictionary:
+	if id.begins_with("lm_"):
+		var boss := id.trim_prefix("lm_")
+		var city := ""
+		for region in Campaign.REGIONS:
+			for entry in region.cities:
+				if entry[1] == boss: city = entry[0]
+		return {"tag":Campaign.city_name(boss, city), "icon":"flag", "title":Campaign.boss_name(boss), "body":I18n.t("lmfun_" + boss)}
 	var page := {"tag":I18n.t("new_tag")}
 	if id.begins_with("weather_"):
 		var kind := id.trim_prefix("weather_")

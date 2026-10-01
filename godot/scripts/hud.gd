@@ -18,6 +18,8 @@ const UiStyle = preload("res://scripts/ui_style.gd")
 const UiButton = preload("res://scripts/ui_button.gd")
 const I18n = preload("res://scripts/i18n.gd")
 const Ads = preload("res://scripts/ads.gd")
+const Minimap = preload("res://scripts/minimap.gd")
+var minimap := {}
 var daily_button: BaseButton
 var endless_button: BaseButton
 var help_button: BaseButton
@@ -285,6 +287,7 @@ func draw_playing() -> void:
 	panel(Rect2(w-176, 36, 84, 68), Color("1b3048ed"), 20)
 	text_at(I18n.t("cleared"), Vector2(w-134, 58), 13, MUTED, true)
 	UiStyle.text(self, "%d%%" % int(completion*100), Vector2(w-134, 90), 23, LIGHT, true, 0, title_font)
+	Minimap.draw(self, Vector2(w-32, 118), minimap)
 	if combo >= 2: draw_combo()
 	draw_floaters()
 	panel(Rect2(24, h-115, w-48, 88), Color("1b3048ed"), 20)

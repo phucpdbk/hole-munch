@@ -5,6 +5,7 @@ extends Node3D
 # city if it swallows the landmark first. The ground and object shaders cut a
 # second opening at its position, so its bites sink like the player's.
 const Traffic = preload("res://scripts/traffic.gd")
+const Mechanics = preload("res://scripts/mechanics.gd")
 const EAT_RATIO := 0.85
 const GROWTH := 0.45
 const MAX_RADIUS := 8.5
@@ -119,6 +120,8 @@ static func best_target(items: Array, boss: Dictionary, from: Vector3, hole_radi
 	var best_value := 0.0
 	for item in items:
 		if item.get("is_boss", false) or not Traffic.is_active(item) or item.radius > limit: continue
+		# Like a player, steer clear of bombs while small and of anything still falling.
+		if item.get("falling", 0.0) > 0 or (item.get("bomb", false) and hole_radius < Mechanics.BOMB_SAFE): continue
 		var distance := Vector2(item.position.x-from.x, item.position.z-from.z).length()
 		var value: float = item.radius*item.radius/(distance + 3.0)
 		if value > best_value:

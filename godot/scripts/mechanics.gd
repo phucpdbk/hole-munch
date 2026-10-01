@@ -18,9 +18,15 @@ const BLAST_REACH := 2.4
 const HUNGER_DELAY := 3.0
 const HUNGER_RATE := 0.06
 const HUNGER_KEEP := 0.8
-const PICKUP_FIRST := 6.0
-const PICKUP_GAP := Vector2(7.0, 11.0)
+const PICKUP_FIRST := 14.0
+const PICKUP_GAP := Vector2(16.0, 26.0)
 const PICKUP_LIFE := 8.0
+# Pickups and bombs fall from the sky onto a road, with a shadow showing where.
+const DROP_HEIGHT := 16.0
+const DROP_TIME := 1.2
+# Each bomb lands at a random moment in this window (seconds into the round).
+const BOMB_DROPS := Vector2(8.0, 40.0)
+const PICKUP_MARKER := 3
 const POWER_TIME := 5.0
 const TIME_PICKUP := 5.0
 const FREEZE_TIME := 4.0
@@ -42,6 +48,10 @@ const FOG_VIEW := 0.8
 const WEATHER_NOTES := ["rain", "snow", "wind", "storm", "fog"]
 
 var pylons: Array = []
+var bombs: Array = []
+var round_time := 0.0
+# Ground shadows: one per bomb, then one for the pickup (PICKUP_MARKER).
+var markers: Array[MeshInstance3D] = []
 var boss: Dictionary = {}
 var weather := "clear"
 var rng := RandomNumberGenerator.new()
@@ -103,11 +113,36 @@ func _ready() -> void:
 	orb.add_child(orb_label)
 	add_child(orb)
 	orb.visible = false
+	var shadow_material := StandardMaterial3D.new()
+	shadow_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	shadow_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	shadow_material.albedo_color = Color(0.05, 0.03, 0.12, 0.45)
+	var disc := CylinderMesh.new()
+	disc.top_radius = 1.0
+	disc.bottom_radius = 1.0
+	disc.height = 0.02
+	disc.radial_segments = 24
+	for i in BOMBS + 1:
+		var marker := MeshInstance3D.new()
+		marker.mesh = disc
+		marker.material_override = shadow_material
+		marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		marker.visible = false
+		add_child(marker)
+		markers.append(marker)
+
+# Shadow under something falling: grows and darkens as it nears the ground.
+func show_marker(index: int, at: Vector3, size: float, k: float) -> void:
+	var marker := markers[index]
+	marker.visible = true
+	marker.position = Vector3(at.x, 0.14, at.z)
+	marker.scale = Vector3.ONE*size*lerpf(1.0, 0.35, k)
 
 # --- level setup (called by game.gd after the boss is sized) ---------------------
 
 func setup(game, landmark: bool, seed_value: int) -> void:
 	pylons.clear()
+	bombs.clear()
 	boss = game.items[game.boss_index]
 	if landmark: place_pylons(game)
 	place_bombs(game, seed_value)
@@ -144,13 +179,23 @@ func place_bombs(game, seed_value: int) -> void:
 		var bomb: Dictionary = game.add_item("bomb", at, BOMB_SIZE)
 		bomb.bomb = true
 		bomb.optional = true
+		bombs.append(bomb)
 		placed += 1
 
-func reset(level_weather: String, seed_value: int) -> void:
+func reset(game, level_weather: String, seed_value: int) -> void:
 	weather = level_weather
 	rng.seed = seed_value
 	pickup = {}
 	pickup_timer = PICKUP_FIRST
+	round_time = 0.0
+	for marker in markers: marker.visible = false
+	# Bombs wait in the sky and drop one by one at seeded random moments.
+	for bomb in bombs:
+		bomb.drop_at = rng.randf_range(BOMB_DROPS.x, BOMB_DROPS.y)
+		bomb.falling = 0.0
+		bomb.hidden = true
+		bomb.position = bomb.origin
+		game.set_item_transform(bomb)
 	powers = {"magnet":0.0, "speed":0.0}
 	stun = 0.0
 	glide = Vector3.ZERO
@@ -178,6 +223,27 @@ func update(game, dt: float) -> void:
 		game.sfx.play("grow")
 	update_hunger(game, dt)
 	update_pickup(game, dt)
+	round_time += dt
+	update_bombs(game, dt)
+
+func update_bombs(game, dt: float) -> void:
+	for i in bombs.size():
+		var bomb: Dictionary = bombs[i]
+		if bomb.eaten:
+			markers[i].visible = false
+			continue
+		if bomb.hidden and round_time >= bomb.drop_at:
+			bomb.hidden = false
+			bomb.falling = DROP_TIME
+		if bomb.falling <= 0.0: continue
+		bomb.falling = maxf(0.0, bomb.falling - dt)
+		var k: float = bomb.falling/DROP_TIME
+		bomb.position = bomb.origin + Vector3(0, DROP_HEIGHT*k*k, 0)
+		game.set_item_transform(bomb)
+		show_marker(i, bomb.origin, BOMB_SIZE*1.6, k)
+		if bomb.falling <= 0.0:
+			markers[i].visible = false
+			game.fx.puff(bomb.origin, BOMB_SIZE, 1.0)
 
 # Going too long without a bite starves the hole back toward its start size, but
 # never below HUNGER_KEEP of its best size this round: a map whose food runs thin
@@ -197,6 +263,15 @@ func update_pickup(game, dt: float) -> void:
 		pickup_timer -= dt
 		if pickup_timer <= 0: spawn_pickup(game)
 		return
+	if pickup.drop > 0.0:
+		pickup.drop = maxf(0.0, pickup.drop - dt)
+		var k: float = pickup.drop/DROP_TIME
+		orb.position = pickup.position + Vector3(0, 1.1 + DROP_HEIGHT*k*k, 0)
+		show_marker(PICKUP_MARKER, pickup.position, 0.9, k)
+		if pickup.drop <= 0.0:
+			markers[PICKUP_MARKER].visible = false
+			game.fx.ripple(pickup.position, 1.0, PICKUPS[pickup.kind][1])
+		return
 	pickup.life -= dt
 	var bob: float = sin(game.elapsed*3.0)*0.2
 	orb.position = pickup.position + Vector3(0, 1.1 + bob, 0)
@@ -209,16 +284,19 @@ func update_pickup(game, dt: float) -> void:
 	elif pickup.life <= 0:
 		clear_pickup()
 
+# Anywhere along an inner road, not only at crossings, and not on top of the hole.
 func spawn_pickup(game) -> void:
 	var xs: Array = game.layout.crossings_x
 	var zs: Array = game.layout.crossings_z
 	var at := Vector3.ZERO
 	for attempt in 8:
-		at = Vector3(xs[rng.randi()%xs.size()], 0.16, zs[rng.randi()%zs.size()])
+		var free := rng.randf_range(-0.9, 0.9)
+		at = Vector3(xs[rng.randi()%xs.size()], 0.16, free*game.layout.move_z) if rng.randf() < 0.5 \
+			else Vector3(free*game.layout.move_x, 0.16, zs[rng.randi()%zs.size()])
 		if Vector2(at.x-game.hole_position.x, at.z-game.hole_position.z).length() > 4.0: break
 	var kinds: Array = PICKUPS.keys().filter(func(k): return k != "time" or game.clock_can_grow())
 	var kind: String = kinds[rng.randi()%kinds.size()]
-	pickup = {"kind":kind, "position":at, "life":PICKUP_LIFE}
+	pickup = {"kind":kind, "position":at, "life":PICKUP_LIFE, "drop":DROP_TIME}
 	var color: Color = PICKUPS[kind][1]
 	orb_material.albedo_color = color
 	orb_label.text = I18n.t(PICKUPS[kind][0])

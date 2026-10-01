@@ -31,8 +31,9 @@ func run(g) -> void:
 func check_language_and_intro(g) -> void:
 	var I18n = g.I18n
 	var rows_complete := true
-	for key in I18n.Strings.S:
-		var row: Array = I18n.Strings.S[key]
+	var tables: Dictionary = I18n.Strings.S.merged(I18n.LandmarkLines.S)
+	for key in tables:
+		var row: Array = tables[key]
 		if row.size() != I18n.LANGS.size() or row.any(func(cell): return str(cell) == ""):
 			rows_complete = false
 			push_error("incomplete translation: " + key)
@@ -57,6 +58,12 @@ func check_language_and_intro(g) -> void:
 	check(restored.lang == "pt" and restored.seen.size() == 2, "bad language and seen entries are ignored")
 	var Intro = g.Intro
 	check(Intro.pending_tips(Campaign.level_info(0), []).is_empty(), "the first city needs no tips")
+	var lines := 0
+	for id in Campaign.LANDMARKS:
+		if I18n.t("lmfun_" + id) != "lmfun_" + id: lines += 1
+	check(lines == Campaign.LANDMARKS.size(), "every landmark has an intro line")
+	check(Intro.landmark_tip(Campaign.level_info(0), []) == ["lm_onepillar"] and Intro.landmark_tip(Campaign.level_info(0), ["lm_onepillar"]).is_empty(), "each landmark is introduced once")
+	check(Intro.tip_page("lm_eiffel").title == Campaign.boss_name("eiffel") and Intro.tip_page("lm_eiffel").tag != "", "landmark card shows name and city")
 	check(Intro.pending_tips(Campaign.level_info(1), []) == ["weather_rain", "pickup"], "city 2 introduces rain and power orbs")
 	var seen: Array = ["weather_rain", "pickup"]
 	check(Intro.pending_tips(Campaign.level_info(1), seen).is_empty(), "seen tips are not repeated")
@@ -185,7 +192,10 @@ func check_levels(g) -> void:
 		g.remaining = 0.01
 		g.step(0.02,Vector2.ZERO)
 		check(g.mode == "result" and g.hud.won and g.campaign.coins > coins_before, "level %d boss can be caught and pays coins" % (i+1))
-		if i < Campaign.level_count()-1:
+		if i == 0:
+			g.go_menu()
+			check(g.campaign.selected == 1 and g.mode == "menu" and g.score == 0, "home after a win shows the next city")
+		elif i < Campaign.level_count()-1:
 			g.on_play()
 			check(g.campaign.selected == i+1 and g.score == 0, "next button loads a fresh level")
 

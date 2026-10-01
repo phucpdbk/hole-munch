@@ -272,7 +272,7 @@ func mark_seen(ids: Array) -> void:
 # they open, so the replayed on_play() starts the round.
 func offer_tips() -> bool:
 	if test_mode or capture_mode or run_kind != "campaign": return false
-	var ids := Intro.pending_tips(level, campaign.seen)
+	var ids := Intro.landmark_tip(level, campaign.seen) + Intro.pending_tips(level, campaign.seen)
 	if ids.is_empty(): return false
 	mark_seen(ids)
 	intro.open(ids.map(func(id): return Intro.tip_page(id)), on_play)
@@ -726,7 +726,7 @@ func reset_stats() -> void:
 	revive_left = 0.0
 	doubled = false
 	reset_hazards()
-	mechanics.reset(level.weather, 991 + campaign.selected*31)
+	mechanics.reset(self, level.weather, 991 + campaign.selected*31)
 	if fx: fx.clear()
 	started = false
 	paused = false
@@ -777,6 +777,10 @@ func go_menu() -> void:
 	if run_kind != "campaign":
 		run_kind = "campaign"
 		load_level(campaign_level)
+	elif mode == "result" and hud.won and has_next_city():
+		# Home after a win lands on the next city, as NEXT CITY would.
+		load_level(campaign.selected+1)
+		persist()
 	elif mode in ["paused", "result"]: reset_round()
 	playing = false
 	paused = false
@@ -895,7 +899,7 @@ func step(dt: float, input: Vector2) -> void:
 	advance_falls(dt)
 	if magnet_level() > 0: pull_small_items(dt)
 	for item in items:
-		if item.eaten or item.get("hidden", false) or item.fall >= 0: continue
+		if item.eaten or item.get("hidden", false) or item.fall >= 0 or item.get("falling", 0.0) > 0: continue
 		if item.radius > radius*EAT_RATIO or item.get("shielded", false): continue
 		# Like 2D: the centre must pass inside the rim, less a bit for bigger objects.
 		var reach: float = radius - item.radius*0.4
@@ -1198,6 +1202,21 @@ func open_update() -> void:
 	if update_url != "": OS.shell_open(update_url)
 
 # How far the hole has grown toward swallowing the landmark, 0..1.
+# What the HUD minimap shows: roads, hole, landmark, rival and sky drops.
+func minimap_data() -> Dictionary:
+	if layout == null or boss_index < 0 or boss_index >= items.size(): return {}
+	var data := {"half":Vector2(layout.half_x, layout.half_z), "streets_x":layout.streets_x, "streets_z":layout.streets_z,
+		"hole":Vector2(hole_position.x, hole_position.z), "radius":radius,
+		"boss":Vector2(items[boss_index].position.x, items[boss_index].position.z),
+		"open":not items[boss_index].get("shielded", false), "bombs":[]}
+	for bomb in mechanics.bombs:
+		if not bomb.eaten and not bomb.hidden: data.bombs.append(Vector2(bomb.origin.x, bomb.origin.z))
+	if not mechanics.pickup.is_empty(): data.pickup = Vector2(mechanics.pickup.position.x, mechanics.pickup.position.z)
+	if is_instance_valid(rival) and rival.active:
+		data.rival = Vector2(rival.position.x, rival.position.z)
+		data.rival_radius = rival.radius
+	return data
+
 func growth() -> float:
 	return clampf((radius-float(stats.start_radius))/(boss_radius/EAT_RATIO-float(stats.start_radius)),0,1)
 
@@ -1309,6 +1328,7 @@ func update_hud() -> void:
 	hud.eaten = eaten
 	hud.waiting = not started
 	hud.growth = growth()
+	hud.minimap = minimap_data()
 	hud.revive_left = revive_left
 	hud.revive_seconds = int(Ads.REVIVE_SECONDS)
 	hud.can_double = can_double()
