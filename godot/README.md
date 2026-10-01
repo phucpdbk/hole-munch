@@ -182,6 +182,17 @@ store-target requirements, physical-device QA, final assets and privacy metadata
 iOS has a project-only export preset and Mac setup script. See [IOS.md](IOS.md).
 Xcode compilation, signing and device testing still require a Mac and Apple Team.
 
+## Web build (GitHub Pages)
+
+The "Web" preset exports a single-threaded build (GitHub Pages cannot send the
+COOP/COEP headers threads need) without the AdMob addon; ads and the update check
+are Android-only. Install the 4.7.1 web export templates, then run
+`bash godot/tools/deploy-web.sh` from the repo root (set `GODOT_BIN` if Godot is
+not on PATH). It publishes to the `gh-pages` branch:
+https://phucpdbk.github.io/hole-munch/ serves the Godot build, `/classic/` the
+previous HTML5 game and `/privacy.html` the privacy policy. Pass `--no-push` to
+build the branch locally without publishing.
+
 ## Deferred migration
 
 World events, onboarding goals, achievements, ads and web save migration are not
