@@ -82,7 +82,7 @@ func is_aiming(item: Dictionary) -> bool:
 
 func approach(unit: Dictionary, player: Vector3, dt: float) -> void:
 	var item: Dictionary = unit.item
-	if not item.get("defender",false) or roads_x.is_empty() or roads_z.is_empty(): return
+	if not item.get("defender",false) or item.get("stay",false) or roads_x.is_empty() or roads_z.is_empty(): return
 	var offset: Vector3 = player-item.position
 	offset.y = 0
 	if offset.length() <= 7.0 or is_aiming(item): return

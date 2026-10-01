@@ -84,6 +84,7 @@ func run(game) -> void:
 	for i in range(60): g.step(0.02,Vector2.ZERO)
 	check(g.mode=="result" and g.hud.won and g.remaining > 20,"clearing the map ends the round early")
 	check_mechanics()
+	check_features()
 	check_ads()
 	check_updates()
 	if failures > 0:
@@ -217,6 +218,44 @@ func check_growth_route() -> void:
 		route_seconds += ROUTE_STEP
 	g.remaining = timer - route_seconds
 	check(g.boss_down and g.remaining > 0,"growth route reaches and swallows the boss within the timer")
+
+# Gold districts, roadblocks, shortcuts and danger zones (scripts/map_features.gd).
+func check_features() -> void:
+	var F = g.MapFeatures
+	g.load_level(0)
+	check(g.features.gold_blocks.is_empty() and g.features.barriers.is_empty(), "the first city has a plain map")
+	g.load_level(26)
+	var wanted: Dictionary = F.counts(26)
+	var features = g.features
+	check(features.gold_blocks.size() == wanted.gold and features.barriers.size() == wanted.barriers and features.shortcuts.size() == wanted.shortcuts and features.danger_blocks.size() == wanted.danger, "a later city gets gold, roadblocks, shortcuts and a danger zone")
+	var gold: Array = g.items.filter(func(item): return item.get("gold", false))
+	check(gold.size() > 5 and gold.all(func(item): return item.get("move", "") == ""), "gold districts mark their buildings")
+	var plain: Dictionary = g.items.filter(func(item): return item.kind == gold[0].kind and not item.get("gold", false))[0]
+	check(g.base_points(gold[0]) == F.GOLD_POINTS*g.base_points(plain) or gold[0].radius != plain.radius, "gold food scores double")
+	check(is_equal_approx(g.bite_size(gold[0]), gold[0].radius*sqrt(F.GOLD_GROWTH)), "gold food feeds 1.5x growth")
+	var guards: Array = g.items.filter(func(item): return item.get("stay", false))
+	check(guards.size() == 3 and guards.all(func(item): return item.defender), "a guard squad holds the danger zone")
+	g.reset_round()
+	g.playing = true; g.mode = "playing"; g.started = true; g.remaining = 60.0
+	g.defense.grace = INF
+	g.rival.active = false
+	var guard: Dictionary = guards[0]
+	var post: Vector3 = guard.position
+	g.hole_position = post + Vector3(9, 0, 0)
+	for i in 30: g.step(0.05, Vector2.ZERO)
+	check(guard.position == post, "danger-zone guards stay at their post")
+	var barrier: Dictionary = features.barriers[0]
+	g.hole_position = barrier.position + Vector3(3, 0, 0)
+	g.hole_position.y = 0
+	for i in 60: g.step(0.02, Vector2(-1, 0))
+	var gap := Vector2(g.hole_position.x - barrier.position.x, g.hole_position.z - barrier.position.z).length()
+	check(not barrier.eaten and barrier.fall < 0 and gap > barrier.radius*0.7, "a small hole cannot cross a roadblock")
+	var queued: Array = g.items.filter(func(item): return item.get("move", "") == "car" and not item.get("blocks", []).is_empty())
+	g.reset_round()
+	for i in 1500: g.animate_world(0.02)
+	var stuck: Array = queued.filter(func(car): return car.velocity < 0.05)
+	check(not queued.is_empty() and stuck.size() >= 2, "roadblocks jam the traffic behind them")
+	g.load_level(0)
 
 # Rewarded-ad rescue and coin doubling, plus the interstitial pacing (scripts/ads.gd).
 func check_ads() -> void:

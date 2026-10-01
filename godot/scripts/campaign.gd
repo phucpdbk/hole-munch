@@ -180,7 +180,7 @@ static func level_info(index: int) -> Dictionary:
 # Par times: how long the real-time greedy test route (smoke.gd) needs per city.
 # timer gives generous slack early and less later; regenerate with --campaign-smoke
 # (it prints each route) after changing map contents.
-const PAR_SECONDS: Array[int] = [54, 56, 31, 24, 22, 43, 47, 112, 22, 60, 74, 59, 53, 93, 66, 113, 62, 77, 82, 79, 76, 93, 65, 113, 151, 169, 24, 153, 142, 154, 101, 217, 109, 154, 171, 85, 179, 140, 83, 232, 125, 70, 142, 147, 120, 88, 190, 52]
+const PAR_SECONDS: Array[int] = [54, 56, 49, 20, 60, 56, 35, 64, 44, 30, 22, 27, 67, 23, 85, 107, 44, 88, 72, 36, 77, 63, 42, 126, 138, 168, 96, 146, 150, 84, 98, 194, 80, 112, 80, 90, 105, 168, 73, 174, 158, 65, 67, 68, 128, 132, 87, 115]
 
 # Timer = par × slack, never below a floor. The par route plays like a sharp
 # player, so the slack covers steering, dodging and learning the map. Nothing

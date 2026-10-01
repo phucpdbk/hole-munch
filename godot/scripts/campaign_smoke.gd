@@ -158,7 +158,11 @@ func check_levels(g) -> void:
 		var info: Dictionary = g.level
 		check(is_equal_approx(g.remaining, float(info.seconds)) and g.boss_radius >= g.MIN_BOSS and g.boss_radius <= g.MAX_BOSS + g.FINALE_BOSS, "level %d config applied (boss %.1f, %ds)" % [i+1, g.boss_radius, info.seconds])
 		# 30 city/prop batches plus one each for shield pylons and bombs.
-		check(g.batches.size() <= 32, "level %d render batches bounded (%d)" % [i+1, g.batches.size()])
+		check(g.batches.size() <= 34, "level %d render batches bounded (%d)" % [i+1, g.batches.size()])
+		var wanted: Dictionary = g.MapFeatures.counts(i)
+		var f = g.features
+		check(f.gold_blocks.size() == wanted.gold and f.danger_blocks.size() == wanted.danger and f.shortcuts.size() == wanted.shortcuts \
+			and f.barriers.size() <= wanted.barriers and (wanted.barriers == 0 or f.barriers.size() > 0), "level %d map features (%d gold, %d blocks, %d alleys, %d danger)" % [i+1, f.gold_blocks.size(), f.barriers.size(), f.shortcuts.size(), f.danger_blocks.size()])
 		var boss_mesh: Mesh = g.batches[g.items[g.boss_index].batch].mesh
 		check(g.is_landmark() and g.minions.is_empty(),"level %d objective is a landmark, never a military unit" % (i+1))
 		check(boss_mesh.get_surface_count() == 1 and boss_mesh.get_aabb().size.y > 1.5, "level %d boss mesh is built" % (i+1))

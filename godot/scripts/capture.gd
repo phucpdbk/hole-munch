@@ -59,6 +59,23 @@ func run(game, campaign_mode: bool) -> void:
 		await challenge_preview()
 		g.get_tree().quit()
 		return
+	# Gold district, roadblock and danger zone of a later city, with the minimap.
+	if "--map-capture" in OS.get_cmdline_user_args():
+		g.load_level(26)
+		g.go_menu()
+		await frames(40)
+		await snapshot("map-menu")
+		g.on_play()
+		g.started = true
+		g.defense.grace = INF
+		var spots := {"gold":g.features.gold_blocks[0], "block":Vector2(g.features.barriers[0].position.x, g.features.barriers[0].position.z),
+			"danger":g.features.danger_blocks[0], "alley":g.features.shortcut_blocks[0]}
+		for name in spots:
+			g.hole_position = Vector3(spots[name].x + 4.0, 0, spots[name].y + 4.0)
+			await frames(60)
+			await snapshot("map-" + name)
+		g.get_tree().quit()
+		return
 	if "--daily-capture" in OS.get_cmdline_user_args():
 		await daily_preview()
 		g.get_tree().quit()

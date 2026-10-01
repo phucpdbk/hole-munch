@@ -10,9 +10,10 @@ const I18n = preload("res://scripts/i18n.gd")
 const Campaign = preload("res://scripts/campaign.gd")
 const STORY := [["globe", "story1"], ["food", "story2"], ["shield", "story3"], ["target", "story4"]]
 # First city index where each always-on mechanic gets its card.
-const FEATURE_FROM := {"pickup":1, "bomb":2, "hunger":3, "counter":4}
+const FEATURE_FROM := {"pickup":1, "bomb":2, "hunger":3, "counter":4, "gold":2, "roadblock":3, "shortcut":5, "danger":6}
 const FEATURE_ICON := {"pickup":"magnet", "bomb":"bomb", "hunger":"food", "counter":"megaphone",
 	"rival":"skull", "finale":"crown", "region":"globe",
+	"gold":"gem", "roadblock":"lock", "shortcut":"map", "danger":"shield",
 	"daily_stampede":"target", "daily_coinrain":"coin", "daily_goldrush":"chest"}
 const WEATHER_TIPS := ["rain", "snow", "fog", "wind", "storm"]
 const MAX_TIPS := 2

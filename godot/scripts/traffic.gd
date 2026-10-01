@@ -93,6 +93,11 @@ func allowed_move(car: Dictionary, lane: Array, green: String, dt: float) -> flo
 			var ahead: float = (crossing - car.along) * car.direction
 			# Only cars that have not yet entered the crossing wait at the stop line.
 			if ahead > BOX - STOP_SLACK: room = minf(room, maxf(0.0, ahead - BOX))
+	# A roadblock (map_features.gd) holds the lane until the hole eats it.
+	for block in car.get("blocks", []):
+		if not is_active(block.item): continue
+		var ahead: float = wrapf((block.at - car.along) * car.direction, 0.0, car.wrap * 2.0)
+		room = minf(room, maxf(0.0, ahead - BOX - 0.6))
 	var target: float = minf(car.speed, sqrt(2.0 * BRAKE * room))
 	car.velocity = target if target < car.velocity else move_toward(car.velocity, target, ACCEL * dt)
 	return minf(car.velocity * dt, room)

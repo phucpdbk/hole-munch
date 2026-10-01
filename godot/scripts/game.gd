@@ -26,6 +26,7 @@ const Intro = preload("res://scripts/intro.gd")
 const Ads = preload("res://scripts/ads.gd")
 const UpdateCheck = preload("res://scripts/update_check.gd")
 const DailyGames = preload("res://scripts/daily_games.gd")
+const MapFeatures = preload("res://scripts/map_features.gd")
 # Seconds a carry-in power from the daily mini-game lasts (time adds seconds).
 const CARRY_SECONDS := 12.0
 const CARRY_TIME := 10.0
@@ -78,6 +79,8 @@ var campaign = Campaign.new()
 var level: Dictionary = Campaign.level_info(0)
 var layout = MapLayout.make(3, 3)
 var city_blocks = CityBlocks.new()
+# Gold districts, roadblocks, shortcuts and danger zones (scripts/map_features.gd).
+var features = MapFeatures.new()
 var stats: Dictionary = campaign.stats()
 var palette: Array = level.palette
 var weather: Node3D
@@ -317,6 +320,7 @@ func load_level(index: int) -> void:
 	models.region_style = level.style
 	models.city_profile = CityProfiles.profile(level.boss)
 	city_blocks.plan(layout, models.city_profile, has_farms(), 4819 + campaign.selected*137 + 1)
+	features.plan(layout, city_blocks.districts, campaign.selected, 4819 + campaign.selected*137 + 11, SPAWN)
 	total_points = 0
 	make_ground()
 	make_city()
@@ -435,7 +439,11 @@ func make_ground() -> void:
 
 # Grass courtyards, a paved downtown and a lighter landmark plaza.
 func inner_ground(x: float, z: float) -> Color:
-	if level.weather == "snow": return Color("dfe9ed")
+	var snow: bool = level.weather == "snow"
+	match features.zone(x, z):
+		"gold": return MapFeatures.GOLD_TINT.lerp(Color.WHITE, 0.35 if snow else 0.0)
+		"danger": return MapFeatures.DANGER_TINT.lerp(Color.WHITE, 0.35 if snow else 0.0)
+	if snow: return Color("dfe9ed")
 	match city_blocks.district(x, z):
 		"plaza": return Color(palette[3]).lightened(0.15)
 		"downtown": return Color(palette[2]).darkened(0.06)
@@ -471,6 +479,8 @@ func make_city() -> void:
 				Traffic.make_walker(walker, Vector2(0.75, 0.12), rng.randf_range(0.35, 0.6), rng.randf_range(0, TAU))
 	make_traffic(rng)
 	make_signals()
+	features.build(self, rng)
+	make_zone_labels()
 	# Accessible snacks connect the opening street to trees and cars. Cones sit on
 	# the centre line so both traffic lanes stay clear.
 	for i in range(18):
@@ -529,7 +539,7 @@ func make_boss() -> void:
 			minions.append(minion)
 	var food_area := 0.0
 	for item in items:
-		if item.get("is_boss", false) or item.get("bonus", false): continue
+		if item.get("is_boss", false) or item.get("bonus", false) or item.get("optional", false): continue
 		food_area += item.radius*item.radius
 		total_points += base_points(item)
 	var finale := 1.0 if int(level.slot) == Campaign.CITIES_PER_REGION-1 else 0.0
@@ -575,7 +585,27 @@ func make_signals() -> void:
 				pole.lamp = lamp
 
 func base_points(item: Dictionary) -> int:
-	return maxi(5, int(item.radius*item.radius*65))
+	return maxi(5, int(item.radius*item.radius*65))*(MapFeatures.GOLD_POINTS if item.get("gold", false) else 1)
+
+# Gold-district food feeds more growth than its size alone.
+static func bite_size(item: Dictionary) -> float:
+	return item.radius*(sqrt(MapFeatures.GOLD_GROWTH) if item.get("gold", false) else 1.0)
+
+# A floating "×2" over each gold district.
+func make_zone_labels() -> void:
+	for key in features.gold_blocks:
+		var label := Label3D.new()
+		label.text = "×%d" % MapFeatures.GOLD_POINTS
+		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		label.font = UiStyle.font(800)
+		label.font_size = 160
+		label.outline_size = 36
+		label.pixel_size = 0.012
+		label.modulate = Color("ffd95a")
+		label.outline_modulate = Color("5a3a12")
+		label.position = Vector3(key.x, 4.5, key.y)
+		label.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		world.add_child(label)
 
 func make_batches() -> void:
 	# Only cars, walkers and minions animate; the static street fronts are skipped.
@@ -911,6 +941,7 @@ func step(dt: float, input: Vector2) -> void:
 	hole_position += hole_velocity*dt
 	hole_position.x = clampf(hole_position.x, -layout.move_x, layout.move_x)
 	hole_position.z = clampf(hole_position.z, -layout.move_z, layout.move_z)
+	hole_position = features.collide(hole_position, radius, EAT_RATIO, hole_velocity)
 	radius = lerpf(radius, target_radius, 1.0-exp(-dt*8.0))
 	bite_time = maxf(0, bite_time-dt*2.5)
 	pulse = maxf(0, pulse-dt*2.0)
@@ -973,7 +1004,8 @@ func update_rival(dt: float) -> void:
 	for item in rival.update(dt, items, items[boss_index], hole_position, radius):
 		start_fall(item, rival.position)
 		item.sink = "rival"
-		rival.grow(item.radius)
+		rival.grow(bite_size(item))
+	rival.position = features.collide(rival.position, rival.radius, EAT_RATIO, rival.heading)
 	if rival.swallowed_by(hole_position, radius):
 		eat_rival()
 	elif rival.swallows(hole_position, radius):
@@ -1097,10 +1129,10 @@ func swallow(item: Dictionary) -> void:
 		sfx.play("grow")
 	var points := roundi(base_points(item)*combo_multiplier(combo))
 	score += points
-	if not item.get("bonus", false): eaten_points += base_points(item)
+	if not item.get("bonus", false) and not item.get("optional", false): eaten_points += base_points(item)
 	add_floater(item.position, "+%d" % points, false)
 	if item.radius >= BIG_BITE: fx.ripple(hole_position, radius)
-	grow(item.radius)
+	grow(bite_size(item))
 
 func grow(bite_radius: float) -> void:
 	target_radius = minf(MAX_RADIUS, sqrt(target_radius*target_radius + bite_radius*bite_radius*GROWTH))
@@ -1247,6 +1279,7 @@ func minimap_data() -> Dictionary:
 		"open":not boss.get("shielded", false), "bombs":[]}
 	if not boss.get("hidden", false): data.boss = Vector2(boss.position.x, boss.position.z)
 	if run_kind == "daily": data.dots = daily.dots()
+	data.merge(features.minimap(layout))
 	for bomb in mechanics.bombs:
 		if not bomb.eaten and not bomb.hidden: data.bombs.append(Vector2(bomb.origin.x, bomb.origin.z))
 	if not mechanics.pickup.is_empty(): data.pickup = Vector2(mechanics.pickup.position.x, mechanics.pickup.position.z)

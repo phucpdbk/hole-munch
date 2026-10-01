@@ -14,10 +14,19 @@ static func draw(canvas: CanvasItem, top_right: Vector2, data: Dictionary) -> vo
 	var rect := Rect2(top_right - Vector2(area.x, 0), area)
 	canvas.draw_style_box(UiStyle.flat(Color("1b3048d9"), 12, 1, Color(UiStyle.PANEL_EDGE, 0.7)), rect.grow(6))
 	canvas.draw_rect(rect, Color("6f9d6e"))
+	# Gold and danger districts (map_features.gd).
+	for zone in data.get("zones", []):
+		var block: Rect2 = zone.rect
+		canvas.draw_rect(Rect2(to_map(rect, half, scale, block.position), block.size*scale), Color(zone.color, 0.85))
 	for x in data.streets_x:
 		canvas.draw_line(to_map(rect, half, scale, Vector2(x, -half.y)), to_map(rect, half, scale, Vector2(x, half.y)), Color("3c4650"), 3.0)
 	for z in data.streets_z:
 		canvas.draw_line(to_map(rect, half, scale, Vector2(-half.x, z)), to_map(rect, half, scale, Vector2(half.x, z)), Color("3c4650"), 3.0)
+	for lane in data.get("shortcuts", []):
+		canvas.draw_dashed_line(to_map(rect, half, scale, lane[0]), to_map(rect, half, scale, lane[1]), UiStyle.MINT, 2.0, 4.0)
+	for spot in data.get("barriers", []):
+		canvas.draw_rect(Rect2(to_map(rect, half, scale, spot) - Vector2(4, 4), Vector2(8, 8)), Color("ff9a3c"))
+		canvas.draw_rect(Rect2(to_map(rect, half, scale, spot) - Vector2(4, 4), Vector2(8, 8)), UiStyle.INK, false, 1.0)
 	for dot in data.get("dots", []): canvas.draw_circle(to_map(rect, half, scale, dot), 2.5, UiStyle.GOLD)
 	if data.has("boss"):
 		var boss := to_map(rect, half, scale, data.boss)
