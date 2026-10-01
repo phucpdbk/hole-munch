@@ -6,7 +6,7 @@ extends Node3D
 # second opening at its position, so its bites sink like the player's.
 const Traffic = preload("res://scripts/traffic.gd")
 const EAT_RATIO := 0.85
-const GROWTH := 0.65
+const GROWTH := 0.45
 const MAX_RADIUS := 8.5
 const RETARGET := 0.35
 const HUNT_RANGE := 9.0

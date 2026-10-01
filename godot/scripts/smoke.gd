@@ -297,6 +297,8 @@ func check_mechanics() -> void:
 	mech.hunger = mech.HUNGER_DELAY + 0.1
 	mech.update_hunger(g, 1.0)
 	check(mech.hungry and g.target_radius < 2.0, "a starving hole shrinks")
+	mech.update_hunger(g, 60.0)
+	check(is_equal_approx(g.target_radius, 2.0*mech.HUNGER_KEEP), "starving stops at a share of the round's best size")
 	mech.fed()
 	mech.update_hunger(g, 0.1)
 	check(not mech.hungry, "a bite ends hunger")

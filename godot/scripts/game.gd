@@ -34,7 +34,7 @@ const MODEL_BOSS := 2.8
 const SPAWN := Vector3(0, 0, 9)
 const BOSS_HOME := Vector3(0, 0.16, -1.8)
 const EAT_RATIO := 0.85
-const GROWTH := 0.65
+const GROWTH := 0.45
 const COMBO_WINDOW := 1.0
 # Combo milestones buy time in endless only: [bites, seconds]. Past the last
 # one, every COMBO_REPEAT more bites adds COMBO_REPEAT_SECONDS. Campaign and

@@ -17,6 +17,7 @@ const BOMB_SECONDS := 3.0
 const BLAST_REACH := 2.4
 const HUNGER_DELAY := 3.0
 const HUNGER_RATE := 0.06
+const HUNGER_KEEP := 0.8
 const PICKUP_FIRST := 6.0
 const PICKUP_GAP := Vector2(7.0, 11.0)
 const PICKUP_LIFE := 8.0
@@ -51,6 +52,7 @@ var stun := 0.0
 var glide := Vector3.ZERO
 var hunger := 0.0
 var hungry := false
+var peak_radius := 0.0
 var shield: MeshInstance3D
 var shield_material: StandardMaterial3D
 var orb: Node3D
@@ -154,6 +156,7 @@ func reset(level_weather: String, seed_value: int) -> void:
 	glide = Vector3.ZERO
 	hunger = 0.0
 	hungry = false
+	peak_radius = 0.0
 	orb.visible = false
 	if not boss.is_empty(): boss.shielded = not pylons.is_empty()
 
@@ -176,10 +179,13 @@ func update(game, dt: float) -> void:
 	update_hunger(game, dt)
 	update_pickup(game, dt)
 
-# Going too long without a bite starves the hole back toward its start size.
+# Going too long without a bite starves the hole back toward its start size, but
+# never below HUNGER_KEEP of its best size this round: a map whose food runs thin
+# late must stay winnable.
 func update_hunger(game, dt: float) -> void:
 	hunger += dt
-	var floor_radius := float(game.stats.start_radius)
+	peak_radius = maxf(peak_radius, game.target_radius)
+	var floor_radius := maxf(float(game.stats.start_radius), peak_radius*HUNGER_KEEP)
 	hungry = hunger > HUNGER_DELAY and game.target_radius > floor_radius + 0.01
 	if hungry: game.target_radius = maxf(floor_radius, game.target_radius*(1.0-HUNGER_RATE*dt))
 

@@ -167,19 +167,19 @@ static func level_info(index: int) -> Dictionary:
 		"rival":has_rival(index),
 		# Share of the map's food the hole must eat before the boss fits. Dense
 		# street fronts hold about four times the food of the old detached houses.
-		"share":lerpf(0.07, 0.15, progress)}
+		"share":lerpf(0.2, 0.3, progress)}
 
 # Par times: how long the real-time greedy test route (smoke.gd) needs per city.
 # timer gives generous slack early and less later; regenerate with --campaign-smoke
 # (it prints each route) after changing map contents.
-const PAR_SECONDS: Array[int] = [14, 58, 42, 17, 47, 14, 32, 95, 17, 37, 60, 45, 57, 67, 71, 130, 98, 77, 42, 91, 75, 69, 58, 135, 138, 183, 25, 156, 123, 84, 113, 177, 104, 167, 194, 117, 167, 202, 18, 206, 15, 128, 105, 45, 122, 117, 110, 177]
+const PAR_SECONDS: Array[int] = [16, 63, 51, 17, 22, 17, 47, 112, 31, 56, 74, 50, 53, 108, 77, 113, 62, 76, 47, 65, 75, 93, 65, 113, 77, 159, 24, 132, 144, 95, 101, 217, 90, 153, 171, 85, 179, 140, 83, 180, 127, 69, 160, 147, 129, 88, 209, 148]
 
 # Timer = par × slack, never below a floor. The par route plays like a sharp
 # player, so the slack covers steering, dodging and learning the map. Nothing
 # adds time in campaign or daily rounds, so this is the whole budget.
 const TIME_SLACK_START := 2.3
 const TIME_SLACK_END := 1.55
-const TIME_FLOOR_START := 45.0
+const TIME_FLOOR_START := 60.0
 const TIME_FLOOR_END := 30.0
 
 static func level_seconds(index: int, blocks: int, progress: float) -> float:
