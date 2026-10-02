@@ -22,7 +22,7 @@ config/icon="res://icon.svg"
 [application_custom]
 
 prototype/version="0.1"
-testing/unlock_all_levels=true
+testing/unlock_all_levels=false
 build_code=12
 
 [display]
