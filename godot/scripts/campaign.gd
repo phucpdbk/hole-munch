@@ -99,7 +99,7 @@ const COST_GROWTH := 1.75
 const TIME_PER_UPGRADE := 1.0
 # Best combo raises the coin reward by 1% per bite, up to +60%.
 const COMBO_COIN_CAP := 60
-const START_RADIUS := 0.86
+const START_RADIUS := 0.95
 
 var selected := 0
 var unlocked := 0
@@ -180,12 +180,12 @@ static func level_info(index: int) -> Dictionary:
 # Par times: how long the real-time greedy test route (smoke.gd) needs per city.
 # timer gives generous slack early and less later; regenerate with --campaign-smoke
 # (it prints each route) after changing map contents.
-const PAR_SECONDS: Array[int] = [16, 21, 15, 13, 17, 15, 17, 23, 20, 16, 15, 15, 38, 20, 23, 20, 19, 19, 16, 25, 20, 22, 22, 20, 21, 23, 18, 16, 24, 23, 16, 21, 17, 22, 29, 23, 17, 20, 29, 33, 18, 18, 36, 22, 21, 33, 20, 27]
+const PAR_SECONDS: Array[int] = [18, 22, 15, 14, 25, 15, 20, 22, 19, 15, 17, 15, 38, 16, 24, 20, 18, 18, 16, 24, 18, 21, 21, 19, 21, 22, 17, 15, 23, 22, 16, 21, 19, 22, 33, 26, 18, 20, 20, 32, 18, 18, 36, 21, 20, 33, 20, 28]
 
 # Timer = par × slack, never below a floor. The par route plays like a sharp
 # player who knows the whole map and takes the landmark the moment it fits, so
 # the slack covers steering, dodging, the guardian fight and learning the map,
-# and leaves time to keep eating after the landmark falls. Nothing
+# and every second left when the landmark falls pays coins. Nothing
 # adds time in campaign or daily rounds, so this is the whole budget.
 const TIME_SLACK_START := 5.0
 const TIME_SLACK_END := 3.0
@@ -284,7 +284,7 @@ func equip(slot: String, index: int) -> bool:
 
 # Small per-level effects help without trivialising the boss: a fully grown
 # size upgrade (+0.30) still cannot eat street buildings from the start.
-const SIZE_PER_UPGRADE := 0.05
+const SIZE_PER_UPGRADE := 0.04
 const SPEED_PER_UPGRADE := 0.04
 const GREED_PER_UPGRADE := 0.08
 # Map food pays coins per this many points; stars and the win itself pay the rest,

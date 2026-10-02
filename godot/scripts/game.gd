@@ -116,15 +116,17 @@ var goal_mask := 0
 var defenders_eaten := 0
 var rival_eaten := false
 var counter_started := false
-# The landmark fell; the round still runs until the clock ends or the map is bare.
+# The landmark fell: the round is won on the next step.
 var boss_down := false
 # Pylons, pickups, hunger, bombs and weather handling (scripts/mechanics.gd).
 var mechanics
 var intro: Control
 var hole_style
 var shaft_shader: ShaderMaterial
-# Coins per second left when the whole map is cleared early.
+# Coins per second left when the landmark falls (the round ends there).
 const CLEAR_COINS := 2
+# Coins this result got from the seconds left on the clock.
+var time_coins := 0
 var lose_reason := ""
 var record_note := ""
 var rival: Node3D
@@ -481,23 +483,53 @@ func make_city() -> void:
 	make_signals()
 	features.build(self, rng)
 	make_zone_labels()
-	# Accessible snacks connect the opening street to trees and cars. Cones sit on
-	# the centre line so both traffic lanes stay clear.
-	for i in range(18):
-		add_item("cone", Vector3(-7.0+i*0.82, 0.07, 9.0), 0.2)
-	for i in range(16):
-		var walker := add_item("person", Vector3(-6.4+i*0.8, 0.16, 6.9), 0.22, i%4)
-		Traffic.make_walker(walker, Vector2(0.28, 0.1), rng.randf_range(0.25, 0.4), rng.randf_range(0, TAU))
+	make_opening(rng)
 	# Small squads guard the central plaza; eat them to silence their attacks.
+	# Which corner each squad starts at changes from city to city.
+	var flip: bool = campaign.selected%2 == 1
+	var swap: bool = campaign.selected%4 >= 2
 	for i in Challenges.defender_count(campaign.selected):
-		var road_x: float = layout.crossings_x[0] if i%2 == 0 else layout.crossings_x[-1]
-		var road_z: float = layout.crossings_z[-1] if i < 3 else layout.crossings_z[0]
+		var road_x: float = layout.crossings_x[0] if (i%2 == 0) != flip else layout.crossings_x[-1]
+		var road_z: float = layout.crossings_z[-1] if (i < 3) != swap else layout.crossings_z[0]
 		var tank := i%3 == 0
 		var guard := add_item("patrol_tank" if tank else "soldier",Vector3(road_x,0.16,road_z+i*0.5),1.5 if tank else 0.36)
 		guard.defender = true
 	make_reinforcements()
 	make_boss()
 	mechanics.setup(self, is_landmark(), 4819 + campaign.selected*137 + 7)
+
+# Accessible snacks connect the opening street to trees and cars, so the first
+# bite lands at once and a bench pays the first growth within seconds. The shape
+# changes per city: a straight row, an L to the east or west, or a split street.
+# Cones sit on road centre lines so both traffic lanes stay clear; walkers and
+# benches keep to the plaza's edge (z 6-7.4), which stays free of buildings.
+func make_opening(rng: RandomNumberGenerator) -> void:
+	var pattern: int = campaign.selected%4
+	var cones: Array[Vector3] = []
+	var walkers: Array[Vector3] = []
+	var benches: Array[Vector3] = []
+	match pattern:
+		1, 2:
+			var side := 1.0 if pattern == 1 else -1.0
+			for i in range(13): cones.append(Vector3(side*(-1.0+i*0.82), 0.07, 9.0))
+			for i in range(10): cones.append(Vector3(side*9.0, 0.07, 8.0-i*0.82))
+			for i in range(11): walkers.append(Vector3(side*(-1.0+i*0.8), 0.16, 6.9))
+			for i in range(4): walkers.append(Vector3(side*6.6, 0.16, 6.0-i*0.8))
+			benches.assign([Vector3(-side*2.6, 0.16, 6.6), Vector3(side*9.0, 0.16, 0.2)])
+		3:
+			for i in range(19): cones.append(Vector3(-9.0+i*1.0, 0.07, 9.0))
+			for cluster in [-5.0, 5.0]:
+				for i in range(8): walkers.append(Vector3(cluster-1.4+(i%4)*0.9, 0.16, 6.9 - (i/4)*0.7))
+			benches.assign([Vector3(-6.4, 0.16, 6.6), Vector3(6.4, 0.16, 6.6)])
+		_:
+			for i in range(18): cones.append(Vector3(-7.0+i*0.82, 0.07, 9.0))
+			for i in range(16): walkers.append(Vector3(-6.4+i*0.8, 0.16, 6.9))
+			benches.assign([Vector3(-7.0, 0.16, 6.4), Vector3(7.0, 0.16, 6.4)])
+	for at in cones: add_item("cone", at, 0.2)
+	for i in walkers.size():
+		var walker := add_item("person", walkers[i], 0.22, i%4)
+		Traffic.make_walker(walker, Vector2(0.28, 0.1), rng.randf_range(0.25, 0.4), rng.randf_range(0, TAU))
+	for at in benches: add_item("bench", at, 0.55)
 
 # Hidden squad that rolls in from the map edge when the landmark counter-attacks.
 # Marked as bonus so it never changes the boss size or completion.
@@ -980,7 +1012,7 @@ func step(dt: float, input: Vector2) -> void:
 	if run_kind == "daily":
 		if remaining <= 0 or daily.done(): finish(daily.reached())
 		return
-	if boss_down and map_cleared(): finish(true)
+	if boss_down: finish(true)
 	# A boss already sinking wins even if the clock runs out during its fall.
 	elif remaining <= 0 and (boss_down or items[boss_index].fall < 0):
 		if not boss_down and can_offer_revive(): offer_revive()
@@ -1095,7 +1127,6 @@ func update_fall(item: Dictionary, dt: float) -> void:
 		elif run_kind == "endless": endless_advance = true
 		else:
 			boss_down = true
-			add_floater(hole_position, I18n.t("clear_to_end"), true)
 
 func start_fall(item: Dictionary, centre: Vector3) -> void:
 	var is_boss: bool = item.get("is_boss", false)
@@ -1223,11 +1254,11 @@ func finish(won: bool) -> void:
 		_:
 			reward = campaign.reward(won, hud.stars, eaten_points, best_combo)
 			campaign.complete_goals(goal_mask, score)
-	# Clearing the whole map early pays for every second left on the clock.
-	if won and run_kind == "campaign" and map_cleared():
-		var extra := int(remaining)*CLEAR_COINS
-		reward += extra
-		if record_note == "": record_note = I18n.t("early_clear", extra)
+	# Taking the landmark early pays for every second left on the clock.
+	time_coins = int(remaining)*CLEAR_COINS if won and run_kind == "campaign" else 0
+	if time_coins > 0:
+		reward += time_coins
+		if record_note == "": record_note = I18n.t("time_left_coins", [int(remaining), time_coins])
 	campaign.coins += reward
 	ads.round_ended()
 	persist()
@@ -1441,7 +1472,7 @@ func update_hud() -> void:
 	if not started and mechanics.weather_note() != "": hud.note = mechanics.weather_note()
 	elif mechanics.hungry: hud.note = I18n.t("hungry")
 	elif run_kind == "daily": hud.note = ""
-	elif boss_down: hud.note = I18n.t("boss_down", [target_name, roundi((1.0-completion())*100)])
+	elif boss_down: hud.note = I18n.t("boss_down", target_name)
 	elif mechanics.shield_up() and radius*EAT_RATIO >= boss_radius: hud.note = I18n.t("eat_guardian")
 	else: hud.note = I18n.t("big_enough", target_name) if radius*EAT_RATIO >= boss_radius else ""
 	var city_label: String = Campaign.city_name(level.boss, Campaign.REGIONS[level.region].cities[level.slot][0])

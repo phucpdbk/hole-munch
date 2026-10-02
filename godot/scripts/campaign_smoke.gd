@@ -77,6 +77,7 @@ func check_progress() -> void:
 	var count := Campaign.level_count()
 	check(count == 48 and Campaign.REGIONS.size() == 6, "six continents with eight cities each")
 	var progress = Campaign.new()
+	progress.unlock_all_for_testing = true
 	check(progress.can_select(count-1) and not progress.can_select(count), "playtest allows all valid levels")
 	progress.selected = count-1
 	progress.complete(3,100)
@@ -194,9 +195,7 @@ func check_levels(g) -> void:
 		g.hole_position = g.items[g.boss_index].position
 		g.started = true
 		for frame in 60: g.step(0.02,Vector2.ZERO)
-		check(g.boss_down and g.mode == "playing", "level %d keeps playing after the boss falls" % (i+1))
-		g.remaining = 0.01
-		g.step(0.02,Vector2.ZERO)
+		check(g.boss_down and g.mode == "result", "level %d ends when the boss falls" % (i+1))
 		check(g.mode == "result" and g.hud.won and g.campaign.coins > coins_before, "level %d boss can be caught and pays coins" % (i+1))
 		if i == 0:
 			g.go_menu()

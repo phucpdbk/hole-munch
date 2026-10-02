@@ -78,11 +78,9 @@ func run(game) -> void:
 	g.target_radius = g.boss_radius/g.EAT_RATIO+0.1; g.radius = g.target_radius
 	g.hole_position = Vector3(boss.position.x,0,boss.position.z)
 	for i in range(60): g.step(0.02,Vector2.ZERO)
-	check(g.boss_down and g.mode=="playing","eating the boss keeps the round running")
-	for item in g.items:
-		if not item.get("bonus",false) and not item.get("is_boss",false) and not item.eaten and item.fall < 0: g.swallow(item)
-	for i in range(60): g.step(0.02,Vector2.ZERO)
-	check(g.mode=="result" and g.hud.won and g.remaining > 20,"clearing the map ends the round early")
+	check(g.boss_down and g.mode=="result" and g.hud.won and g.remaining > 20,"swallowing the boss wins the round at once")
+	# The test keeps stepping after the result, so the clock may have moved on since.
+	check(g.time_coins >= int(g.remaining)*g.CLEAR_COINS and g.time_coins > 40,"seconds left on the clock pay coins")
 	check_mechanics()
 	check_features()
 	check_ads()

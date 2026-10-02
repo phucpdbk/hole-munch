@@ -60,7 +60,7 @@ its landmark to conquer it, while dodging independent military defenders.
 - **Endless** (VÔ TẬN): 60 s clock, every bite adds a little time (plus combo
   time and +5 s pickups), each landmark adds 30 s and leads to a random harder
   city; best score and cities are saved.
-- **Upgrades** (NÂNG CẤP): coins buy start size (+0.05 × 6), speed (+4% × 8),
+- **Upgrades** (NÂNG CẤP): coins buy start size (+0.04 × 6), speed (+4% × 8),
   time (+1 s × 5), magnet (× 5) and coin bonus (+8% × 8); base prices
   160/140/200/300/240, ×1.75 per level. A maxed size upgrade still cannot eat
   a shop at the start (checked in `--campaign-smoke`). Map food pays 1 coin per
