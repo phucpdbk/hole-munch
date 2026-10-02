@@ -302,6 +302,16 @@ func check_guardian_fight() -> void:
 	check(bites == mascot.HP and not g.mechanics.shield_up(), "the guardian falls on the third bite (%d bites)" % bites)
 	g.reset_round()
 	check(mascot.hp == mascot.HP and is_equal_approx(g.mechanics.guardian.radius, full), "a new round heals the guardian")
+	# Cornered: the knock bends back toward the middle instead of pinning it.
+	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
+	var corner := Vector3(g.layout.move_x - 0.5, guardian.position.y, g.layout.move_z - 0.5)
+	guardian.position = corner
+	g.radius = full/g.EAT_RATIO + 0.3; g.target_radius = g.radius
+	g.hole_position = Vector3(corner.x - 0.4, 0, corner.z - 0.4)
+	for i in 3: g.step(0.02, Vector2.ZERO)
+	for i in int(mascot.KNOCK_TIME/0.02): g.step(0.02, Vector2.ZERO)
+	check(mascot.hp == mascot.HP - 1 and guardian.position.x < corner.x - 1.0 and guardian.position.z < corner.z - 1.0, "a cornered guardian is knocked back into the map")
+	g.reset_round()
 	g.load_level(0)
 
 # Gold districts, roadblocks, shortcuts and danger zones (scripts/map_features.gd).

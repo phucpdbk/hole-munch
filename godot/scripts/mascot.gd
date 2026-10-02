@@ -95,7 +95,7 @@ func bite(game) -> bool:
 	item.full_radius = item.get("full_radius", item.radius)
 	item.radius *= BITE_SHRINK
 	var away := flat(item.position - game.hole_position)
-	heading = away.normalized() if away.length() > 0.05 else Vector3.FORWARD
+	heading = inward(game, away.normalized() if away.length() > 0.05 else Vector3.FORWARD)
 	state = "knocked"
 	timer = KNOCK_TIME
 	squash = 1.0
@@ -151,7 +151,7 @@ func think(game, dt: float) -> void:
 			if timer <= 0 and distance < ALERT + item.radius:
 				state = "flee"
 				timer = FLEE_DASH
-				heading = -to_hole/maxf(distance, 0.001)
+				heading = inward(game, -to_hole/maxf(distance, 0.001))
 		"flee":
 			timer -= dt
 			item.position += heading*FLEE_SPEED*dt
@@ -231,6 +231,17 @@ func stay_on_map(game) -> void:
 	position.x = clampf(position.x, -game.layout.move_x, game.layout.move_x)
 	position.z = clampf(position.z, -game.layout.move_z, game.layout.move_z)
 	item.position = position
+
+# Near the map edge a knock or an escape bends toward the middle, so the
+# guardian is never pinned in a corner where the hole sits on top of it.
+const EDGE_MARGIN := 4.0
+
+func inward(game, direction: Vector3) -> Vector3:
+	var limit := Vector2(game.layout.move_x, game.layout.move_z) - Vector2.ONE*EDGE_MARGIN
+	var bent := direction
+	if absf(item.position.x) > limit.x and signf(direction.x) == signf(item.position.x): bent.x = -signf(item.position.x)*absf(direction.x)
+	if absf(item.position.z) > limit.y and signf(direction.z) == signf(item.position.z): bent.z = -signf(item.position.z)*absf(direction.z)
+	return flat(bent).normalized() if flat(bent).length() > 0.01 else flat(-item.position).normalized()
 
 static func flat(v: Vector3) -> Vector3:
 	return Vector3(v.x, 0, v.z)
