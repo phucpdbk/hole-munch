@@ -73,6 +73,8 @@ const S := {
 	"coin_parts": ["Ăn %d · Sao %d · Thắng %d · Giờ %d · ×%s", "Food %d · Stars %d · Win %d · Time %d · ×%s", "Comida %d · Estrellas %d · Victoria %d · Tiempo %d · ×%s", "Comida %d · Estrelas %d · Vitória %d · Tempo %d · ×%s", "Repas %d · Étoiles %d · Victoire %d · Temps %d · ×%s", "Makan %d · Bintang %d · Menang %d · Waktu %d · ×%s"],
 	"next_reward": ["Quà tiếp: %s", "Next reward: %s", "Siguiente premio: %s", "Próximo prêmio: %s", "Prochaine récompense : %s", "Hadiah berikutnya: %s"],
 	"retry_stars": ["CHƠI LẠI LẤY ★", "RETRY FOR ★", "REPETIR POR ★", "DE NOVO POR ★", "REJOUER POUR ★", "ULANG DEMI ★"],
+	"streak_days": ["CHUỖI %d NGÀY", "%d-DAY STREAK", "RACHA DE %d DÍAS", "SEQUÊNCIA DE %d DIAS", "SÉRIE DE %d JOURS", "BERUNTUN %d HARI"],
+	"streak_gift": ["CHUỖI %d NGÀY · +%d XU", "%d-DAY STREAK · +%d COINS", "RACHA DE %d DÍAS · +%d MONEDAS", "SEQUÊNCIA DE %d DIAS · +%d MOEDAS", "SÉRIE DE %d JOURS · +%d PIÈCES", "BERUNTUN %d HARI · +%d KOIN"],
 	"paused": ["TẠM DỪNG", "PAUSED", "PAUSA", "PAUSADO", "PAUSE", "JEDA"],
 	"eaten_by_rival": ["BỊ HỐ ĐỐI THỦ NUỐT!", "SWALLOWED BY THE RIVAL!", "¡EL RIVAL TE DEVORÓ!", "O RIVAL TE DEVOROU!", "LE RIVAL T'A AVALÉ !", "DITELAN SAINGAN!"],
 	"rival_took": ["ĐỐI THỦ ĐÃ CHIẾM %s!", "THE RIVAL TOOK %s!", "¡EL RIVAL TOMÓ %s!", "O RIVAL TOMOU %s!", "LE RIVAL A PRIS %s !", "SAINGAN MEREBUT %s!"],

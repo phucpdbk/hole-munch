@@ -50,6 +50,8 @@ var retry_button: BaseButton
 var rival_growth := -1.0
 var daily_won := false
 var daily_left := 3
+# Days in a row with a finished daily round (0 once the streak has lapsed).
+var streak := 0
 var daily_title := ""
 var daily_goal := ""
 var daily_icon := "daily"
@@ -298,6 +300,13 @@ func draw_daily_caption() -> void:
 	var at := daily_button.position + Vector2(4, -8)
 	UiStyle.draw_icon(self, daily_icon if daily_left > 0 else "lock", at + Vector2(9, -6), 20)
 	UiStyle.text(self, daily_title, at + Vector2(24, 0), 13, UiStyle.MINT if daily_left > 0 else MUTED, false, 4, body_font)
+	# The daily streak sits at the right end of the same line: a flame and the days.
+	if streak > 0:
+		var label := I18n.t("streak_days", streak)
+		var right := daily_button.position.x + daily_button.size.x
+		var width := UiStyle.text_width(label, 13, body_font)
+		UiStyle.draw_icon(self, "fire", Vector2(right - width - 12, at.y - 6), 20)
+		UiStyle.text(self, label, Vector2(right - width, at.y), 13, GOLD, false, 4, body_font)
 
 # Carry-in powers waiting for the next campaign round.
 func draw_items(right: float, top: float) -> void:

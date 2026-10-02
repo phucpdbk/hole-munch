@@ -1276,6 +1276,12 @@ func finish(won: bool) -> void:
 				reward = roundi(reward*Campaign.DAILY_COIN_BONUS)
 				record_note = I18n.t("daily_power", I18n.t("item_" + Campaign.daily_power(date)))
 			else: record_note = I18n.t("daily_best", int(campaign.daily.best))
+			# The first finished daily of a day keeps the streak and pays its gift.
+			var gift: Dictionary = campaign.advance_streak(date)
+			if not gift.is_empty():
+				var line := I18n.t("streak_gift", [int(gift.day), int(gift.coins)])
+				if int(gift.effect) >= 0: line += " · " + Campaign.effect_name(int(gift.effect))
+				record_note = line + " · " + record_note
 		"endless":
 			reward = campaign.endless_reward(score, endless_stage)
 			record_note = (I18n.t("new_record") if campaign.record_endless(score, endless_stage) else I18n.t("record", int(campaign.endless.best))) + I18n.t("cities_taken", endless_stage)
@@ -1547,6 +1553,7 @@ func update_hud() -> void:
 	hud.goal_mask = goal_mask if mode == "result" else campaign.goals[campaign.selected] if run_kind == "campaign" else 0
 	hud.rival_growth = clampf(rival.radius*EAT_RATIO/boss_radius, 0, 1) if rival.active else -1.0
 	hud.daily_won = campaign.daily_record(Campaign.today()).won
+	hud.streak = campaign.streak_days(Campaign.today())
 	hud.endless_best = int(campaign.endless.best)
 	var next_region: int = (campaign.selected+1)/Campaign.CITIES_PER_REGION
 	hud.gate_note = "" if next_region >= Campaign.REGIONS.size() or campaign.region_open(next_region) else I18n.t("gate", [Campaign.stars_needed(next_region), Campaign.region_name(next_region), campaign.total_stars()])

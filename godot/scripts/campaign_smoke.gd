@@ -231,9 +231,28 @@ func check_goals_and_modes() -> void:
 	check(progress.record_endless(900, 3) and not progress.record_endless(100, 1) and progress.endless.best == 900 and progress.endless.stage == 3, "endless keeps the best run")
 	var rng := RandomNumberGenerator.new()
 	check(Campaign.endless_level(0, rng) < 8 and Campaign.endless_level(20, rng) >= 40, "endless cities get harder by stage")
+	check_streak(progress)
+	progress.reminders = false
 	var restored = Campaign.new()
 	restored.restore(JSON.parse_string(JSON.stringify(progress.data())))
 	check(restored.data() == progress.data(), "save round trip keeps goals and records")
+	check(restored.streak.count == progress.streak.count and not restored.reminders, "the streak and the reminder switch are saved")
+
+# Days in a row with a finished daily: coins grow over a week, day 7 gives an
+# effect, a skipped day starts over, and the same day never pays twice.
+func check_streak(progress) -> void:
+	check(Campaign.day_before("2026-03-01") == "2026-02-28" and Campaign.day_before("2027-01-01") == "2026-12-31", "the day before crosses months and years")
+	progress.streak = {"count":0, "last":""}
+	var coins_before: int = progress.coins
+	var owned_before: int = progress.owned.effects.size()
+	var gifts: Array = []
+	for day in range(1, 8): gifts.append(progress.advance_streak("2026-11-%02d" % day))
+	check(progress.streak.count == 7 and gifts[0].coins == Campaign.STREAK_COINS[0] and gifts[6].day == 7, "seven days in a row count up")
+	check(gifts[6].effect >= 0 and progress.owns("effects", gifts[6].effect) and progress.owned.effects.size() == owned_before + 1, "day seven gives an effect")
+	check(progress.coins - coins_before == Campaign.STREAK_COINS.reduce(func(a, b): return a + b), "each day pays its coins")
+	check(progress.advance_streak("2026-11-07").is_empty(), "a second daily the same day pays nothing")
+	check(progress.streak_days("2026-11-08") == 7 and progress.streak_days("2026-11-09") == 0, "the streak shows until a day is skipped")
+	check(progress.advance_streak("2026-11-10").day == 1, "a skipped day starts the streak over")
 
 func check_challenge_systems(g) -> void:
 	check(g.combo_seconds(8) == 2.0 and g.combo_seconds(16) == 3.0 and g.combo_seconds(30) == 5.0 and g.combo_seconds(45) == 3.0 and g.combo_seconds(9) == 0.0, "combo milestones grant time")

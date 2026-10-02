@@ -122,6 +122,10 @@ var daily := {}
 var items := {"magnet":0, "speed":0, "time":0}
 # Endless survival records.
 var endless := {"best":0, "stage":0}
+# Days in a row with a finished daily round: {"count":n, "last":"YYYY-MM-DD"}.
+var streak := {"count":0, "last":""}
+# The once-a-day reminder (notify.gd); the player can switch it off.
+var reminders := true
 # Intro pages and feature tips already shown (see intro.gd), and the UI language.
 var seen: Array[String] = []
 var lang := ""
@@ -320,9 +324,10 @@ func next_journey_reward() -> Dictionary:
 
 func data() -> Dictionary:
 	# A temporary preview selection must not become a permanent unlock.
-	return {"version":7, "selected":mini(selected,unlocked), "unlocked":unlocked, "medals":medals, "goals":goals,
+	return {"version":8, "selected":mini(selected,unlocked), "unlocked":unlocked, "medals":medals, "goals":goals,
 		"craft":craft, "skin":skin, "effect":effect, "trail":trail, "owned":owned.duplicate(true), "best":best, "coins":coins, "upgrades":upgrades.duplicate(),
-		"daily":daily.duplicate(), "items":items.duplicate(), "endless":endless.duplicate(), "seen":seen.duplicate(), "lang":lang}
+		"daily":daily.duplicate(), "items":items.duplicate(), "endless":endless.duplicate(), "seen":seen.duplicate(), "lang":lang,
+		"streak":streak.duplicate(), "reminders":reminders}
 
 func restore(value: Variant) -> void:
 	if not value is Dictionary: return
@@ -392,6 +397,11 @@ func restore_owned(value: Dictionary) -> void:
 # Language and seen tips survive every save version, including migrations.
 func restore_settings(value: Dictionary) -> void:
 	if value.get("lang") is String and value.lang in I18n.LANGS: lang = value.lang
+	if value.get("reminders") is bool: reminders = value.reminders
+	var saved_streak = value.get("streak", {})
+	if saved_streak is Dictionary and saved_streak.get("last") is String and saved_streak.last.length() <= 10 \
+			and (saved_streak.get("count") is float or saved_streak.get("count") is int):
+		streak = {"count":clampi(int(saved_streak.count), 0, 9999), "last":saved_streak.last}
 	var saved_seen = value.get("seen", [])
 	if not saved_seen is Array: return
 	for id in saved_seen:
@@ -478,6 +488,38 @@ func record_daily(date: String, score: int, won: bool) -> bool:
 		var power := daily_power(date)
 		items[power] = mini(MAX_ITEMS, int(items[power]) + 1)
 	return first_win
+
+# --- Daily streak --------------------------------------------------------------
+# A finished daily round (won or not) keeps the streak; skipping a day resets it.
+# Each new day pays coins that grow over a week; every seventh day also gives the
+# first effect not owned yet (or STREAK_WEEK_COINS once all are owned).
+const STREAK_COINS := [20, 30, 40, 50, 60, 80, 120]
+const STREAK_WEEK_COINS := 300
+
+static func day_before(date: String) -> String:
+	var unix := Time.get_unix_time_from_datetime_string(date + "T12:00:00")
+	return Time.get_date_string_from_unix_time(unix - 86400)
+
+# Streak still alive today: played today or yesterday.
+func streak_days(date: String) -> int:
+	return int(streak.count) if streak.last in [date, day_before(date)] else 0
+
+# Called when a daily round ends. Returns {} or the day's streak reward:
+# {"day":n, "coins":c, "effect":index or -1}. Coins are added here.
+func advance_streak(date: String) -> Dictionary:
+	if streak.last == date: return {}
+	var count := int(streak.count) + 1 if streak.last == day_before(date) else 1
+	streak = {"count":count, "last":date}
+	var gift := {"day":count, "coins":int(STREAK_COINS[(count-1)%STREAK_COINS.size()]), "effect":-1}
+	if count%STREAK_COINS.size() == 0:
+		for index in Cosmetics.display_order("effects"):
+			if not owns("effects", index) and not Cosmetics.reward_only("effects", index):
+				gift.effect = index
+				break
+		if gift.effect >= 0: owned.effects = owned.effects + [gift.effect]
+		else: gift.coins += STREAK_WEEK_COINS
+	coins += gift.coins
+	return gift
 
 # Takes one of each carry-in power for a campaign round; returns the kinds used.
 func use_items() -> Array:
