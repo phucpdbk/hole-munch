@@ -9,18 +9,21 @@ const UiStyle = preload("res://scripts/ui_style.gd")
 const UiButton = preload("res://scripts/ui_button.gd")
 const PREVIEW := 46.0
 const BUTTON_H := 34.0
+const THUMBS := "res://assets/thumbs/craft_%d.png"
 var slot := "skins"
 var index := 0
 var title := ""
 var selected := false
 var clock := 0.0
 var button: BaseButton
+var thumb: Texture2D
 
 func setup(slot_id: String, item: int, item_name: String, label: String, enabled: bool, is_equipped: bool, action: Callable, icon_kind := "") -> void:
 	slot = slot_id
 	index = item
 	title = item_name
 	selected = is_equipped
+	if slot == "crafts" and ResourceLoader.exists(THUMBS % index): thumb = load(THUMBS % index)
 	button = UiButton.new()
 	button.text = label
 	button.font_size = 14
@@ -50,7 +53,7 @@ func _draw() -> void:
 		"skins": draw_skin(center, PREVIEW*0.34)
 		"effects": draw_shapes(center, Fx.EFFECT_LOOKS[index])
 		"trails": draw_trail(center)
-		_: draw_circle(center, PREVIEW*0.3, Color(preload("res://scripts/fleet.gd").COLORS[index]))
+		_: draw_craft(center)
 	var font_size := 15 if UiStyle.text_width(title, 15) < size.x - 12 else 12
 	UiStyle.text(self, title, Vector2(size.x/2, 10 + PREVIEW + 20), font_size, UiStyle.LIGHT, true)
 
@@ -89,6 +92,16 @@ func draw_skin_ornament(center: Vector2, r: float, b: Color) -> void:
 		11: draw_circle(center + Vector2.from_angle(clock*1.4)*r*1.05, r*0.16, Color("f4dbff"))
 		12:
 			for i in 8: draw_circle(center + Vector2.from_angle(TAU*i/8)*r*1.12 + Vector2(0, r*0.1), r*(0.09 + 0.03*sin(clock*3 + i)), b)
+
+# Crafts use the render from tools/bake_craft_thumbs.gd, bobbing a little like
+# the hovering saucer; a coloured dot stands in until it is baked.
+func draw_craft(center: Vector2) -> void:
+	if thumb == null:
+		draw_circle(center, PREVIEW*0.3, Color(preload("res://scripts/fleet.gd").COLORS[index]))
+		return
+	var side := PREVIEW*1.25
+	var at := center + Vector2(0, sin(clock*2.0)*1.5)
+	draw_texture_rect(thumb, Rect2(at - Vector2.ONE*side/2, Vector2.ONE*side), false)
 
 func draw_trail(center: Vector2) -> void:
 	var look: Array = Fx.TRAIL_LOOKS[index]
