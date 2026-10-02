@@ -297,9 +297,26 @@ func stats() -> Dictionary:
 		"bonus_time":upgrades.time*TIME_PER_UPGRADE, "magnet":upgrades.magnet, "coin_mul":1.0 + upgrades.greed*GREED_PER_UPGRADE}
 
 func reward(won: bool, stars: int, eaten_points: int, best_combo := 0) -> int:
-	var base := eaten_points/POINTS_PER_COIN_WIN + stars*15 + 10 + selected*2 if won else eaten_points/POINTS_PER_COIN_LOSS
+	var parts := reward_parts(won, stars, eaten_points, best_combo)
+	return roundi((parts.food + parts.stars + parts.win)*parts.multiplier)
+
+# Where a round's coins come from, before the combo and coin-bonus multiplier.
+func reward_parts(won: bool, stars: int, eaten_points: int, best_combo := 0) -> Dictionary:
 	var combo_mul := 1.0 + mini(best_combo, COMBO_COIN_CAP)/100.0
-	return roundi(base*combo_mul*stats().coin_mul)
+	return {"food":eaten_points/(POINTS_PER_COIN_WIN if won else POINTS_PER_COIN_LOSS),
+		"stars":stars*15 if won else 0, "win":10 + selected*2 if won else 0,
+		"multiplier":combo_mul*float(stats().coin_mul)}
+
+# The closest journey reward not earned yet: {slot, index, track, need, have}, or {}.
+func next_journey_reward() -> Dictionary:
+	var best: Dictionary = {}
+	for entry in Cosmetics.REWARDS:
+		var have := reward_progress(entry[2])
+		if have >= int(entry[3]): continue
+		var missing: int = int(entry[3]) - have
+		if best.is_empty() or missing < int(best.need) - int(best.have):
+			best = {"slot":entry[0], "index":entry[1], "track":entry[2], "need":int(entry[3]), "have":have}
+	return best
 
 func data() -> Dictionary:
 	# A temporary preview selection must not become a permanent unlock.

@@ -16,7 +16,7 @@ const FEATURE_ICON := {"pickup":"magnet", "bomb":"bomb", "hunger":"food", "count
 	"guardian":"shield", "gold":"gem", "roadblock":"lock", "shortcut":"map", "danger":"shield",
 	"daily_stampede":"target", "daily_coinrain":"coin", "daily_goldrush":"chest"}
 const WEATHER_TIPS := ["rain", "snow", "fog", "wind", "storm"]
-const MAX_TIPS := 2
+const MAX_TIPS := 1
 const CARD_DIR := "res://assets/landmark_cards/"
 
 var pages: Array = []
@@ -73,8 +73,8 @@ static func pending_tips(level: Dictionary, seen: Array) -> Array:
 	if int(level.slot) == Campaign.CITIES_PER_REGION-1: ids.append("finale")
 	return ids.filter(func(id): return id not in seen).slice(0, MAX_TIPS)
 
-# A one-off card that introduces the city's landmark with a funny line; it comes
-# before the mechanic tips and does not count towards MAX_TIPS.
+# A one-off card that introduces the city's landmark with a funny line; game.gd
+# shows it only on a start with no new mechanic to explain.
 static func landmark_tip(level: Dictionary, seen: Array) -> Array:
 	var id := "lm_" + str(level.boss)
 	return [] if id in seen or not I18n.has("lmfun_" + str(level.boss)) else [id]

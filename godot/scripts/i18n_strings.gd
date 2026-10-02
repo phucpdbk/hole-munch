@@ -70,6 +70,9 @@ const S := {
 	# --- Results -----------------------------------------------------------------------
 	"result_line": ["%s điểm · %s món đã nuốt · Dọn %d%% · Combo %d", "%s points · %s eaten · %d%% cleared · Combo %d", "%s puntos · %s devorados · %d%% limpio · Combo %d", "%s pontos · %s devorados · %d%% limpo · Combo %d", "%s points · %s avalés · %d%% nettoyé · Combo %d", "%s poin · %s ditelan · %d%% bersih · Kombo %d"],
 	"coins_line": ["+%d xu · Tổng %d xu", "+%d coins · Total %d", "+%d monedas · Total %d", "+%d moedas · Total %d", "+%d pièces · Total %d", "+%d koin · Total %d"],
+	"coin_parts": ["Ăn %d · Sao %d · Thắng %d · Giờ %d · ×%s", "Food %d · Stars %d · Win %d · Time %d · ×%s", "Comida %d · Estrellas %d · Victoria %d · Tiempo %d · ×%s", "Comida %d · Estrelas %d · Vitória %d · Tempo %d · ×%s", "Repas %d · Étoiles %d · Victoire %d · Temps %d · ×%s", "Makan %d · Bintang %d · Menang %d · Waktu %d · ×%s"],
+	"next_reward": ["Quà tiếp: %s", "Next reward: %s", "Siguiente premio: %s", "Próximo prêmio: %s", "Prochaine récompense : %s", "Hadiah berikutnya: %s"],
+	"retry_stars": ["CHƠI LẠI LẤY ★", "RETRY FOR ★", "REPETIR POR ★", "DE NOVO POR ★", "REJOUER POUR ★", "ULANG DEMI ★"],
 	"paused": ["TẠM DỪNG", "PAUSED", "PAUSA", "PAUSADO", "PAUSE", "JEDA"],
 	"eaten_by_rival": ["BỊ HỐ ĐỐI THỦ NUỐT!", "SWALLOWED BY THE RIVAL!", "¡EL RIVAL TE DEVORÓ!", "O RIVAL TE DEVOROU!", "LE RIVAL T'A AVALÉ !", "DITELAN SAINGAN!"],
 	"rival_took": ["ĐỐI THỦ ĐÃ CHIẾM %s!", "THE RIVAL TOOK %s!", "¡EL RIVAL TOMÓ %s!", "O RIVAL TOMOU %s!", "LE RIVAL A PRIS %s !", "SAINGAN MEREBUT %s!"],

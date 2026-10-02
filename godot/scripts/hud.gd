@@ -1,6 +1,7 @@
 extends Control
 
 signal play_requested
+signal retry_requested
 signal pause_requested
 signal menu_requested
 signal levels_requested
@@ -19,6 +20,7 @@ const UiButton = preload("res://scripts/ui_button.gd")
 const I18n = preload("res://scripts/i18n.gd")
 const Ads = preload("res://scripts/ads.gd")
 const Minimap = preload("res://scripts/minimap.gd")
+const Campaign = preload("res://scripts/campaign.gd")
 var minimap := {}
 var daily_button: BaseButton
 var endless_button: BaseButton
@@ -39,6 +41,12 @@ var lose_reason := ""
 var record_note := ""
 var goal_labels: Array = []
 var goal_mask := 0
+# Result screen: per-goal progress ("50%/75%"), where the coins came from, and
+# the closest journey reward ({slot, index, track, need, have} or {}).
+var goal_progress: Array = []
+var coin_parts := ""
+var next_reward: Dictionary = {}
+var retry_button: BaseButton
 var rival_growth := -1.0
 var daily_won := false
 var daily_left := 3
@@ -111,6 +119,8 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	play_button = make_button("play", Color("f6cb70"), true)
 	play_button.pressed.connect(func(): play_requested.emit())
+	retry_button = make_button("replay", Color("2f7d8c"))
+	retry_button.pressed.connect(func(): retry_requested.emit())
 	pause_button = make_button("pause", Color("2a4660"))
 	pause_button.pressed.connect(func(): pause_requested.emit())
 	menu_button = make_button("home", Color("35546d"))
@@ -171,6 +181,9 @@ func layout() -> void:
 		var left := 36.0 if mode == "menu" else w/2-264
 		var width := 364.0 if mode == "menu" else 528.0
 		place(play_button, Rect2(left, h-168, width, 64), 26)
+		if retry_wanted():
+			place(retry_button, Rect2(left, h-168, width*0.42, 64), 17)
+			place(play_button, Rect2(left + width*0.42 + 8, h-168, width*0.58 - 8, 64), 24)
 		place(menu_button, Rect2(left, h-94, width, 54), 19)
 		for i in 3:
 			place([levels_button, shop_button, styles_button][i], Rect2(36+i*124, h-94, 116, 56), 15)
@@ -178,6 +191,7 @@ func layout() -> void:
 			place([daily_button, endless_button][i], Rect2(36+i*186, h-232, 178, 52), 16)
 		return
 	place(play_button, Rect2(44, h - 172, w - 88, 66), 26)
+	place(retry_button, Rect2(44, h - 246, w - 88, 56), 18)
 	place(menu_button, Rect2(44, h - 94, w - 88, 52), 19)
 	var third := (w-88-16)/3
 	for i in 3:
@@ -185,10 +199,17 @@ func layout() -> void:
 	for i in 2:
 		place([daily_button, endless_button][i], Rect2(44 + i*((w-88)/2+4), h-340, (w-88)/2-4, 52), 15)
 
+# A won campaign city with a star still missing offers a replay of that city.
+func retry_wanted() -> bool:
+	return mode == "result" and run_kind == "campaign" and won and stars < 3 and has_next
+
 func sync() -> void:
-	if last_layout_mode != mode:
+	var layout_key := mode + str(retry_wanted())
+	if last_layout_mode != layout_key:
 		layout()
-		last_layout_mode = mode
+		last_layout_mode = layout_key
+	retry_button.visible = retry_wanted()
+	retry_button.text = I18n.t("retry_stars")
 	# A daily result with no tries left only goes home.
 	play_button.visible = mode not in ["playing", "revive"] and not (mode == "result" and run_kind == "daily" and daily_left <= 0)
 	revive_button.visible = mode == "revive"
@@ -372,6 +393,9 @@ func draw_portrait_result() -> void:
 	UiStyle.text(self, result_sub(), Vector2(w/2, h-194), 15, MUTED, true, 0, body_font)
 
 func draw_landscape_result() -> void:
+	if mode == "result" and run_kind == "campaign" and not goal_progress.is_empty() and size.x >= 820:
+		draw_campaign_result()
+		return
 	var w := size.x
 	var h := size.y
 	draw_rect(Rect2(Vector2.ZERO, size), Color("0f1e3080"))
@@ -389,6 +413,55 @@ func draw_landscape_result() -> void:
 	UiStyle.text(self, result_sub(), Vector2(w/2, 276), 15, MUTED, true, 0, body_font)
 	if mode == "result" and gate_note != "" and run_kind == "campaign" and won and not has_next and not last_city:
 		UiStyle.text(self, gate_note, Vector2(w/2, 300), 15, Color("ffb3a6"), true, 0, body_font)
+
+# Campaign result: what each goal still needs on the left, where the coins came
+# from and the next journey reward on the right, so a missed star reads as a
+# reason to replay rather than a dead end.
+func draw_campaign_result() -> void:
+	var w := size.x
+	var h := size.y
+	draw_rect(Rect2(Vector2.ZERO, size), Color("0f1e3080"))
+	panel(Rect2(w/2-380, 24, 760, h-48), Color("1b3048f5"), 26)
+	for i in 3: draw_star(Vector2(w/2+(i-1)*64, 66), 26, i < stars)
+	UiStyle.text(self, result_title(), Vector2(w/2, 122), 28, GOLD, true, 6, title_font)
+	UiStyle.text(self, I18n.t("result_line", [score, eaten, int(completion*100), best_combo]), Vector2(w/2, 152), 15, LIGHT, true, 0, body_font)
+	var left := w/2 - 350
+	for i in goal_labels.size():
+		var done := goal_mask & (1 << i) != 0
+		var y := 190.0 + i*28
+		UiStyle.draw_icon(self, "star", Vector2(left + 10, y - 5), 20, Color.WHITE if done else Color(0.3, 0.38, 0.46, 0.9))
+		UiStyle.text(self, str(goal_labels[i]), Vector2(left + 28, y), 15, GOLD if done else LIGHT, false, 0, body_font)
+		var progress := str(goal_progress[i]) if i < goal_progress.size() else ""
+		# Goals only count on a win, so a lost round shows its numbers muted.
+		var tint: Color = UiStyle.MINT if done else Color("ffb3a6") if won else MUTED
+		if progress != "": UiStyle.text(self, progress, Vector2(w/2 - 70, y), 15, tint, false, 0, title_font)
+	var right := w/2 + 10
+	var line := I18n.t("coins_line", [reward, coins])
+	UiStyle.draw_icon(self, "coin", Vector2(right + 14, 184), 26)
+	text_at(line, Vector2(right + 32, 191), 18, GOLD)
+	if coin_parts != "": UiStyle.text(self, coin_parts, Vector2(right, 215), 12, MUTED, false, 0, body_font)
+	draw_next_reward(Rect2(right, 232, 330, 28))
+	UiStyle.text(self, result_sub(), Vector2(w/2, 290), 14, MUTED, true, 0, body_font)
+	if gate_note != "" and won and not has_next and not last_city:
+		UiStyle.text(self, gate_note, Vector2(w/2, 304), 13, Color("ffb3a6"), true, 0, body_font)
+
+# The closest journey reward: its name, a progress bar and the count.
+func draw_next_reward(rect: Rect2) -> void:
+	if next_reward.is_empty(): return
+	var have: int = next_reward.have
+	var need: int = next_reward.need
+	var name := I18n.t("next_reward", reward_name(next_reward))
+	UiStyle.text(self, name, rect.position + Vector2(0, 10), 13, LIGHT, false, 0, body_font)
+	var count := I18n.t("reward_stars" if next_reward.track == "stars" else "reward_landmarks", [have, need])
+	UiStyle.text(self, count, rect.position + Vector2(rect.size.x - UiStyle.text_width(count, 13, body_font), 10), 13, GOLD, false, 0, body_font)
+	panel(Rect2(rect.position + Vector2(0, 18), Vector2(rect.size.x, 8)), Color("465d6b"), 4)
+	panel(Rect2(rect.position + Vector2(0, 18), Vector2(maxf(8.0, rect.size.x*clampf(float(have)/maxf(1.0, need), 0, 1)), 8)), GOLD, 4)
+
+static func reward_name(entry: Dictionary) -> String:
+	match str(entry.slot):
+		"skins": return Campaign.skin_name(entry.index)
+		"effects": return Campaign.effect_name(entry.index)
+	return Campaign.trail_name(entry.index)
 
 # Time ran out near the landmark: one rewarded-ad rescue with a short countdown.
 func draw_revive() -> void:

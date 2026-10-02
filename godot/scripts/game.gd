@@ -226,6 +226,7 @@ func _ready() -> void:
 	hud = Hud.new()
 	layer.add_child(hud)
 	hud.play_requested.connect(on_play)
+	hud.retry_requested.connect(retry_city)
 	hud.pause_requested.connect(toggle_pause)
 	hud.menu_requested.connect(go_menu)
 	hud.levels_requested.connect(func(): open_panel("levels"))
@@ -288,11 +289,13 @@ func mark_seen(ids: Array) -> void:
 		if id not in campaign.seen: campaign.seen.append(id)
 	persist()
 
-# Cards for mechanics this city is the first to use. They are marked seen as
-# they open, so the replayed on_play() starts the round.
+# At most one card before a round: the most important new mechanic, else the
+# city's landmark. Cards are marked seen as they open, so the replayed on_play()
+# starts the round; anything still unseen waits for a later start.
 func offer_tips() -> bool:
 	if test_mode or capture_mode or run_kind != "campaign": return false
-	var ids := Intro.landmark_tip(level, campaign.seen) + Intro.pending_tips(level, campaign.seen)
+	var ids := Intro.pending_tips(level, campaign.seen)
+	if ids.is_empty(): ids = Intro.landmark_tip(level, campaign.seen)
 	if ids.is_empty(): return false
 	mark_seen(ids)
 	intro.open(ids.map(func(id): return Intro.tip_page(id)), on_play)
@@ -840,6 +843,15 @@ func reset_hazards() -> void:
 func has_next_city() -> bool:
 	return run_kind == "campaign" and campaign.can_select(campaign.selected+1)
 
+# "Retry for stars" on a won result: the same city again, not the next one.
+func retry_city() -> void:
+	if intro.visible or mode != "result" or run_kind != "campaign": return
+	ads.maybe_interstitial(campaign.selected)
+	reset_round()
+	playing = true
+	mode = "playing"
+	use_carry_in()
+
 func on_play() -> void:
 	if intro.visible: return
 	if mode == "result" and run_kind == "daily":
@@ -1246,8 +1258,11 @@ func finish(won: bool) -> void:
 	floaters.clear()
 	clear_drag()
 	sfx.play("win" if won else "lose")
-	goal_mask = Challenges.evaluate(goal_list, run_summary(won))
+	var summary := run_summary(won)
+	goal_mask = Challenges.evaluate(goal_list, summary)
 	hud.stars = Challenges.count(goal_mask)
+	hud.goal_progress = goal_list.map(func(goal): return Challenges.progress_text(goal, summary)) if run_kind == "campaign" else []
+	hud.coin_parts = ""
 	# Coins pay for upgrades; only original map food counts, not combo points.
 	match run_kind:
 		"daily":
@@ -1272,6 +1287,10 @@ func finish(won: bool) -> void:
 	if time_coins > 0:
 		reward += time_coins
 		if record_note == "": record_note = I18n.t("time_left_coins", [int(remaining), time_coins])
+	if run_kind == "campaign":
+		var parts: Dictionary = campaign.reward_parts(won, hud.stars, eaten_points, best_combo)
+		hud.coin_parts = I18n.t("coin_parts", [roundi(parts.food), parts.stars, parts.win, time_coins, ("%.2f" % parts.multiplier).trim_suffix("0").trim_suffix(".0")])
+	hud.next_reward = campaign.next_journey_reward()
 	campaign.coins += reward
 	ads.round_ended()
 	persist()

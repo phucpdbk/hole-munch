@@ -81,6 +81,10 @@ func run(game) -> void:
 	check(g.boss_down and g.mode=="result" and g.hud.won and g.remaining > 20,"swallowing the boss wins the round at once")
 	# The test keeps stepping after the result, so the clock may have moved on since.
 	check(g.time_coins >= int(g.remaining)*g.CLEAR_COINS and g.time_coins > 40,"seconds left on the clock pay coins")
+	check(g.hud.goal_progress.size() == g.goal_list.size() and g.hud.coin_parts != "" and not g.hud.next_reward.is_empty(), "the result shows goal progress, coin sources and the next reward")
+	var city: int = g.campaign.selected
+	g.retry_city()
+	check(g.mode == "playing" and g.campaign.selected == city and not g.boss_down, "retry replays the same city")
 	check_mechanics()
 	check_features()
 	check_ads()

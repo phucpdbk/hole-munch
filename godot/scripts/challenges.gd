@@ -55,6 +55,18 @@ static func met(goal: Dictionary, run: Dictionary) -> bool:
 		"rival": return run.rival_eaten
 	return false
 
+# How far this round got toward a goal, in numbers that read in every language
+# ("50%/75%", "9/12"); empty for the win itself.
+static func progress_text(goal: Dictionary, run: Dictionary) -> String:
+	match goal.id:
+		"clean", "spotless": return "%d%%/%d%%" % [roundi(run.completion*100), roundi(goal.value*100)]
+		"combo": return "%d/%d" % [run.best_combo, goal.value]
+		"fast": return "%ds/%ds" % [int(run.remaining) if run.won else 0, goal.value]
+		"hunter": return "%d/%d" % [run.defenders_eaten, goal.value]
+		"nohit": return "%d/0" % run.hits
+		"rival": return "%d/1" % int(run.rival_eaten)
+	return ""
+
 # Bit i set when goal i was met this round.
 static func evaluate(list: Array, run: Dictionary) -> int:
 	var mask := 0

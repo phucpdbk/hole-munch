@@ -66,7 +66,7 @@ func check_language_and_intro(g) -> void:
 	check(Intro.landmark_tip(Campaign.level_info(0), []) == ["lm_onepillar"] and Intro.landmark_tip(Campaign.level_info(0), ["lm_onepillar"]).is_empty(), "each landmark is introduced once")
 	check(Intro.tip_page("lm_eiffel").title == Campaign.boss_name("eiffel") and Intro.tip_page("lm_eiffel").tag != "", "landmark card shows name and city")
 	check(Intro.tip_page("lm_onepillar").has("picture") and load(Intro.tip_page("lm_onepillar").picture) is Texture2D, "landmark card shows its picture when one exists")
-	check(Intro.pending_tips(Campaign.level_info(1), []) == ["weather_rain", "pickup"], "city 2 introduces rain and power orbs")
+	check(Intro.pending_tips(Campaign.level_info(1), []) == ["weather_rain"] and Intro.pending_tips(Campaign.level_info(1), ["weather_rain"]) == ["pickup"], "city 2 introduces rain, then power orbs on the next start")
 	var seen: Array = ["weather_rain", "pickup", "guardian"]
 	check(Intro.pending_tips(Campaign.level_info(1), seen).is_empty(), "seen tips are not repeated")
 	check(Intro.pending_tips(Campaign.level_info(8), seen)[0] == "region_europe", "a new continent gets a welcome card first")
