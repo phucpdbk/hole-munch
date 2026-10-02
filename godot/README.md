@@ -33,7 +33,9 @@ its landmark to conquer it, while dodging independent military defenders.
   each end of the starter snacks, and one of four shapes per city (row, east or
   west L, split street); defender squads also change corner per city.
 - **Guardian boss fight** (`mascot.gd`, `mascot_attacks.gd`, `mascot_rig.gd`):
-  the guardian patrols the crossings, hunts a nearby hole and runs home when the
+  the guardian walks only along streets and its plaza (`mascot_roads.gd`, never
+  through blocks; a leap flies over one but lands on a street): it patrols the
+  crossings, hunts a nearby hole and runs home when the
   hole nears the landmark (minimap diamond). It takes three bites: the first two
   knock it away (hearts on the HUD). Attacks: fire, water and lightning beams up
   at the saucer, a leap that rams it, a stomp ring and a charge. A hit rocks the

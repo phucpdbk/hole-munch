@@ -1,9 +1,9 @@
 extends Node3D
 
 # Landmark guardian: a mascot (mascot_specs.gd) that keeps the landmark's shield
-# up until the hole swallows it. It roams the whole city: patrols between
-# crossings, hunts a nearby hole, and runs home when the hole closes in on the
-# landmark. In range it winds up and attacks the saucer (mascot_attacks.gd); once
+# up until the hole swallows it. It roams the whole city along the streets
+# (mascot_roads.gd), never through blocks: patrols between crossings, hunts a
+# nearby hole, and runs home when the hole closes in on the landmark. In range it winds up and attacks the saucer (mascot_attacks.gd); once
 # the hole can eat it, it runs off in short sprints instead. It takes three bites:
 # the first two knock it away, so the fight cannot be skipped by a passing sweep.
 # Attacks are telegraphed defence strikes, so hits go through game.take_hit().
@@ -11,6 +11,7 @@ extends Node3D
 # animation live in mascot_rig.gd.
 const MascotRig = preload("res://scripts/mascot_rig.gd")
 const MascotAttacks = preload("res://scripts/mascot_attacks.gd")
+const Roads = preload("res://scripts/mascot_roads.gd")
 const Traffic = preload("res://scripts/traffic.gd")
 const ATTACK_COLORS := MascotAttacks.COLORS
 const FIRST_COOLDOWN := 4.0
@@ -34,6 +35,8 @@ const STAGGER := 1.2
 const KNOCK_SPEED := 9.0
 const KNOCK_TIME := 0.35
 const BITE_SHRINK := 0.92
+# How far ahead an escape looks for a street to run along.
+const FLEE_REACH := 8.0
 
 var spec: Dictionary = {}
 var item: Dictionary = {}
@@ -95,7 +98,7 @@ func bite(game) -> bool:
 	item.full_radius = item.get("full_radius", item.radius)
 	item.radius *= BITE_SHRINK
 	var away := flat(item.position - game.hole_position)
-	heading = inward(game, away.normalized() if away.length() > 0.05 else Vector3.FORWARD)
+	heading = Roads.along(game.layout, item.position, inward(game, away.normalized() if away.length() > 0.05 else Vector3.FORWARD))
 	state = "knocked"
 	timer = KNOCK_TIME
 	squash = 1.0
@@ -129,7 +132,7 @@ func think(game, dt: float) -> void:
 			if timer <= 0: release(game)
 		"charge":
 			timer -= dt
-			walk_to(aim, MascotAttacks.CHARGE_SPEED, dt)
+			road_walk(game, aim, MascotAttacks.CHARGE_SPEED, dt)
 			if timer <= 0 or flat(aim - item.position).length() < 0.2: land(game)
 		"leap": leap(game, dt)
 		"recover":
@@ -152,11 +155,10 @@ func think(game, dt: float) -> void:
 				state = "flee"
 				timer = FLEE_DASH
 				heading = inward(game, -to_hole/maxf(distance, 0.001))
+				waypoint = Roads.project(game.layout, item.position + heading*FLEE_REACH)
 		"flee":
 			timer -= dt
-			item.position += heading*FLEE_SPEED*dt
-			moving = FLEE_SPEED
-			face(heading)
+			road_walk(game, waypoint, FLEE_SPEED, dt)
 			if timer <= 0:
 				state = "flee_rest"
 				timer = FLEE_REST
@@ -173,12 +175,12 @@ func roam(game, dt: float, to_hole: Vector3, distance: float) -> void:
 	elif distance < HUNT_RANGE: state = "hunt"
 	elif distance > LOSE_RANGE: state = "patrol"
 	match state:
-		"home": walk_to(home, HOME_SPEED, dt)
+		"home": road_walk(game, home, HOME_SPEED, dt)
 		"hunt":
-			if distance > RANGE*0.6: walk_to(game.hole_position, HUNT_SPEED, dt)
+			if distance > RANGE*0.6: road_walk(game, game.hole_position, HUNT_SPEED, dt)
 		_:
 			if flat(waypoint - item.position).length() < 0.6: waypoint = next_waypoint(game)
-			walk_to(waypoint, WALK_SPEED, dt)
+			road_walk(game, waypoint, WALK_SPEED, dt)
 	if distance < HUNT_RANGE: face(to_hole)
 	if cooldown <= 0 and distance < RANGE + item.radius and game.defense.grace <= 0:
 		state = "windup"
@@ -194,23 +196,31 @@ func next_waypoint(game) -> Vector3:
 	return Vector3(x, home.y, z)
 
 func release(game) -> void:
+	# A charge runs along the street, so it aims at the road point by the hole.
+	if spec.get("attack", "") == "charge": aim = Roads.project(game.layout, aim)
 	state = MascotAttacks.launch(self, game, aim)
 	lunge = 1.0
 	match state:
-		"charge": timer = maxf(0.4, flat(aim - item.position).length()/MascotAttacks.CHARGE_SPEED) + 0.4
+		"charge":
+			var path := flat(aim - item.position)
+			timer = maxf(0.4, (absf(path.x) + absf(path.z))/MascotAttacks.CHARGE_SPEED) + 0.4
 		"leap":
 			timer = 0.0
 			leap_start = item.position
 		_: timer = RECOVER
 
-# A jump up to the saucer's height over the aim point, then a drop and a thud.
+# A jump up to the saucer's height over the aim point, then a drop back onto
+# the closest street (it may fly over a block, but never lands in one).
 func leap(game, dt: float) -> void:
 	timer += dt
 	var t := clampf(timer/MascotAttacks.LEAP_TIME, 0.0, 1.0)
-	var across := minf(1.0, t*2.0)
-	across = 1.0 - (1.0 - across)*(1.0 - across)
 	var target := Vector3(aim.x, home.y, aim.z)
-	item.position = leap_start.lerp(target, across)
+	var landing: Vector3 = Roads.project(game.layout, target)
+	if t < 0.5:
+		var across := t*2.0
+		item.position = leap_start.lerp(target, 1.0 - (1.0 - across)*(1.0 - across))
+	else:
+		item.position = target.lerp(landing, (t - 0.5)*2.0)
 	var peak: float = maxf(1.5, game.saucer.position.y - item.radius*1.2)
 	air = sin(t*PI)
 	item.position.y = home.y + air*peak
@@ -227,7 +237,8 @@ func land(game) -> void:
 
 func stay_on_map(game) -> void:
 	var position: Vector3 = item.position
-	if air <= 0.0: position = game.features.collide(position, item.radius, 0.0, heading)
+	# On the ground it always stands on a street or in the plaza.
+	if air <= 0.0 and not Roads.walkable(game.layout, position): position = Roads.road_point(game.layout, position)
 	position.x = clampf(position.x, -game.layout.move_x, game.layout.move_x)
 	position.z = clampf(position.z, -game.layout.move_z, game.layout.move_z)
 	item.position = position
@@ -246,9 +257,11 @@ func inward(game, direction: Vector3) -> Vector3:
 static func flat(v: Vector3) -> Vector3:
 	return Vector3(v.x, 0, v.z)
 
-func walk_to(target: Vector3, speed: float, dt: float) -> void:
-	var offset := flat(target - item.position)
-	if offset.length() < 0.3: return
+# Walk toward target along the streets (see mascot_roads.gd).
+func road_walk(game, target: Vector3, speed: float, dt: float) -> void:
+	var corner: Vector3 = Roads.next_point(game.layout, item.position, target)
+	var offset := flat(corner - item.position)
+	if offset.length() < 0.05: return
 	item.position += offset.limit_length(speed*dt)
 	moving = speed
 	heading = offset.normalized()

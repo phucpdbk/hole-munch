@@ -300,6 +300,16 @@ func guardian_preview() -> void:
 			await g.get_tree().process_frame
 			if g.saucer_wobble > 0.6: break
 		await snapshot("guardian-%s-hit" % style)
+	# Hunting a hole that sits inside a block: the guardian comes by the streets.
+	g.load_level(1)
+	g.reset_round()
+	g.playing = true; g.mode = "playing"; g.started = true; g.remaining = 99.0
+	g.rival.active = false
+	g.defense.grace = INF
+	g.hole_position = Vector3(14.0, 0, 13.0)
+	for frame in [60, 90, 90]:
+		for i in frame: await g.get_tree().process_frame
+		await snapshot("guardian-street-%d" % frame)
 
 func snapshot(name: String) -> void:
 	await g.get_tree().process_frame

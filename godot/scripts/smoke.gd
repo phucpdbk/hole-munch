@@ -273,6 +273,24 @@ func check_guardian() -> void:
 	check(g.mechanics.mascot.rig.scale.y > 0.5, "the guardian animates")
 	check_guardian_fight()
 
+# Hunting a hole that wanders through the blocks, attacking it, and fleeing it,
+# the guardian only ever stands on a street or in the landmark's plaza.
+func check_guardian_streets(mascot, guardian: Dictionary) -> void:
+	var Roads = mascot.Roads
+	var spots := [Vector3(16, 0, 14), Vector3(-15, 0, 16), Vector3(-17, 0, -15), Vector3(14, 0, -16), Vector3(3, 0, 18)]
+	var off_street := 0
+	var travelled := 0.0
+	g.defense.grace = 0.0
+	for spot in spots:
+		g.hole_position = Vector3(clampf(spot.x, -g.layout.move_x, g.layout.move_x), 0, clampf(spot.z, -g.layout.move_z, g.layout.move_z))
+		for i in 150:
+			var before: Vector3 = guardian.position
+			g.step(0.02, Vector2.ZERO)
+			travelled += Vector2(guardian.position.x - before.x, guardian.position.z - before.z).length()
+			if mascot.air <= 0.0 and not Roads.walkable(g.layout, guardian.position): off_street += 1
+	g.defense.grace = 99.0
+	check(off_street == 0 and travelled > 10.0, "the guardian keeps to the streets (%d steps off, %.0f travelled)" % [off_street, travelled])
+
 # The guardian roams to hunt the hole, and takes three bites: the first two knock
 # it away and the shield only drops on the third.
 func check_guardian_fight() -> void:
@@ -288,6 +306,7 @@ func check_guardian_fight() -> void:
 	for i in 60: g.step(0.02, Vector2.ZERO)
 	check(mascot.state == "hunt" and guardian.position.x > home.x + 1.0, "the guardian leaves the landmark to hunt a nearby hole")
 	check(g.hud.guardian_max == mascot.HP and g.minimap_data().has("guardian"), "the HUD shows the guardian's hearts and the minimap its position")
+	check_guardian_streets(mascot, guardian)
 	var full: float = guardian.radius
 	var bites := 0
 	for attempt in 8:
@@ -302,15 +321,17 @@ func check_guardian_fight() -> void:
 	check(bites == mascot.HP and not g.mechanics.shield_up(), "the guardian falls on the third bite (%d bites)" % bites)
 	g.reset_round()
 	check(mascot.hp == mascot.HP and is_equal_approx(g.mechanics.guardian.radius, full), "a new round heals the guardian")
-	# Cornered: the knock bends back toward the middle instead of pinning it.
+	# At the dead end of a street by the map edge, the knock runs back along the
+	# street toward the middle instead of pinning it under the hole.
 	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
-	var corner := Vector3(g.layout.move_x - 0.5, guardian.position.y, g.layout.move_z - 0.5)
+	var street: float = g.layout.crossings_z[-1]
+	var corner := Vector3(g.layout.move_x - 0.5, guardian.position.y, street)
 	guardian.position = corner
 	g.radius = full/g.EAT_RATIO + 0.3; g.target_radius = g.radius
 	g.hole_position = Vector3(corner.x - 0.4, 0, corner.z - 0.4)
 	for i in 3: g.step(0.02, Vector2.ZERO)
 	for i in int(mascot.KNOCK_TIME/0.02): g.step(0.02, Vector2.ZERO)
-	check(mascot.hp == mascot.HP - 1 and guardian.position.x < corner.x - 1.0 and guardian.position.z < corner.z - 1.0, "a cornered guardian is knocked back into the map")
+	check(mascot.hp == mascot.HP - 1 and guardian.position.x < corner.x - 1.0 and is_equal_approx(guardian.position.z, street), "a cornered guardian is knocked back along its street")
 	g.reset_round()
 	g.load_level(0)
 
