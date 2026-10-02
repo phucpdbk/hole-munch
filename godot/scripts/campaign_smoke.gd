@@ -19,6 +19,7 @@ func run(g) -> void:
 	# `--quick` skips the slow 48-city sweep while iterating on other checks.
 	if "--quick" not in OS.get_cmdline_user_args(): check_levels(g)
 	check_challenge_systems(g)
+	check_promo(g)
 	check_rival(g)
 	check_special_runs(g)
 	check_panels(g)
@@ -237,6 +238,18 @@ func check_goals_and_modes() -> void:
 	restored.restore(JSON.parse_string(JSON.stringify(progress.data())))
 	check(restored.data() == progress.data(), "save round trip keeps goals and records")
 	check(restored.streak.count == progress.streak.count and not restored.reminders, "the streak and the reminder switch are saved")
+
+# Prize seasons (promo.gd) and leaderboards (play_games.gd) without Play Games.
+func check_promo(g) -> void:
+	var Promo = g.Promo
+	var seasons := [{"id":"s1", "start":"2026-11-02", "end":"2026-11-29", "leaderboard":"board1", "winners":3},
+		{"id":"s0", "start":"2026-10-01", "end":"2026-10-28", "leaderboard":"", "winners":3}]
+	check(Promo.active_season("2026-11-10", seasons).id == "s1" and Promo.active_season("2026-10-10", seasons).is_empty(), "a season runs between its dates and needs a leaderboard")
+	check(Promo.claim_season("2026-12-05", seasons).id == "s1" and Promo.claim_season("2026-12-20", seasons).is_empty() and Promo.claim_season("2026-11-20", seasons).is_empty(), "winners can claim for two weeks after a season")
+	var code: String = Promo.claim_code("player-42", "s1")
+	check(code.length() == 8 and code == Promo.claim_code("player-42", "s1") and code != Promo.claim_code("player-43", "s1"), "claim codes are short, stable and per player")
+	check(Promo.winner(3, seasons[0]) and not Promo.winner(4, seasons[0]) and not Promo.winner(0, seasons[0]), "only the top ranks win")
+	check(not g.play_games.available() and not g.hud.board_button.visible and g.promo_line() == "", "without Play Games or a season, no leaderboard or prize shows")
 
 # Days in a row with a finished daily: coins grow over a week, day 7 gives an
 # effect, a skipped day starts over, and the same day never pays twice.

@@ -27,6 +27,8 @@ const Ads = preload("res://scripts/ads.gd")
 const UpdateCheck = preload("res://scripts/update_check.gd")
 const DailyGames = preload("res://scripts/daily_games.gd")
 const MapFeatures = preload("res://scripts/map_features.gd")
+const PlayGames = preload("res://scripts/play_games.gd")
+const Promo = preload("res://scripts/promo.gd")
 # Seconds a carry-in power from the daily mini-game lasts (time adds seconds).
 const CARRY_SECONDS := 12.0
 const CARRY_TIME := 10.0
@@ -193,6 +195,10 @@ var doubled := false
 # Link to a newer build found by scripts/update_check.gd, empty when up to date.
 var updates: UpdateCheck
 var update_url := ""
+# Leaderboards (play_games.gd) and the prize season they feed (promo.gd).
+var play_games: Node
+# The season this player won and can claim: {} or {season, code}.
+var prize_claim: Dictionary = {}
 var camera_target := Vector3.ZERO
 
 func _ready() -> void:
@@ -248,6 +254,12 @@ func _ready() -> void:
 	add_child(updates)
 	updates.update_available.connect(func(info: Dictionary): update_url = info.url)
 	hud.update_requested.connect(open_update)
+	play_games = PlayGames.new()
+	add_child(play_games)
+	play_games.rank_loaded.connect(on_rank_loaded)
+	play_games.player_loaded.connect(func(_id, _name): check_claim())
+	hud.board_requested.connect(open_board)
+	hud.promo_requested.connect(open_promo)
 	intro = Intro.new()
 	layer.add_child(intro)
 	apply_style()
@@ -295,6 +307,9 @@ func mark_seen(ids: Array) -> void:
 func offer_tips() -> bool:
 	if test_mode or capture_mode or run_kind != "campaign": return false
 	var ids := Intro.pending_tips(level, campaign.seen)
+	var season := Promo.active_season(Campaign.today())
+	if ids.is_empty() and promo_line() != "" and not season.is_empty() and "promo_" + str(season.id) not in campaign.seen:
+		ids = ["promo_" + str(season.id)]
 	if ids.is_empty(): ids = Intro.landmark_tip(level, campaign.seen)
 	if ids.is_empty(): return false
 	mark_seen(ids)
@@ -1276,6 +1291,7 @@ func finish(won: bool) -> void:
 				reward = roundi(reward*Campaign.DAILY_COIN_BONUS)
 				record_note = I18n.t("daily_power", I18n.t("item_" + Campaign.daily_power(date)))
 			else: record_note = I18n.t("daily_best", int(campaign.daily.best))
+			submit_daily_score(score)
 			# The first finished daily of a day keeps the streak and pays its gift.
 			var gift: Dictionary = campaign.advance_streak(date)
 			if not gift.is_empty():
@@ -1344,6 +1360,54 @@ func double_reward() -> void:
 		reward *= 2
 		record_note = I18n.t("ad_doubled")
 		persist())
+
+# --- Leaderboards and prize seasons (play_games.gd, promo.gd) -----------------------
+# A daily score goes to today's board and, during a prize season, to its board.
+func submit_daily_score(points: int) -> void:
+	if not play_games.available(): return
+	var daily_board := PlayGames.daily_id()
+	play_games.submit(daily_board, points)
+	play_games.load_rank(daily_board, true)
+	var season := Promo.active_season(Campaign.today())
+	if not season.is_empty():
+		play_games.submit(str(season.leaderboard), points)
+		play_games.load_rank(str(season.leaderboard), false)
+
+func on_rank_loaded(board: String, rank: int) -> void:
+	if rank <= 0: return
+	if board == PlayGames.daily_id() and mode == "result" and run_kind == "daily":
+		record_note = I18n.t("daily_rank", rank) + " · " + record_note
+	check_claim()
+
+# Once a season has ended, a top-ranked player gets a claim code.
+func check_claim() -> void:
+	var season := Promo.claim_season(Campaign.today())
+	if season.is_empty() or not Promo.ready_to_run() or play_games.player_id == "": return
+	var board := str(season.leaderboard)
+	if not play_games.ranks.has(board):
+		play_games.ranks[board] = 0
+		play_games.load_rank(board, false)
+		return
+	if Promo.winner(int(play_games.ranks[board]), season):
+		prize_claim = {"season":season, "code":Promo.claim_code(play_games.player_id, str(season.id))}
+
+func open_board() -> void:
+	var season := Promo.active_season(Campaign.today())
+	play_games.open_board(str(season.leaderboard) if not season.is_empty() else PlayGames.daily_id())
+
+# The prize banner opens the rules; a winner's banner opens the claim email.
+func open_promo() -> void:
+	if not prize_claim.is_empty():
+		OS.shell_open(Promo.claim_link(prize_claim.code, prize_claim.season, play_games.player_name))
+	elif Promo.ready_to_run():
+		OS.shell_open(Promo.RULES_URL)
+
+func promo_line() -> String:
+	if not Promo.ready_to_run(): return ""
+	if not prize_claim.is_empty(): return I18n.t("promo_won", prize_claim.code)
+	var season := Promo.active_season(Campaign.today())
+	if season.is_empty(): return ""
+	return I18n.t("promo_banner", [int(season.winners), str(season.end).substr(5)])
 
 # The menu button opens the newer build's page (a vetted https/market link).
 func open_update() -> void:
@@ -1554,6 +1618,8 @@ func update_hud() -> void:
 	hud.rival_growth = clampf(rival.radius*EAT_RATIO/boss_radius, 0, 1) if rival.active else -1.0
 	hud.daily_won = campaign.daily_record(Campaign.today()).won
 	hud.streak = campaign.streak_days(Campaign.today())
+	hud.board_ready = play_games.available()
+	hud.promo_text = promo_line()
 	hud.endless_best = int(campaign.endless.best)
 	var next_region: int = (campaign.selected+1)/Campaign.CITIES_PER_REGION
 	hud.gate_note = "" if next_region >= Campaign.REGIONS.size() or campaign.region_open(next_region) else I18n.t("gate", [Campaign.stars_needed(next_region), Campaign.region_name(next_region), campaign.total_stars()])

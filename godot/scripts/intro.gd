@@ -92,7 +92,9 @@ static func tip_page(id: String) -> Dictionary:
 		if ResourceLoader.exists(picture): page.picture = picture
 		return page
 	var page := {"tag":I18n.t("new_tag")}
-	if id.begins_with("weather_"):
+	if id.begins_with("promo_"):
+		page.merge({"icon":"crown", "title":I18n.t("tip_promo_t"), "body":I18n.t("tip_promo_b")})
+	elif id.begins_with("weather_"):
 		var kind := id.trim_prefix("weather_")
 		page.merge({"icon":kind, "title":I18n.t("tip_%s_t" % kind), "body":I18n.t("tip_%s_b" % kind)})
 	elif id.begins_with("region_"):
