@@ -31,6 +31,13 @@ func build() -> void:
 		# .gdignore files, so they are not picked up by the resource scan.
 		for key in config.get_section_keys("preset.0.options"):
 			preset.set(key,config.get_value("preset.0.options",key))
+		# Sign with the project's debug key (build-android.ps1 creates it), so a new
+		# build installs over the one on the phone and keeps its save.
+		var keystore := ProjectSettings.globalize_path("res://builds/debug.keystore")
+		if FileAccess.file_exists(keystore):
+			preset.set("keystore/debug", keystore)
+			preset.set("keystore/debug_user", "androiddebugkey")
+			preset.set("keystore/debug_password", "android")
 		error = platform.export_project(preset,true,ProjectSettings.globalize_path("res://builds/hole-munch-prototype.apk"))
 	settings.set_setting(sdk_key,previous_sdk)
 	settings.set_setting(jdk_key,previous_jdk)
