@@ -29,6 +29,7 @@ const DailyGames = preload("res://scripts/daily_games.gd")
 const MapFeatures = preload("res://scripts/map_features.gd")
 const PlayGames = preload("res://scripts/play_games.gd")
 const Promo = preload("res://scripts/promo.gd")
+const Notify = preload("res://scripts/notify.gd")
 # Seconds a carry-in power from the daily mini-game lasts (time adds seconds).
 const CARRY_SECONDS := 12.0
 const CARRY_TIME := 10.0
@@ -199,6 +200,8 @@ var update_url := ""
 var play_games: Node
 # The season this player won and can claim: {} or {season, code}.
 var prize_claim: Dictionary = {}
+# The once-a-day reminder (notify.gd).
+var notify: Node
 var camera_target := Vector3.ZERO
 
 func _ready() -> void:
@@ -260,6 +263,9 @@ func _ready() -> void:
 	play_games.player_loaded.connect(func(_id, _name): check_claim())
 	hud.board_requested.connect(open_board)
 	hud.promo_requested.connect(open_promo)
+	notify = Notify.new()
+	add_child(notify)
+	hud.reminder_requested.connect(toggle_reminders)
 	intro = Intro.new()
 	layer.add_child(intro)
 	apply_style()
@@ -932,6 +938,9 @@ func clear_drag() -> void:
 func _notification(what: int) -> void:
 	if what in [NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_FOCUS_OUT]:
 		if mode == "playing" and not test_mode and not capture_mode: toggle_pause()
+	# Leaving the app re-sets tomorrow's single reminder.
+	if what in [NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_WM_CLOSE_REQUEST] and is_instance_valid(notify):
+		notify.reschedule(campaign.reminders, campaign.streak_days(Campaign.today()))
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		if is_instance_valid(wardrobe) and wardrobe.visible: close_panel()
 		elif mode == "playing": toggle_pause()
@@ -1314,6 +1323,10 @@ func finish(won: bool) -> void:
 		hud.coin_parts = I18n.t("coin_parts", [roundi(parts.food), parts.stars, parts.win, time_coins, ("%.2f" % parts.multiplier).trim_suffix("0").trim_suffix(".0")])
 	hud.next_reward = campaign.next_journey_reward()
 	campaign.coins += reward
+	# Reminders are offered after the first win, never at launch.
+	if won and "reminder_asked" not in campaign.seen and notify.available():
+		campaign.seen.append("reminder_asked")
+		notify.ask_permission()
 	ads.round_ended()
 	persist()
 
@@ -1394,6 +1407,11 @@ func check_claim() -> void:
 func open_board() -> void:
 	var season := Promo.active_season(Campaign.today())
 	play_games.open_board(str(season.leaderboard) if not season.is_empty() else PlayGames.daily_id())
+
+func toggle_reminders() -> void:
+	campaign.reminders = not campaign.reminders
+	if campaign.reminders: notify.ask_permission()
+	persist()
 
 # The prize banner opens the rules; a winner's banner opens the claim email.
 func open_promo() -> void:
@@ -1620,6 +1638,8 @@ func update_hud() -> void:
 	hud.streak = campaign.streak_days(Campaign.today())
 	hud.board_ready = play_games.available()
 	hud.promo_text = promo_line()
+	hud.reminder_ready = notify.available()
+	hud.reminders_on = campaign.reminders
 	hud.endless_best = int(campaign.endless.best)
 	var next_region: int = (campaign.selected+1)/Campaign.CITIES_PER_REGION
 	hud.gate_note = "" if next_region >= Campaign.REGIONS.size() or campaign.region_open(next_region) else I18n.t("gate", [Campaign.stars_needed(next_region), Campaign.region_name(next_region), campaign.total_stars()])

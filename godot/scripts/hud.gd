@@ -17,6 +17,7 @@ signal double_requested
 signal update_requested
 signal board_requested
 signal promo_requested
+signal reminder_requested
 const UiStyle = preload("res://scripts/ui_style.gd")
 const UiButton = preload("res://scripts/ui_button.gd")
 const I18n = preload("res://scripts/i18n.gd")
@@ -40,6 +41,10 @@ var board_button: BaseButton
 var promo_button: BaseButton
 var board_ready := false
 var promo_text := ""
+# The daily reminder switch (Android with the notification addon); faded when off.
+var reminder_button: BaseButton
+var reminder_ready := false
+var reminders_on := true
 var update_ready := false
 var last_city := false
 var run_kind := "campaign"
@@ -160,6 +165,8 @@ func _ready() -> void:
 	board_button.pressed.connect(func(): board_requested.emit())
 	promo_button = make_button("crown", Color("b8862f"))
 	promo_button.pressed.connect(func(): promo_requested.emit())
+	reminder_button = make_button("megaphone", Color("35546d"))
+	reminder_button.pressed.connect(func(): reminder_requested.emit())
 	resized.connect(layout)
 	layout()
 
@@ -184,7 +191,8 @@ func layout() -> void:
 	place(pause_button, Rect2(w - 84, 36, 58, 58))
 	place(help_button, Rect2(w - 296, 26, 50, 50))
 	place(language_button, Rect2(w - 238, 26, 50, 50))
-	place(update_button, Rect2(w - 474, 26, 170, 50), 14)
+	place(update_button, Rect2(w - 532, 26, 170, 50), 14)
+	place(reminder_button, Rect2(w - 354, 26, 50, 50))
 	# Bottom right in the menu; on a daily result, beside the home button.
 	var corner := mode == "menu"
 	place(promo_button, Rect2(w - 448, h - 84, 420, 56) if corner else Rect2(w/2 - 264, h - 232, 528, 52), 14)
@@ -243,6 +251,8 @@ func sync() -> void:
 	board_button.text = I18n.t("leaderboard")
 	promo_button.visible = promo_text != "" and (mode == "menu" or (daily_result and not board_ready))
 	promo_button.text = promo_text
+	reminder_button.visible = mode == "menu" and reminder_ready
+	reminder_button.modulate.a = 1.0 if reminders_on else 0.45
 	update_button.text = I18n.t("update_ready")
 	revive_button.text = I18n.t("ad_revive", revive_seconds)
 	give_up_button.text = I18n.t("ad_give_up")

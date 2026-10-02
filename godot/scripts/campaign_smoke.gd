@@ -250,6 +250,10 @@ func check_promo(g) -> void:
 	check(code.length() == 8 and code == Promo.claim_code("player-42", "s1") and code != Promo.claim_code("player-43", "s1"), "claim codes are short, stable and per player")
 	check(Promo.winner(3, seasons[0]) and not Promo.winner(4, seasons[0]) and not Promo.winner(0, seasons[0]), "only the top ranks win")
 	check(not g.play_games.available() and not g.hud.board_button.visible and g.promo_line() == "", "without Play Games or a season, no leaderboard or prize shows")
+	var Notify = g.Notify
+	check(Notify.delay_until_tomorrow({"hour":20, "minute":0, "second":0}) == 23*3600 and Notify.delay_until_tomorrow({"hour":0, "minute":0, "second":0}) == 43*3600, "the reminder lands at 19:00 the next day")
+	check(Notify.message(4)[0].contains("4") and Notify.message(1)[0] != Notify.message(4)[0], "a streak gets its own reminder text")
+	check(not g.notify.available() and not g.hud.reminder_button.visible, "without the notification addon there is no reminder switch")
 
 # Days in a row with a finished daily: coins grow over a week, day 7 gives an
 # effect, a skipped day starts over, and the same day never pays twice.
