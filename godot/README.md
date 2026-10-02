@@ -71,16 +71,12 @@ its landmark to conquer it, while dodging independent military defenders.
   rival and one continent tougher defence; the first win of the day pays ×1.5.
 - **Daily streak**: a finished daily round keeps it; days 1–7 pay 20–120 coins
   and every seventh day an effect not owned yet. Shown beside today's mini-game.
-- **Leaderboards** (`play_games.gd`): Android only, with the GodotPlayGameServices
+- **Daily leaderboard** (`play_games.gd`): Android only, with the GodotPlayGameServices
   addon v3.4.0 (godot-sdk-integrations/godot-play-game-services, release
   `addons.zip` into `addons/`, enable it, set the game id in the Android export
   preset field `godot_play_game_services/game_id`). Put the daily leaderboard id
   in Project Settings `application_custom/play_games/daily_leaderboard`. Without
   the addon or the id every leaderboard button stays hidden.
-- **Prize seasons** (`promo.gd`): top players of a season leaderboard win a real
-  saucer model. Off until `SEASONS`, `CONTACT` and the rules page
-  (`contest-rules.html`, a draft template, not deployed) are filled in. Shows a
-  menu banner, one intro card, and after the season a claim code for winners.
 - **Reminders** (`notify.gd`): Android only, with the NotificationScheduler addon
   v6.0 (godot-mobile-plugins/godot-notification-scheduler, Android zip into
   `addons/`). One notification at 19:00 the next day, re-set whenever the app

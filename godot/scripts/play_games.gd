@@ -1,13 +1,12 @@
 extends Node
 
-# Google Play Games leaderboards for the daily challenge and prize seasons.
+# Google Play Games leaderboard for the daily challenge.
 # The GodotPlayGameServices addon (v3.4.0, Android Gradle build, see README) is
 # loaded by path at runtime, so desktop, web and headless runs never parse it
 # and simply report available() == false: every button that needs it hides.
 #
 # Leaderboard ids come from Project Settings (they are public ids, not secrets):
 #   application_custom/play_games/daily_leaderboard
-# Season leaderboards are listed in promo.gd.
 signal rank_loaded(leaderboard_id: String, rank: int)
 signal player_loaded(player_id: String, display_name: String)
 
@@ -64,8 +63,7 @@ func submit(leaderboard_id: String, score: int) -> void:
 	if not available() or not signed_in or leaderboard_id == "" or score <= 0: return
 	leaderboards.submit_score(leaderboard_id, score)
 
-# Asks for the player's rank; rank_loaded arrives later (today's for the daily
-# board, all-time for a season board, which only lives for its season).
+# Asks for the player's rank; rank_loaded arrives later (today's, or all-time).
 func load_rank(leaderboard_id: String, today_only: bool) -> void:
 	if not available() or not signed_in or leaderboard_id == "": return
 	leaderboards.load_player_score(leaderboard_id, TIME_SPAN_DAILY if today_only else TIME_SPAN_ALL_TIME, COLLECTION_PUBLIC)

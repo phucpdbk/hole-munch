@@ -16,7 +16,6 @@ signal give_up_requested
 signal double_requested
 signal update_requested
 signal board_requested
-signal promo_requested
 signal reminder_requested
 const UiStyle = preload("res://scripts/ui_style.gd")
 const UiButton = preload("res://scripts/ui_button.gd")
@@ -36,11 +35,9 @@ var revive_left := 0.0
 var revive_seconds := 15
 var can_double := false
 var update_button: BaseButton
-# Play Games leaderboard (Android with the addon) and the prize-season banner.
+# Play Games daily leaderboard (Android with the addon).
 var board_button: BaseButton
-var promo_button: BaseButton
 var board_ready := false
-var promo_text := ""
 # The daily reminder switch (Android with the notification addon); faded when off.
 var reminder_button: BaseButton
 var reminder_ready := false
@@ -163,8 +160,6 @@ func _ready() -> void:
 	update_button.pressed.connect(func(): update_requested.emit())
 	board_button = make_button("trophy", Color("2f7d8c"))
 	board_button.pressed.connect(func(): board_requested.emit())
-	promo_button = make_button("crown", Color("b8862f"))
-	promo_button.pressed.connect(func(): promo_requested.emit())
 	reminder_button = make_button("megaphone", Color("35546d"))
 	reminder_button.pressed.connect(func(): reminder_requested.emit())
 	resized.connect(layout)
@@ -195,16 +190,14 @@ func layout() -> void:
 	place(reminder_button, Rect2(w - 354, 26, 50, 50))
 	# Bottom right in the menu; on a daily result, beside the home button.
 	var corner := mode == "menu"
-	place(promo_button, Rect2(w - 448, h - 84, 420, 56) if corner else Rect2(w/2 - 264, h - 232, 528, 52), 14)
-	place(board_button, Rect2(w - 448, h - 148, 420, 54) if corner else Rect2(w/2 - 264, h - 232, 528, 52), 15)
+	place(board_button, Rect2(w - 448, h - 84, 420, 56) if corner else Rect2(w/2 - 264, h - 232, 528, 52), 15)
 	var offer_width := minf(440.0, w-48)
 	place(revive_button, Rect2(w/2-offer_width/2, h/2+10, offer_width, 64), 22)
 	place(give_up_button, Rect2(w/2-110, h/2+88, 220, 48), 16)
-	if w > h and can_double and mode == "result" and (board_ready or promo_text != "") and run_kind == "daily":
-		# Share the row: the ad offer on the left, the leaderboard or prize on the right.
+	if w > h and can_double and mode == "result" and board_ready and run_kind == "daily":
+		# Share the row: the ad offer on the left, the leaderboard on the right.
 		place(double_button, Rect2(w/2-264, h-232, 260, 52), 14)
 		place(board_button, Rect2(w/2+4, h-232, 260, 52), 14)
-		place(promo_button, Rect2(w/2+4, h-232, 260, 52), 12)
 	elif w > h: place(double_button, Rect2(w/2-210, h-232, 420, 52), 17)
 	else: place(double_button, Rect2(44, h-500, w-88, 52), 16)
 	if w > h:
@@ -234,7 +227,7 @@ func retry_wanted() -> bool:
 	return mode == "result" and run_kind == "campaign" and won and stars < 3 and has_next
 
 func sync() -> void:
-	var layout_key := mode + str(retry_wanted()) + str(can_double) + str(board_ready) + str(promo_text != "")
+	var layout_key := mode + str(retry_wanted()) + str(can_double) + str(board_ready)
 	if last_layout_mode != layout_key:
 		layout()
 		last_layout_mode = layout_key
@@ -249,8 +242,6 @@ func sync() -> void:
 	var daily_result := mode == "result" and run_kind == "daily"
 	board_button.visible = board_ready and (mode == "menu" or daily_result)
 	board_button.text = I18n.t("leaderboard")
-	promo_button.visible = promo_text != "" and (mode == "menu" or (daily_result and not board_ready))
-	promo_button.text = promo_text
 	reminder_button.visible = mode == "menu" and reminder_ready
 	reminder_button.modulate.a = 1.0 if reminders_on else 0.45
 	update_button.text = I18n.t("update_ready")
