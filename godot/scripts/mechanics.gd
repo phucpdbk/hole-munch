@@ -6,6 +6,8 @@ extends Node3D
 # and shield, and answers questions such as "may the boss be eaten yet?".
 const Traffic = preload("res://scripts/traffic.gd")
 const Mascot = preload("res://scripts/mascot.gd")
+const MascotAttacks = preload("res://scripts/mascot_attacks.gd")
+const KNOCK_FADE := 6.0
 const MascotSpecs = preload("res://scripts/mascot_specs.gd")
 # The guardian is about half the landmark's size, so it falls mid-way up the ladder.
 const GUARDIAN_SHARE := 0.55
@@ -62,6 +64,9 @@ var pickup_timer := PICKUP_FIRST
 var powers := {"magnet":0.0, "speed":0.0}
 var stun := 0.0
 var glide := Vector3.ZERO
+# A hit shoves the hole away from the blast; the shove fades within a moment.
+var knock := Vector3.ZERO
+var attacks: Node3D
 var hunger := 0.0
 var hungry := false
 var peak_radius := 0.0
@@ -86,6 +91,8 @@ func _ready() -> void:
 	shield.material_override = shield_material
 	shield.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(shield)
+	attacks = MascotAttacks.new()
+	add_child(attacks)
 	orb = Node3D.new()
 	var ball := MeshInstance3D.new()
 	var sphere := SphereMesh.new()
@@ -201,6 +208,7 @@ func reset(game, level_weather: String, seed_value: int) -> void:
 	powers = {"magnet":0.0, "speed":0.0}
 	stun = 0.0
 	glide = Vector3.ZERO
+	knock = Vector3.ZERO
 	hunger = 0.0
 	hungry = false
 	peak_radius = 0.0
@@ -224,7 +232,9 @@ func update(game, dt: float) -> void:
 		game.add_floater(boss.position, I18n.t("guardian_down"), true)
 		game.fx.ripple(boss.position, game.boss_radius*1.2, Color("9fdcff"))
 		game.sfx.play("grow")
+	knock = knock.lerp(Vector3.ZERO, 1.0-exp(-dt*KNOCK_FADE))
 	if mascot: mascot.think(game, dt)
+	attacks.update(game, mascot if shield_up() else null)
 	update_hunger(game, dt)
 	update_pickup(game, dt)
 	round_time += dt
@@ -349,7 +359,7 @@ func explode(game, bomb: Dictionary) -> void:
 	var reach: float = game.radius*BLAST_REACH
 	var blast: Array = game.items.filter(func(item):
 		return not item.eaten and item.fall < 0 and Traffic.is_active(item) and not item.get("is_boss", false) \
-			and not item.get("bomb", false) and item.radius <= game.radius*game.EAT_RATIO \
+			and not item.get("bomb", false) and not item.get("guardian", false) and item.radius <= game.radius*game.EAT_RATIO \
 			and Vector2(item.position.x-bomb.position.x, item.position.z-bomb.position.z).length() < reach)
 	for item in blast: game.swallow(item)
 	game.add_floater(game.hole_position, I18n.t("bomb_feast", blast.size()), true)
@@ -368,9 +378,21 @@ func magnet_bonus() -> int:
 # The glide is kept apart from the wind so the drift never accumulates.
 func steer(wanted: Vector3, dt: float, clock: float) -> Vector3:
 	glide = glide.lerp(wanted, 1.0-exp(-dt*SLIP_GRIP)) if weather in SLIPPERY else wanted
-	if weather not in WINDY or stun > 0: return glide
+	if weather not in WINDY or stun > 0: return glide + knock
 	var angle := clock*0.15
-	return glide + Vector3(cos(angle), 0, sin(angle))*WIND_PUSH
+	return glide + knock + Vector3(cos(angle), 0, sin(angle))*WIND_PUSH
+
+func knock_back(direction: Vector3, strength: float) -> void:
+	var flat := Vector3(direction.x, 0, direction.z)
+	if flat.length() > 0.01: knock = flat.normalized()*strength
+
+# The hole closed over the guardian: true only on the bite that swallows it.
+func guardian_yields(game, item: Dictionary) -> bool:
+	if item != guardian or mascot == null: return true
+	return mascot.bite(game)
+
+func guardian_biteable(item: Dictionary) -> bool:
+	return item != guardian or mascot == null or mascot.can_be_bitten()
 
 func animate(dt: float) -> void:
 	if is_instance_valid(mascot): mascot.animate(dt)

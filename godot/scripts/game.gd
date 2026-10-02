@@ -49,6 +49,9 @@ const COMBO_REPEAT := 15
 const COMBO_REPEAT_SECONDS := 3.0
 const HIT_SECONDS := 2.0
 const HIT_SHRINK := 0.94
+# A hit shoves the hole (world units per second, fading) and rocks the saucer.
+const HIT_KNOCK := 7.0
+const WOBBLE_FADE := 1.6
 # Landmark counter-attack starts once the hole is this close to fitting the boss.
 const COUNTER_FROM := 4
 const COUNTER_AT := 0.8
@@ -127,6 +130,8 @@ var shaft_shader: ShaderMaterial
 const CLEAR_COINS := 2
 # Coins this result got from the seconds left on the clock.
 var time_coins := 0
+# 1 right after a hit, fading to 0: the saucer rocks and lurches.
+var saucer_wobble := 0.0
 var lose_reason := ""
 var record_note := ""
 var rival: Node3D
@@ -793,6 +798,7 @@ func reset_stats() -> void:
 	combo_time = 0.0
 	best_combo = 0
 	bonus_seconds = 0.0
+	saucer_wobble = 0.0
 	hole_velocity = Vector3.ZERO
 	growth_milestone = 1.0
 	floaters.clear()
@@ -1001,11 +1007,12 @@ func step(dt: float, input: Vector2) -> void:
 	if magnet_level() > 0: pull_small_items(dt)
 	for item in items:
 		if item.eaten or item.get("hidden", false) or item.fall >= 0 or item.get("falling", 0.0) > 0: continue
-		if item.radius > radius*EAT_RATIO or item.get("shielded", false): continue
+		if item.radius > radius*EAT_RATIO or item.get("shielded", false) or not mechanics.guardian_biteable(item): continue
 		# Like 2D: the centre must pass inside the rim, less a bit for bigger objects.
 		var reach: float = radius - item.radius*0.4
 		if Vector2(item.position.x-hole_position.x,item.position.z-hole_position.z).length() < reach:
-			swallow(item)
+			# The guardian takes several bites; the earlier ones knock it away.
+			if mechanics.guardian_yields(self, item): swallow(item)
 	update_counter()
 	update_rival(dt)
 	if not playing: return
@@ -1208,6 +1215,12 @@ func take_hit() -> void:
 	add_floater(hole_position,I18n.t("hit"),true)
 	fx.puff(hole_position,0.8,1.0)
 	sfx.play("tick")
+	# The saucer reels from the blow and the hole is shoved away from it.
+	saucer_wobble = 1.0
+	fx.shake = maxf(fx.shake, 0.55)
+	var source: Dictionary = defense.last_hit.get("source", {})
+	var from: Vector3 = source.get("position", hole_position - hole_velocity)
+	mechanics.knock_back(hole_position - from, HIT_KNOCK)
 
 static func combo_multiplier(count: int) -> float:
 	return 3.0 if count >= 30 else 2.0 if count >= 16 else 1.5 if count >= 8 else 1.0
@@ -1320,6 +1333,10 @@ func minimap_data() -> Dictionary:
 		"hole":Vector2(hole_position.x, hole_position.z), "radius":radius,
 		"open":not boss.get("shielded", false), "bombs":[]}
 	if not boss.get("hidden", false): data.boss = Vector2(boss.position.x, boss.position.z)
+	if mechanics.shield_up():
+		var guardian: Dictionary = mechanics.guardian
+		data.guardian = Vector2(guardian.position.x, guardian.position.z)
+		data.guardian_color = mechanics.mascot.attack_color() if mechanics.mascot != null else Color("9fdcff")
 	if run_kind == "daily": data.dots = daily.dots()
 	data.merge(features.minimap(layout))
 	for bomb in mechanics.bombs:
@@ -1418,9 +1435,11 @@ func update_view(dt: float) -> void:
 	var hover := (1.8 if mode == "customize" else 3.4 + radius*0.9) + sin(elapsed*2.0)*0.15
 	saucer.visible = mode != "customize" or wardrobe.tab == "crafts"
 	beam.visible = saucer.visible
-	saucer.position = hole_position + Vector3(0, hover, 0)
+	if not paused: saucer_wobble = maxf(0.0, saucer_wobble - dt*WOBBLE_FADE)
+	var reel := saucer_wobble*saucer_wobble
+	saucer.position = hole_position + Vector3(sin(elapsed*13.0)*reel*0.6, hover - reel*0.8, cos(elapsed*11.0)*reel*0.6)
 	saucer.scale = Vector3.ONE*(0.55 + radius*0.28)
-	saucer.rotation.y = elapsed*0.8 if campaign.craft < 5 else 0.5+sin(elapsed*1.3)*0.16
+	saucer.rotation = Vector3(sin(elapsed*17.0)*reel*0.55, elapsed*0.8 if campaign.craft < 5 else 0.5+sin(elapsed*1.3)*0.16, cos(elapsed*14.0)*reel*0.45)
 	beam.position = hole_position + Vector3(0, hover*0.5, 0)
 	beam.scale = Vector3(radius*(0.9 + bite_time*0.3), hover, radius*(0.9 + bite_time*0.3))
 	var rival_shown: bool = rival.active and mode in ["playing", "paused", "result"]
@@ -1459,6 +1478,9 @@ func update_hud() -> void:
 	hud.eaten = eaten
 	hud.waiting = not started
 	hud.growth = growth()
+	var guarding: bool = mechanics.shield_up() and mechanics.mascot != null
+	hud.guardian_max = mechanics.mascot.HP if guarding else 0
+	hud.guardian_hp = mechanics.mascot.hp if guarding else 0
 	hud.minimap = minimap_data()
 	hud.revive_left = revive_left
 	hud.revive_seconds = int(Ads.REVIVE_SECONDS)

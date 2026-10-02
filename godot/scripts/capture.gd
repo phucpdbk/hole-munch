@@ -37,6 +37,11 @@ func run(game, campaign_mode: bool) -> void:
 			await snapshot("skin-%d" % skin)
 		g.get_tree().quit()
 		return
+	# Each guardian attack style mid-shot at the saucer, then a hit wobble.
+	if "--guardian-capture" in OS.get_cmdline_user_args():
+		await guardian_preview()
+		g.get_tree().quit()
+		return
 	# Menu shot of every campaign landmark, to review Meshy bakes side by side.
 	if "--landmark-gallery" in OS.get_cmdline_user_args():
 		for index in g.Campaign.level_count():
@@ -266,6 +271,35 @@ func ui_preview() -> void:
 	g.finish(true)
 	await frames(6)
 	await snapshot("ui-%s-result" % lang)
+
+func guardian_preview() -> void:
+	var specs: Dictionary = g.Mechanics.MascotSpecs.MASCOTS
+	var shown := {}
+	for index in g.Campaign.level_count():
+		var id: String = g.Campaign.level_info(index).boss
+		var style: String = specs.get(id, ["", "", "", "", "", ""])[5]
+		if style == "" or shown.has(style): continue
+		shown[style] = true
+		g.load_level(index)
+		g.reset_round()
+		g.playing = true; g.mode = "playing"; g.started = true; g.remaining = 99.0
+		g.rival.active = false
+		g.defense.grace = 0.0
+		var mascot = g.mechanics.mascot
+		var guardian: Dictionary = g.mechanics.guardian
+		mascot.cooldown = 0.0
+		g.hole_position = guardian.position + Vector3(-3.0, 0, guardian.radius + 3.5)
+		g.hole_position.y = 0
+		# Run real frames until the attack is in the air, then shoot it.
+		for frame in 240:
+			await g.get_tree().process_frame
+			var flying: bool = g.defense.strikes.any(func(s): return s.source == guardian and s.time <= s.flight*0.5)
+			if flying or (style == "leap" and mascot.air > 0.8): break
+		await snapshot("guardian-%s-%s" % [style, id])
+		for frame in 40:
+			await g.get_tree().process_frame
+			if g.saucer_wobble > 0.6: break
+		await snapshot("guardian-%s-hit" % style)
 
 func snapshot(name: String) -> void:
 	await g.get_tree().process_frame

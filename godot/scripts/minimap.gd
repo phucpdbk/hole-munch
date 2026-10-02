@@ -1,7 +1,7 @@
 extends RefCounted
 
 # A small top-down map of the city in the HUD: roads, the hole, the landmark,
-# the rival, and pickups or bombs falling from the sky. game.gd fills the data
+# the guardian, the rival, and pickups or bombs falling from the sky. game.gd fills the data
 # each frame (minimap_data); positions are world x/z.
 const UiStyle = preload("res://scripts/ui_style.gd")
 const SIZE := 132.0
@@ -32,6 +32,13 @@ static func draw(canvas: CanvasItem, top_right: Vector2, data: Dictionary) -> vo
 		var boss := to_map(rect, half, scale, data.boss)
 		canvas.draw_circle(boss, 6.0, UiStyle.GOLD if data.open else Color("9fdcff"))
 		canvas.draw_arc(boss, 7.5, 0, TAU, 16, UiStyle.INK, 1.5, true)
+	# The roaming guardian: a diamond in its attack colour.
+	if data.has("guardian"):
+		var at := to_map(rect, half, scale, data.guardian)
+		var diamond := PackedVector2Array([at + Vector2(0, -5), at + Vector2(5, 0), at + Vector2(0, 5), at + Vector2(-5, 0)])
+		canvas.draw_colored_polygon(diamond, data.guardian_color)
+		diamond.append(diamond[0])
+		canvas.draw_polyline(diamond, UiStyle.INK, 1.5, true)
 	for bomb in data.bombs: canvas.draw_circle(to_map(rect, half, scale, bomb), 3.0, Color("ff5a4e"))
 	if data.has("pickup"): canvas.draw_circle(to_map(rect, half, scale, data.pickup), 3.5, Color("c69bff"))
 	if data.has("rival"):

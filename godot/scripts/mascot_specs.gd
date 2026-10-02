@@ -2,44 +2,45 @@ extends RefCounted
 
 # Guardian mascots: one per landmark, built from the toy primitives in models.gd.
 # Each entry is [archetype, main colour, belly colour, accessory colour, accessory,
-# attack]. shape() returns the parts grouped by pivot (body, head, arms, legs,
+# attack]. Attacks (mascot_attacks.gd): fire, water and lightning shoot at the
+# saucer, leap jumps up to ram it, stomp shakes the ground and charge rams the hole. shape() returns the parts grouped by pivot (body, head, arms, legs,
 # tail) so mascot.gd can swing each group. Models face +z with a footprint of
 # about one unit; the game scales them to the guardian's swallow radius.
 const MASCOTS := {
 	"onepillar":["dragon", "4caf7a", "f2d36b", "ff8fb1", "flower", "water"],
-	"namsan":["robot", "6fa8dc", "f4f4f4", "e63946", "cap", "charge"],
+	"namsan":["robot", "6fa8dc", "f4f4f4", "e63946", "cap", "lightning"],
 	"khuevan":["bird", "e86a4a", "ffd27a", "ffd23f", "crown", "fire"],
-	"watarun":["beast", "f2b84b", "fff1c9", "ffd23f", "crown", "stomp"],
+	"watarun":["beast", "f2b84b", "fff1c9", "ffd23f", "crown", "leap"],
 	"taj":["bird", "3aa6a0", "f4e2b8", "f4f4f4", "turban", "water"],
-	"pearl":["robot", "e45b8b", "c9d6e8", "7fd3ff", "none", "charge"],
+	"pearl":["robot", "e45b8b", "c9d6e8", "7fd3ff", "none", "lightning"],
 	"fuji":["blob", "f6f6ff", "cfe3f7", "e63946", "bow", "stomp"],
 	"tokyotower":["robot", "ff6a3d", "ffffff", "2b2d42", "cap", "fire"],
-	"eiffel":["bird", "9aa3ad", "d8dde3", "2b2d42", "beret", "charge"],
+	"eiffel":["bird", "9aa3ad", "d8dde3", "2b2d42", "beret", "leap"],
 	"brandenburg":["beast", "c9a24b", "f2e1b0", "ffd23f", "crown", "charge"],
-	"bigben":["robot", "c9a86a", "3b3b3b", "2b2d42", "tophat", "stomp"],
-	"alcala":["beast", "e0b060", "f6dfae", "ffd23f", "crown", "stomp"],
+	"bigben":["robot", "c9a86a", "3b3b3b", "2b2d42", "tophat", "lightning"],
+	"alcala":["beast", "e0b060", "f6dfae", "ffd23f", "crown", "leap"],
 	"pisa":["blob", "f0e6d2", "c94f3d", "f4f4f4", "cap", "stomp"],
 	"royalpalace":["bird", "ff8c1a", "ffffff", "ffd23f", "crown", "water"],
 	"colosseum":["beast", "c8875a", "f0d2b0", "c9a24b", "helmet", "charge"],
 	"stbasils":["blob", "e94b5a", "3fae8f", "ffd23f", "turban", "stomp"],
-	"pyramid":["beast", "e8c87a", "f6e6bd", "2b5d8c", "crown", "stomp"],
+	"pyramid":["beast", "e8c87a", "f6e6bd", "2b5d8c", "crown", "leap"],
 	"cairotower":["bird", "3c7d6e", "f2d36b", "e63946", "none", "fire"],
 	"sphinx":["beast", "d9b26f", "f4e2b8", "4a6fa5", "crown", "fire"],
 	"kicc":["beast", "f0c040", "fbe7a6", "6b4226", "none", "charge"],
 	"djenne":["blob", "c98a52", "f2e3c4", "f4f4f4", "none", "stomp"],
 	"nationaltheatre":["bird", "e35d3b", "fbd36b", "2a9d8f", "cap", "water"],
-	"baobab":["beast", "8b8d94", "d7c9b8", "e76f51", "bow", "stomp"],
+	"baobab":["beast", "8b8d94", "d7c9b8", "e76f51", "bow", "leap"],
 	"tablemountain":["bird", "2d2d33", "f4f4f4", "e63946", "bow", "water"],
 	"liberty":["blob", "5fbfa0", "e7f5ee", "ffd23f", "crown", "fire"],
-	"willis":["robot", "4a4f5a", "ffd23f", "e63946", "cap", "charge"],
-	"empire":["beast", "5b4636", "c9b8a6", "e63946", "none", "stomp"],
+	"willis":["robot", "4a4f5a", "ffd23f", "e63946", "cap", "lightning"],
+	"empire":["beast", "5b4636", "c9b8a6", "e63946", "none", "leap"],
 	"cntower":["beast", "8a5a3b", "f2e1c8", "e63946", "cap", "charge"],
 	"needle":["robot", "d8e2ea", "ff6a3d", "2b2d42", "none", "fire"],
 	"hollywood":["blob", "ffd23f", "e14a6d", "2b2d42", "tophat", "fire"],
 	"chichen":["dragon", "3fa06b", "f2c14e", "e63946", "flower", "water"],
-	"capitol":["bird", "6b4a2b", "f4f4f4", "2b2d42", "tophat", "charge"],
+	"capitol":["bird", "6b4a2b", "f4f4f4", "2b2d42", "tophat", "leap"],
 	"christ":["bird", "2a9d8f", "ffd166", "e63946", "flower", "water"],
-	"masp":["robot", "e63946", "2b2d42", "ffd23f", "none", "stomp"],
+	"masp":["robot", "e63946", "2b2d42", "ffd23f", "none", "lightning"],
 	"machu":["beast", "f1e3d3", "c9a98a", "e63946", "cap", "charge"],
 	"limacathedral":["blob", "f4d35e", "8f2d56", "c94f3d", "sombrero", "fire"],
 	"obelisco":["blob", "8ecae6", "f6f6f6", "2b2d42", "tophat", "stomp"],
@@ -47,13 +48,13 @@ const MASCOTS := {
 	"sugarloaf":["beast", "9c6644", "f2cc8f", "ff8fb1", "bow", "charge"],
 	"costanera":["robot", "8d99ae", "06d6a0", "ffd23f", "none", "fire"],
 	"sydney":["bird", "f4f4f4", "ffd23f", "ffd23f", "none", "water"],
-	"flinders":["robot", "f4a261", "264653", "2a9d8f", "cap", "charge"],
+	"flinders":["robot", "f4a261", "264653", "2a9d8f", "cap", "lightning"],
 	"uluru":["beast", "c1440e", "f2a65a", "2b2d42", "none", "charge"],
-	"belltower":["robot", "bfa36f", "5c4033", "2b2d42", "tophat", "stomp"],
-	"skytower":["bird", "6c757d", "c9b79c", "ffd23f", "none", "charge"],
+	"belltower":["robot", "bfa36f", "5c4033", "2b2d42", "tophat", "lightning"],
+	"skytower":["bird", "6c757d", "c9b79c", "ffd23f", "none", "leap"],
 	"fijitemple":["dragon", "ff6b6b", "ffd166", "ff8fb1", "flower", "fire"],
 	"moai":["blob", "8d8d8d", "b5b5b5", "c1440e", "none", "stomp"],
-	"parliament":["beast", "9e9e9e", "f0f0f0", "2a9d8f", "cap", "stomp"],
+	"parliament":["beast", "9e9e9e", "f0f0f0", "2a9d8f", "cap", "leap"],
 }
 const FALLBACK := ["blob", "7fb8a4", "f2efe4", "e63946", "none", "stomp"]
 const INK := Color("1d2430")
@@ -63,7 +64,7 @@ const HEAD_TOP := {"blob":0.5, "bird":0.6, "dragon":0.42, "robot":0.5, "beast":0
 
 static func spec(id: String) -> Dictionary:
 	var row: Array = MASCOTS.get(id, FALLBACK)
-	return {"archetype":row[0], "a":Color(row[1]), "b":Color(row[2]), "c":Color(row[3]), "accessory":row[4], "attack":row[5]}
+	return {"id":id, "archetype":row[0], "a":Color(row[1]), "b":Color(row[2]), "c":Color(row[3]), "accessory":row[4], "attack":row[5]}
 
 # {"pivots":{group: Vector3}, "parts":{group: [model pieces]}}; pieces are local to their pivot.
 static func shape(m, value: Dictionary) -> Dictionary:

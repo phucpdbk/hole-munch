@@ -223,10 +223,12 @@ func check_guardian() -> void:
 	var Specs = g.Mechanics.MascotSpecs
 	var ids: Array = g.Campaign.LANDMARKS.keys()
 	check(ids.all(func(id): return Specs.MASCOTS.has(id)), "every landmark has a guardian mascot")
+	# One landmark per attack style.
 	var styles := {}
-	for id in ids: styles[Specs.MASCOTS[id][5]] = true
-	check(styles.size() == 4, "guardians use all four attack styles")
-	for id in ["eiffel", "onepillar", "bigben", "colosseum"]:
+	for id in ids:
+		if not styles.has(Specs.MASCOTS[id][5]): styles[Specs.MASCOTS[id][5]] = id
+	check(styles.size() == 6, "guardians use all six attack styles")
+	for id in styles.values():
 		var spec: Dictionary = Specs.spec(id)
 		g.reset_round()
 		g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
@@ -242,13 +244,18 @@ func check_guardian() -> void:
 		for i in int((mascot.WINDUP + 0.1)/0.02): g.step(0.02, Vector2.ZERO)
 		var shots: Array = g.defense.strikes.filter(func(s): return s.source == guardian)
 		check(not shots.is_empty() and shots.all(func(s): return s.color == mascot.ATTACK_COLORS[spec.attack]), "%s guardian attacks with %s" % [id, spec.attack])
-		if spec.attack == "charge":
+		if spec.attack in ["charge", "leap"]:
 			var start: Vector3 = guardian.position
-			for i in 10: g.step(0.02, Vector2.ZERO)
-			check(guardian.position.distance_to(start) > 0.5, "a charging guardian runs at the hole")
+			var peak := 0.0
+			for i in 20:
+				g.step(0.02, Vector2.ZERO)
+				peak = maxf(peak, guardian.position.y - start.y)
+			check(guardian.position.distance_to(start) > 0.5, "a %s guardian moves at the hole" % spec.attack)
+			if spec.attack == "leap": check(peak > 1.0, "a leaping guardian jumps up toward the saucer")
 		var time_before: float = g.remaining
 		for i in 120: g.step(0.02, Vector2.ZERO)
 		check(g.defense.hits > 0 and g.remaining < time_before - 2.0, "%s guardian's %s hits a hole that stands still" % [id, spec.attack])
+		check(g.saucer_wobble > 0.0 or g.defense.hits > 0, "a hit rocks the saucer")
 	g.reset_round()
 	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
 	var guardian: Dictionary = g.mechanics.guardian
@@ -260,6 +267,37 @@ func check_guardian() -> void:
 	check(g.mechanics.mascot.state.begins_with("flee") and guardian.position.x < home.x - 0.5, "an edible guardian runs from the hole")
 	g.mechanics.mascot.animate(0.1)
 	check(g.mechanics.mascot.rig.scale.y > 0.5, "the guardian animates")
+	check_guardian_fight()
+
+# The guardian roams to hunt the hole, and takes three bites: the first two knock
+# it away and the shield only drops on the third.
+func check_guardian_fight() -> void:
+	g.reset_round()
+	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
+	g.rival.active = false
+	var mascot = g.mechanics.mascot
+	var guardian: Dictionary = g.mechanics.guardian
+	var home: Vector3 = guardian.position
+	g.defense.grace = 99.0
+	g.hole_position = home + Vector3(12.0, 0, 0)
+	g.hole_position.y = 0
+	for i in 60: g.step(0.02, Vector2.ZERO)
+	check(mascot.state == "hunt" and guardian.position.x > home.x + 1.0, "the guardian leaves the landmark to hunt a nearby hole")
+	check(g.hud.guardian_max == mascot.HP and g.minimap_data().has("guardian"), "the HUD shows the guardian's hearts and the minimap its position")
+	var full: float = guardian.radius
+	var bites := 0
+	for attempt in 8:
+		if not g.mechanics.shield_up(): break
+		g.radius = full/g.EAT_RATIO + 0.3; g.target_radius = g.radius
+		g.hole_position = Vector3(guardian.position.x, 0, guardian.position.z)
+		var hp_before: int = mascot.hp
+		for i in 5: g.step(0.02, Vector2.ZERO)
+		if mascot.hp < hp_before or guardian.fall >= 0: bites += 1
+		for i in int(mascot.STAGGER/0.02) + 2: g.step(0.02, Vector2.ZERO)
+	for i in 60: g.step(0.02, Vector2.ZERO)
+	check(bites == mascot.HP and not g.mechanics.shield_up(), "the guardian falls on the third bite (%d bites)" % bites)
+	g.reset_round()
+	check(mascot.hp == mascot.HP and is_equal_approx(g.mechanics.guardian.radius, full), "a new round heals the guardian")
 	g.load_level(0)
 
 # Gold districts, roadblocks, shortcuts and danger zones (scripts/map_features.gd).

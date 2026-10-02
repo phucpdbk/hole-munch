@@ -76,6 +76,9 @@ var score := 0
 var best := 0
 var seconds := 110.0
 var growth := 0.0
+# Hearts left on the landmark's guardian (0 when it is gone or there is none).
+var guardian_hp := 0
+var guardian_max := 0
 var eaten := 0
 var won := false
 var waiting := true
@@ -332,6 +335,12 @@ func draw_playing() -> void:
 	text_at(daily_goal if daily_round else I18n.t("take_target", boss_title.to_upper()), Vector2(80, h-80), 17, LIGHT)
 	var value := "%d/%d" % [daily_count, daily_target] if daily_round else "%d%%" % int(growth*100)
 	UiStyle.text(self, value, Vector2(w-(110 if daily_round else 92), h-80), 19, GOLD, false, 0, title_font)
+	# The guardian's hearts sit left of the percentage: it takes that many bites.
+	if not daily_round and guardian_max > 0:
+		for i in guardian_max:
+			var at := Vector2(w-118-(guardian_max-1-i)*26, h-88)
+			if i < guardian_hp: UiStyle.draw_icon(self, "heart", at, 22, Color("ff6b7d"))
+			else: draw_circle(at, 7.0, Color("465d6b"))
 	panel(Rect2(44, h-63, w-88, 10), Color("465d6b"), 5)
 	panel(Rect2(44, h-63, maxf(10, (w-88)*share), 10), GOLD if daily_round else Color("b7a2f1"), 5)
 	if rival_growth >= 0:

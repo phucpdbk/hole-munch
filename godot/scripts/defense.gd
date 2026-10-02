@@ -17,6 +17,8 @@ var hits := 0
 var age := 0.0
 var fired := false
 var impacts: Array = []
+# The strike that landed the last hit, so the game can knock the hole away from it.
+var last_hit: Dictionary = {}
 var roads_x: Array[float] = []
 var roads_z: Array[float] = []
 # Difficulty for the current level, set by reset().
@@ -30,6 +32,7 @@ func reset(items: Array, military_boss: bool, level: int, extra_region := 0) -> 
 	units.clear()
 	strikes.clear()
 	impacts.clear()
+	last_hit = {}
 	slow = 0.0
 	immunity = 0.0
 	var region := mini(level/REGION_SIZE + extra_region, int(LAST_REGION))
@@ -104,11 +107,15 @@ static func projectile_position(strike: Dictionary) -> Vector3:
 
 # Queue one telegraphed blast. Returns false when the sky is already full.
 # Mascot attacks tint their shots (fire, water...); the default is the gunners' gold.
+# A styled strike (fire, water, lightning, leap) is drawn by mascot_attacks.gd as a
+# beam or a jump instead of a shell, over a shorter flight.
 const SHOT_COLOR := Color("ffd96a")
+const BEAM_FLIGHT := 0.6
 
-func add_strike(source: Dictionary, start: Vector3, target: Vector3, radius: float, warning: float, heavy: bool, color := SHOT_COLOR) -> bool:
+func add_strike(source: Dictionary, start: Vector3, target: Vector3, radius: float, warning: float, heavy: bool, color := SHOT_COLOR, style := "") -> bool:
 	if strikes.size() >= MAX_STRIKES: return false
-	strikes.append({"source":source,"target":target,"radius":radius,"time":warning,"duration":warning,"flight":0.75,"start":start,"heavy":heavy,"color":color})
+	var flight := minf(BEAM_FLIGHT, warning) if style != "" else 0.75
+	strikes.append({"source":source,"target":target,"radius":radius,"time":warning,"duration":warning,"flight":flight,"start":start,"heavy":heavy,"color":color,"style":style})
 	return true
 
 # Advances shots and returns true when the hole is hit this frame.
@@ -156,6 +163,7 @@ func land_strikes(dt: float, player: Vector3) -> bool:
 		if distance < strike.radius and immunity <= 0:
 			hit = true
 			hits += 1
+			last_hit = strike
 			slow = 0.85
 			immunity = hit_immunity
 		strikes.remove_at(i)

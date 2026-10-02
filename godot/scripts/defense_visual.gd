@@ -42,7 +42,8 @@ func update(defense, active: bool) -> void:
 	if not active: return
 	for i in defense.strikes.size():
 		var shot: Dictionary = defense.strikes[i]
-		if shot.time > shot.flight: continue
+		# Styled mascot strikes are drawn as beams and jumps by mascot_attacks.gd.
+		if shot.time > shot.flight or shot.get("style", "") != "": continue
 		var pos: Vector3 = defense.projectile_position(shot)
 		var direction: Vector3 = (pos-shot.start).normalized()
 		for pool in [shells, tails, flashes]: pool[i].material_override.albedo_color = shot.color
