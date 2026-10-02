@@ -27,6 +27,18 @@ its landmark to conquer it, while dodging independent military defenders.
   +5 s pickup (both stay in endless only). The only extras are the small time
   upgrade (+1 s per level, 5 levels) and the one rewarded-ad revive below.
   Best combo raises the coin reward by 1% per bite (up to +60%).
+- **Swallowing the landmark wins at once**; every second left pays 2 coins. The
+  clean 75%/90% goals therefore mean clearing the city before the landmark.
+- **Opening street** (`game.gd` `make_opening`): start radius 0.95, a bench at
+  each end of the starter snacks, and one of four shapes per city (row, east or
+  west L, split street); defender squads also change corner per city.
+- **Guardian boss fight** (`mascot.gd`, `mascot_attacks.gd`, `mascot_rig.gd`):
+  the guardian patrols the crossings, hunts a nearby hole and runs home when the
+  hole nears the landmark (minimap diamond). It takes three bites: the first two
+  knock it away (hearts on the HUD). Attacks: fire, water and lightning beams up
+  at the saucer, a leap that rams it, a stomp ring and a charge. A hit rocks the
+  saucer, shakes the camera and shoves the hole. `-- --capture --guardian-capture`
+  shoots every style.
 - **Ads** (`ads.gd`): a rewarded ad can add 15 s once per campaign round, only
   when time runs out with the hole at least 60% of the way to the landmark
   (6 s offer, then it gives up by itself); a result with coins can be doubled
@@ -57,6 +69,23 @@ its landmark to conquer it, while dodging independent military defenders.
   about 70–90% of the timer).
 - **Daily challenge** (THỬ THÁCH NGÀY): one city per date for everyone, with a
   rival and one continent tougher defence; the first win of the day pays ×1.5.
+- **Daily streak**: a finished daily round keeps it; days 1–7 pay 20–120 coins
+  and every seventh day an effect not owned yet. Shown beside today's mini-game.
+- **Leaderboards** (`play_games.gd`): Android only, with the GodotPlayGameServices
+  addon v3.4.0 (godot-sdk-integrations/godot-play-game-services, release
+  `addons.zip` into `addons/`, enable it, set the game id in the Android export
+  preset field `godot_play_game_services/game_id`). Put the daily leaderboard id
+  in Project Settings `application_custom/play_games/daily_leaderboard`. Without
+  the addon or the id every leaderboard button stays hidden.
+- **Prize seasons** (`promo.gd`): top players of a season leaderboard win a real
+  saucer model. Off until `SEASONS`, `CONTACT` and the rules page
+  (`contest-rules.html`, a draft template, not deployed) are filled in. Shows a
+  menu banner, one intro card, and after the season a claim code for winners.
+- **Reminders** (`notify.gd`): Android only, with the NotificationScheduler addon
+  v6.0 (godot-mobile-plugins/godot-notification-scheduler, Android zip into
+  `addons/`). One notification at 19:00 the next day, re-set whenever the app
+  goes to the background; permission is asked after the first win and the
+  megaphone button in the menu switches it off.
 - **Endless** (VÔ TẬN): 60 s clock, every bite adds a little time (plus combo
   time and +5 s pickups), each landmark adds 30 s and leads to a random harder
   city; best score and cities are saved.
@@ -80,12 +109,17 @@ its landmark to conquer it, while dodging independent military defenders.
   launch (again from the ? button), and a "new!" card before the first city with
   each new thing: rain, fog, wind, snow, storm, power orbs, gas bombs, hunger,
   the landmark counter-attack, the rival hole, continent finales and each new
-  continent (at most two cards per start; seen cards are saved).
+  continent (at most one card per start, the landmark card only when nothing new
+  needs explaining; seen cards are saved).
+- **Result screen**: each goal with its numbers (50%/75%), where the coins came
+  from, a bar toward the closest journey reward, and RETRY FOR ★ on a won city
+  that still misses a star.
 - **UI look**: Baloo 2 (titles/buttons) and Nunito (body), both OFL with full
   Vietnamese, in `assets/fonts`; chunky 3D buttons (`ui_button.gd`); icons baked
   from the local POLYGON Icons pack (`assets/icons/README.md`).
-- Save version 5 stores progress, per-goal stars, coins, upgrades and the daily
-  and endless records, plus the chosen language and seen intro cards. Version 4 star counts become their first goals. Older
+- Save version 8 stores progress, per-goal stars, coins, upgrades and the daily
+  and endless records, the streak and reminder switch, plus the chosen language
+  and seen intro cards. Version 4 star counts become their first goals. Older
   native saves keep best score and cosmetics; their stars become 25 coins each.
 
 All 48 levels are temporarily selectable via
@@ -230,6 +264,8 @@ Then bake (headless Godot, `--script res://tools/<tool>.gd [-- ids]`):
   two-legged characters with clear limbs, which is why the mascot prompts ask for a
   standing T-pose. A model that fails rigging still works: the game bobs, leans,
   squashes and jumps the whole body.
+- **Collection thumbnails**: after new saucers, render `assets/thumbs` with
+  `Godot --path . --script res://tools/bake_craft_thumbs.gd` (not headless).
 - **Check**: `-- --capture --guardian-capture` shoots every attack style with the
   baked guardians and saucer, and `-- --capture --landmark-gallery` shows every landmark.
 
