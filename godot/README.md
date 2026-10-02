@@ -193,6 +193,53 @@ https://phucpdbk.github.io/hole-munch/ serves the Godot build, `/classic/` the
 previous HTML5 game and `/privacy.html` the privacy policy. Pass `--no-push` to
 build the branch locally without publishing.
 
+## Meshy assets
+
+`tools/meshy/meshy.mjs` turns the prompts in `tools/meshy/<kind>.json` into GLBs
+(text-to-image, then image-to-3d). Review the PNGs before paying for models.
+Every step is resumable through the output folder's `manifest.json`. The key is
+read only from `MESHY_API_KEY`; never put it in the game or the repo.
+
+```powershell
+$env:MESHY_API_KEY = "msy_..."
+node tools/meshy/meshy.mjs landmarks images --only namsan,watarun
+node tools/meshy/meshy.mjs landmarks models --only namsan,watarun
+node tools/meshy/meshy.mjs mascots all --only onepillar      # images, models, rig
+node tools/meshy/meshy.mjs mascots library                   # animation ids, if a clip is wrong
+node tools/meshy/meshy.mjs crafts all
+```
+
+Then bake (headless Godot, `--script res://tools/<tool>.gd [-- ids]`):
+
+| Kind | Raw GLBs (`.gdignore`d) | Bake tool | Game files | Fallback |
+|---|---|---|---|---|
+| Landmarks | `assets/landmarks_src/<id>.glb` | `bake_landmarks.gd` | `assets/landmarks/<id>.res` + `_albedo.res` | primitive landmark (`landmarks.gd`) |
+| Guardians | `assets/mascots_src/<id>.glb` + `<id>@<clip>.glb` | `bake_mascots.gd` | `assets/mascots/<id>.scn` | primitive rig (`mascot_specs.gd`) |
+| Saucers | `assets/crafts_src/<index>.glb` (0–7, `fleet.gd` NAMES) | `bake_crafts.gd` | `assets/crafts/<index>.res` + `_albedo.res` | primitive craft (`fleet.gd`) |
+
+- **Facing**: models face +z (toward the camera). Fix a bad bake with that tool's
+  `YAW` table; for a hand-made guardian GLB, use `CLIP_OVERRIDES` in `mascot_rig.gd`.
+- **Sizes**: landmarks are normalised to a 2.6 radius on the ground, saucers to 1.6
+  centred on their middle, guardians to a one-unit footprint on the ground (the game
+  scales them to the guardian's swallow radius).
+- **Budget**: about 8k triangles per landmark, 10k per guardian, 5k per saucer,
+  textures 1024 px lossy WebP. Each rigged guardian is one skinned mesh.
+- **Guardian clips**: `idle`, `walk`, `run`, `attack`, `hit`, `leap`. Meshy's
+  auto-rig gives walk and run; the others come from its animation library (first
+  name match, override with `--actions idle=N,attack=N`). Auto-rigging only accepts
+  two-legged characters with clear limbs, which is why the mascot prompts ask for a
+  standing T-pose. A model that fails rigging still works: the game bobs, leans,
+  squashes and jumps the whole body.
+- **Check**: `-- --capture --guardian-capture` shoots every attack style with the
+  baked guardians and saucer, and `-- --capture --landmark-gallery` shows every landmark.
+
+Landmarks still on primitives (43): namsan, watarun, pearl, tokyotower,
+brandenburg, alcala, royalpalace, stbasils, cairotower, kicc, nationaltheatre,
+tablemountain, willis, cntower, hollywood, capitol, masp, limacathedral, monserrate,
+costanera, flinders, belltower, fijitemple, parliament, khuevan, fuji, bigben, pisa,
+colosseum, pyramid, sphinx, djenne, baobab, empire, needle, chichen, christ, machu,
+obelisco, sugarloaf, uluru, skytower, moai.
+
 ## Deferred migration
 
 World events, onboarding goals, achievements, ads and web save migration are not

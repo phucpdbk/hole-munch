@@ -22,7 +22,21 @@ func rival(models) -> ArrayMesh:
 		part("ball",Vector3(cos(a)*1.1,-0.14,sin(a)*1.1),Vector3.ONE*0.13,"ffe066")
 	return m.bake(parts)
 
+# Baked by tools/bake_crafts.gd from Meshy GLBs; null falls back to primitives.
+static func meshy(models, index: int) -> ArrayMesh:
+	var path := "res://assets/crafts/%d.res" % index
+	var texture_path := "res://assets/crafts/%d_albedo.res" % index
+	if not ResourceLoader.exists(path) or not ResourceLoader.exists(texture_path): return null
+	var mesh: ArrayMesh = load(path).duplicate()
+	# Each craft keeps its own copy of the textured landmark shader.
+	var material: ShaderMaterial = models.landmark_material.duplicate()
+	material.set_shader_parameter("albedo_tex", load(texture_path))
+	mesh.surface_set_material(0, material)
+	return mesh
+
 func build(models, index: int) -> ArrayMesh:
+	var baked := meshy(models, index)
+	if baked != null: return baked
 	m = models
 	parts.clear()
 	var c: String = COLORS[index]

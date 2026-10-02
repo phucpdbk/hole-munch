@@ -1,9 +1,10 @@
 extends Node3D
 
 # How a guardian mascot looks and moves. Three sources, best first:
-#   1. A Meshy model with an AnimationPlayer: res://assets/mascots/<id>.glb.
-#      States map to clips through assets/mascots/clips.json ("default" plus
-#      per-landmark overrides); a missing clip falls back to procedural motion.
+#   1. A Meshy model with an AnimationPlayer: res://assets/mascots/<id>.scn from
+#      tools/bake_mascots.gd (clips named idle, walk, run, attack, hit, leap), or a
+#      hand-made <id>.glb whose clip names CLIP_OVERRIDES maps. A missing clip
+#      falls back to procedural motion.
 #   2. A Meshy model without a skeleton: the whole body bobs, leans, squashes and
 #      jumps, which works for any shape (four-legged guardians included).
 #   3. The toy primitive rig from mascot_specs.gd, whose limb pivots also swing.
@@ -11,10 +12,10 @@ extends Node3D
 # and the game scales this node to the guardian's swallow radius.
 const MascotSpecs = preload("res://scripts/mascot_specs.gd")
 const MODEL_DIR := "res://assets/mascots/"
-const CLIPS_FILE := "res://assets/mascots/clips.json"
 const FOOTPRINT := 1.0
-# Clips used when clips.json is missing or has no entry for a state.
-const DEFAULT_CLIPS := {"idle":"Idle", "walk":"Walking", "run":"Running", "attack":"Attack", "hit":"Hit", "leap":"Jump"}
+const DEFAULT_CLIPS := {"idle":"idle", "walk":"walk", "run":"run", "attack":"attack", "hit":"hit", "leap":"leap"}
+# Per-landmark fixes for hand-made models: {"id": {"walk":"Walking", "yaw":180}}.
+const CLIP_OVERRIDES := {}
 
 var source := "primitive"
 var body: Node3D
@@ -27,7 +28,7 @@ var clock := 0.0
 var stride := 0.0
 
 static func model_path(id: String) -> String:
-	for extension in ["glb", "tscn", "scn"]:
+	for extension in ["scn", "glb", "tscn"]:
 		var path: String = MODEL_DIR + id + "." + extension
 		if ResourceLoader.exists(path): return path
 	return ""
@@ -103,13 +104,7 @@ static func find_player(node: Node) -> AnimationPlayer:
 	return null
 
 static func clip_settings(id: String) -> Dictionary:
-	var settings: Dictionary = {}
-	if not FileAccess.file_exists(CLIPS_FILE): return settings
-	var data = JSON.parse_string(FileAccess.get_file_as_string(CLIPS_FILE))
-	if not data is Dictionary: return settings
-	if data.get("default") is Dictionary: settings.merge(data.default, true)
-	if data.get(id) is Dictionary: settings.merge(data[id], true)
-	return settings
+	return CLIP_OVERRIDES.get(id, {})
 
 # pose: {state, moving, crouch, lunge, squash, air, hurt, run_speed}
 func animate(dt: float, pose: Dictionary) -> void:
