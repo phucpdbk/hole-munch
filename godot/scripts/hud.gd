@@ -326,10 +326,11 @@ func draw_daily_caption() -> void:
 	var at := daily_button.position + Vector2(4, -8)
 	UiStyle.draw_icon(self, daily_icon if daily_left > 0 else "lock", at + Vector2(9, -6), 20)
 	UiStyle.text(self, daily_title, at + Vector2(24, 0), 13, UiStyle.MINT if daily_left > 0 else MUTED, false, 4, body_font)
-	# The daily streak sits at the right end of the same line: a flame and the days.
+	# The daily streak sits at the right end of the same line, above the endless
+	# button, so a long mini-game name never runs into it: a flame and the days.
 	if streak > 0:
 		var label := I18n.t("streak_days", streak)
-		var right := daily_button.position.x + daily_button.size.x
+		var right := endless_button.position.x + endless_button.size.x
 		var width := UiStyle.text_width(label, 13, body_font)
 		UiStyle.draw_icon(self, "fire", Vector2(right - width - 12, at.y - 6), 20)
 		UiStyle.text(self, label, Vector2(right - width, at.y), 13, GOLD, false, 4, body_font)

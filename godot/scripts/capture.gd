@@ -239,6 +239,8 @@ func street_preview() -> void:
 
 func ui_preview() -> void:
 	var lang: String = g.I18n.lang
+	# A running streak, so the menu shows it beside today's mini-game.
+	g.campaign.streak = {"count":3, "last":g.Campaign.today()}
 	await frames(40)
 	await snapshot("ui-%s-menu" % lang)
 	g.intro.open(g.Intro.story_pages(), Callable(), true)
