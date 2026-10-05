@@ -82,8 +82,12 @@ func run(game, campaign_mode: bool) -> void:
 		g.get_tree().quit()
 		return
 	# Guardian mascots up close: idle, winding up and attacking (`--mascot-capture`).
+	# `--levels=0,4` picks other cities (0-based).
 	if "--mascot-capture" in OS.get_cmdline_user_args():
-		for index in [8, 0, 1, 3, 6, 10, 26, 46]:
+		var picks: Array = [8, 0, 1, 3, 6, 10, 26, 46]
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--levels="): picks = Array(arg.trim_prefix("--levels=").split(",")).map(func(value): return int(value))
+		for index in picks:
 			g.load_level(index)
 			g.on_play()
 			g.started = true

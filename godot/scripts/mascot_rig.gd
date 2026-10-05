@@ -87,7 +87,11 @@ func bounds(node: Node, parent: Transform3D) -> AABB:
 	var box := AABB()
 	var found := false
 	if node is MeshInstance3D and (node as MeshInstance3D).mesh != null:
-		box = transform*(node as MeshInstance3D).mesh.get_aabb()
+		# A skinned mesh is drawn through its bind poses, which already undo the
+		# armature's node scale (Meshy: 0.01 armature, centimetre bones, metre
+		# vertices), so its vertex box is in model space.
+		var skinned := (node as MeshInstance3D).skin != null
+		box = (Transform3D.IDENTITY if skinned else transform)*(node as MeshInstance3D).mesh.get_aabb()
 		found = true
 	for child in node.get_children():
 		var inner := bounds(child, transform)

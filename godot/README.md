@@ -50,7 +50,12 @@ its landmark to conquer it, while dodging independent military defenders.
   knock it away (hearts on the HUD). Attacks: fire, water and lightning beams up
   at the saucer, a leap that rams it, a stomp ring and a charge. A hit rocks the
   saucer, shakes the camera and shoves the hole. `-- --capture --guardian-capture`
-  shoots every style.
+  shoots every style. Hà Nội (Chùa Một Cột), Agra, Paris, New York (Liberty)
+  and Sydney have Meshy guardians (`assets/mascots/<id>.scn`, auto-rigged,
+  clips idle/walk/run/attack = Charged Spell Cast/hit/leap = Jump Attack via
+  `tools/meshy/meshy.mjs mascots rig --actions idle=0,attack=125,hit=178,leap=86`,
+  baked by `tools/bake_mascots.gd`); the rest keep the toy rig.
+  `--mascot-capture --levels=0,4` shoots chosen cities.
 - **Ads** (`ads.gd`): a rewarded ad can add 15 s once per campaign round, only
   when time runs out with the hole at least 60% of the way to the landmark
   (6 s offer, then it gives up by itself); a result with coins can be doubled
