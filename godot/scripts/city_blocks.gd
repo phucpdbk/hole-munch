@@ -1,12 +1,14 @@
 extends RefCounted
 
-# Street-front city blocks. Each block becomes a district: shophouses touching
-# side by side along the pavement, with high-rise towers (downtown), a green
-# courtyard (commercial) or detached houses (residential) behind them.
+# Street-front city blocks. Each block becomes a district: rows of shophouses
+# along the pavement with empty lots between them, and high-rise towers
+# (downtown), a green courtyard (commercial) or detached houses (residential)
+# behind them.
 # The district mix comes from the landmark city's profile (city_profiles.gd).
 const StreetModels = preload("res://scripts/street_models.gd")
 const PAVEMENT := 1.05
-const ALLEY_CHANCE := 0.08
+# Empty lots between shops keep the wide blocks airy instead of walled in.
+const ALLEY_CHANCE := 0.26
 const STREET_TREE_STEP := 6.0
 const TOWER_GAP := 0.4
 
@@ -47,14 +49,14 @@ func fill(g, rng: RandomNumberGenerator, x: float, z: float, size: Vector2) -> v
 	var inner := size/2 - Vector2(PAVEMENT, PAVEMENT)
 	match district(x, z):
 		"downtown":
-			street_front(g, rng, x, z, inner, true)
+			street_front(g, rng, x, z, inner, 4)
 			towers(g, rng, x, z, inner)
 		"commercial":
-			street_front(g, rng, x, z, inner, true)
+			street_front(g, rng, x, z, inner, 2)
 			for dx in [-inner.x*0.3, inner.x*0.3]:
 				g.add_item("tree", Vector3(x + dx, 0.16, z + rng.randf_range(-1.0, 1.0)), 0.68, rng.randi_range(0, 1))
 		_:
-			street_front(g, rng, x, z, inner, false)
+			street_front(g, rng, x, z, inner, 1)
 			for dx in [-size.x*0.26, size.x*0.26]:
 				for dz in [-size.y*0.26, size.y*0.12]:
 					g.add_item("house", Vector3(x + dx + rng.randf_range(-0.6, 0.6), 0.16, z + dz), 1.5, rng.randi_range(0, 1), PI if dx > 0 else 0.0)
@@ -62,13 +64,15 @@ func fill(g, rng: RandomNumberGenerator, x: float, z: float, size: Vector2) -> v
 				g.add_item("tree", Vector3(x + dx, 0.16, z - inner.y + 0.65), 0.68, int(dx > 0))
 	street_trees(g, x, z, size, inner)
 
-# Shop rows face all four streets (or only the south street for residential
-# blocks). The north/south rows run the full width and own the corners.
-func street_front(g, rng: RandomNumberGenerator, x: float, z: float, inner: Vector2, all_sides: bool) -> void:
+# Shop rows face all four streets downtown, the north and south streets in
+# commercial blocks and only the south street in residential ones. The
+# north/south rows run the full width and own the corners.
+func street_front(g, rng: RandomNumberGenerator, x: float, z: float, inner: Vector2, sides: int) -> void:
 	var depth := StreetModels.DEPTH
 	row(g, rng, Vector3(x - inner.x, 0.16, z + inner.y - depth/2), Vector3.RIGHT, inner.x*2, 0.0)
-	if not all_sides: return
+	if sides < 2: return
 	row(g, rng, Vector3(x - inner.x, 0.16, z - inner.y + depth/2), Vector3.RIGHT, inner.x*2, PI)
+	if sides < 4: return
 	row(g, rng, Vector3(x + inner.x - depth/2, 0.16, z - inner.y + depth), Vector3.BACK, inner.y*2 - depth*2, PI/2)
 	row(g, rng, Vector3(x - inner.x + depth/2, 0.16, z - inner.y + depth), Vector3.BACK, inner.y*2 - depth*2, -PI/2)
 

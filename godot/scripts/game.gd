@@ -992,7 +992,7 @@ func _process(delta: float) -> void:
 	if not paused: mechanics.animate(dt)
 	fx.set_frozen(paused)
 	if not paused: fx.update(delta)
-	weather.update(delta, hole_position, paused)
+	weather.update(delta, hole_position, paused, radius if mode in ["playing", "paused", "revive"] else 0.0)
 	rim_shader.set_shader_parameter("clock", elapsed)
 	shaft_shader.set_shader_parameter("clock", elapsed)
 	if mode != "customize": fx.move_trail(hole_position, playing and not paused and move_direction().length() > 0.05, radius)
@@ -1547,7 +1547,8 @@ func update_hud() -> void:
 	var guarding: bool = mechanics.shield_up() and mechanics.mascot != null
 	hud.guardian_max = mechanics.mascot.HP if guarding else 0
 	hud.guardian_hp = mechanics.mascot.hp if guarding else 0
-	hud.minimap = minimap_data()
+	# Fog hides the map: only the patch around the saucer shows where to go.
+	hud.minimap = {} if level.weather == "fog" else minimap_data()
 	hud.revive_left = revive_left
 	hud.revive_seconds = int(Ads.REVIVE_SECONDS)
 	hud.can_double = can_double()

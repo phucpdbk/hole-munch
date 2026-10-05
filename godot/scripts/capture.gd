@@ -101,6 +101,18 @@ func run(game, campaign_mode: bool) -> void:
 			await snapshot("mascot-%02d-%s-attack" % [index+1, g.level.boss])
 		g.get_tree().quit()
 		return
+	# Rain, fog (veil and hidden minimap), snow and storm mid-round (`--weather-capture`).
+	if "--weather-capture" in OS.get_cmdline_user_args():
+		for index in [1, 2, 6, 7]:
+			g.load_level(index)
+			g.on_play()
+			g.started = true
+			g.defense.grace = INF
+			for i in 30: g.step(0.02, Vector2(0.4, -0.3))
+			await frames(60)
+			await snapshot("weather-%02d-%s" % [index+1, g.level.weather])
+		g.get_tree().quit()
+		return
 	if "--daily-capture" in OS.get_cmdline_user_args():
 		await daily_preview()
 		g.get_tree().quit()

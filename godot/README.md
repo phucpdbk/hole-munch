@@ -18,6 +18,16 @@ its landmark to conquer it, while dodging independent military defenders.
 - **Map size follows difficulty**: 3×3 blocks at the start, 5×3, then 5×5;
   continent finales use the next size up (5×7 from the fourth continent).
   The boss size comes from the map's own food (3.0–5.6, finales up to 6.2).
+  Blocks around the plaza are 24/31/38 units street to street
+  (`map_layout.gd`) and sparsely built: about a quarter of shop lots stay
+  empty, commercial blocks only front the north and south streets.
+- **Weather** (`weather.gd`): rain and storm add a dense screen layer of
+  streaks (`shaders/precipitation.gdshader`) over 3D drops and ground
+  splashes; snow uses parallax flake layers plus soft 3D flakes. Fog covers
+  the screen with a drifting veil (`shaders/fog_veil.gdshader`) that only
+  clears a small window around the saucer (it widens as the hole grows) and
+  hides the minimap. `-- --capture --weather-capture` shoots rain, fog, snow
+  and storm mid-round.
 - **Timer** = par × 2.3 early, falling to ×1.55 late, never below 45 s early /
   30 s late. Par is how long a real-time greedy route (`smoke.gd`, the same
   food-per-distance choice the rival makes, no clock bonus) needs at player

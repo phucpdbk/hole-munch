@@ -4,6 +4,9 @@ extends RefCounted
 # boss plaza is always the centre block, so both counts must be odd.
 const BLOCK_STEP := 18.0
 const BLOCK_SIZE := 14.8
+# Street-to-street widths of the blocks around the plaza. Wide blocks with
+# sparse buildings (city_blocks.gd) leave the hole room to steer between bites.
+const DISTRICT_WIDTHS: Array[float] = [24.0, 31.0, 38.0]
 
 var cols := 3
 var rows := 3
@@ -54,8 +57,8 @@ func vary_districts(seed_value: int) -> void:
 static func district_streets(count: int, seed_value: int) -> Array[float]:
 	var result: Array[float] = [-9.0,9.0]
 	for i in count/2:
-		result.push_front(result[0]-[20.0,26.0,32.0][(seed_value+i)%3])
-		result.append(result[-1]+[20.0,26.0,32.0][(seed_value+i+1)%3])
+		result.push_front(result[0]-DISTRICT_WIDTHS[(seed_value+i)%3])
+		result.append(result[-1]+DISTRICT_WIDTHS[(seed_value+i+1)%3])
 	return result
 
 func block_size(x: float, z: float) -> Vector2:
