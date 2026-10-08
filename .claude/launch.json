@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["--yes", "http-server", "godot/builds/web", "-p", "8765", "-c-1", "--silent"],
       "port": 8765
+    },
+    {
+      "name": "catalog",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["godot/tools/catalog/serve.js"],
+      "port": 8766
     }
   ]
 }

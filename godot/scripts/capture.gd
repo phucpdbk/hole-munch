@@ -42,6 +42,11 @@ func run(game, campaign_mode: bool) -> void:
 		await guardian_preview()
 		g.get_tree().quit()
 		return
+	# Review page of every city: shots plus landmark, guardian and weather data.
+	if "--catalog" in OS.get_cmdline_user_args():
+		await preload("res://scripts/catalog_capture.gd").new().run(g, self)
+		g.get_tree().quit()
+		return
 	# Menu shot of every campaign landmark, to review Meshy bakes side by side.
 	if "--landmark-gallery" in OS.get_cmdline_user_args():
 		for index in g.Campaign.level_count():

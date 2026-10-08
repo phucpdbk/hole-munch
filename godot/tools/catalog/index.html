@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hole Munch Catalog</title>
+<!-- Review page for every campaign city. Copied next to catalog.js and the shots by
+     `-- --capture --catalog` (scripts/catalog_capture.gd); opens straight from disk.
+     Notes and verdicts stay in this browser's localStorage; Export copies them. -->
+<style>
+:root {
+  --bg: #f4f2ec; --panel: #ffffff; --ink: #1d2430; --muted: #6a7280; --line: #dedad0;
+  --accent: #6c4fd8; --chip: #efedf7; --keep: #2e8b57; --change: #d9822b; --redo: #c0392b;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #14171d; --panel: #1d222b; --ink: #e8eaee; --muted: #9aa3b0; --line: #2d3440;
+    --accent: #a993ff; --chip: #262c38; --keep: #5cc48a; --change: #f0a35a; --redo: #ef6b5b; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, "Segoe UI", sans-serif; }
+header { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); padding: 12px 16px; }
+h1 { font-size: 18px; margin: 0 0 8px; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+h1 small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+select, input[type=search], button, textarea { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+input[type=search] { min-width: 180px; flex: 1 1 180px; max-width: 280px; }
+button { cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.count { color: var(--muted); margin-left: auto; }
+main { padding: 16px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+.card[data-verdict=keep] { border-color: var(--keep); }
+.card[data-verdict=change] { border-color: var(--change); }
+.card[data-verdict=redo] { border-color: var(--redo); }
+.hero { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; cursor: zoom-in; background: var(--chip); }
+.thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; background: var(--line); border-top: 2px solid var(--line); }
+.thumbs button { padding: 0; border: 0; border-radius: 0; position: relative; background: var(--chip); }
+.thumbs img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; opacity: .55; }
+.thumbs button.on img, .thumbs button:hover img { opacity: 1; }
+.thumbs span { position: absolute; left: 4px; bottom: 3px; font-size: 10.5px; color: #fff; text-shadow: 0 1px 2px #000; }
+.body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.title { display: flex; gap: 8px; align-items: baseline; }
+.title b { font-size: 15px; }
+.num { color: var(--muted); font-variant-numeric: tabular-nums; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag { background: var(--chip); border-radius: 999px; padding: 1px 8px; font-size: 12px; white-space: nowrap; }
+.tag.meshy { background: var(--accent); color: #fff; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 1px; border: 1px solid rgba(0,0,0,.15); }
+dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0; font-size: 12.5px; }
+dt { color: var(--muted); }
+dd { margin: 0; }
+.review { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
+.verdicts { display: flex; gap: 4px; }
+.verdicts button { flex: 1; padding: 4px; font-size: 12px; }
+.verdicts button.on[data-v=keep] { background: var(--keep); border-color: var(--keep); color: #fff; }
+.verdicts button.on[data-v=change] { background: var(--change); border-color: var(--change); color: #fff; }
+.verdicts button.on[data-v=redo] { background: var(--redo); border-color: var(--redo); color: #fff; }
+textarea { width: 100%; min-height: 48px; resize: vertical; font-size: 13px; }
+#zoom { position: fixed; inset: 0; background: rgba(0,0,0,.85); display: none; align-items: center; justify-content: center; z-index: 10; cursor: zoom-out; flex-direction: column; gap: 8px; }
+#zoom.open { display: flex; }
+#zoom img { max-width: 96vw; max-height: 88vh; border-radius: 8px; }
+#zoom p { color: #fff; margin: 0; }
+.empty { padding: 40px 16px; color: var(--muted); }
+@media (max-width: 420px) { main { grid-template-columns: 1fr; padding: 12px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Catalog các màn <small id="meta"></small></h1>
+  <div class="filters">
+    <input type="search" id="q" placeholder="Tìm thành phố, địa danh…">
+    <select id="f-region"><option value="">Mọi châu lục</option></select>
+    <select id="f-weather"><option value="">Mọi thời tiết</option></select>
+    <select id="f-guardian"><option value="">Linh thú: tất cả</option><option value="animated">Meshy (animated)</option><option value="static">Meshy (static)</option><option value="primitive">Primitive</option></select>
+    <select id="f-landmark"><option value="">Địa danh: tất cả</option><option value="meshy">Meshy</option><option value="toy">Toy</option></select>
+    <select id="f-attack"><option value="">Mọi đòn</option></select>
+    <select id="f-verdict"><option value="">Mọi đánh giá</option><option value="none">Chưa đánh giá</option><option value="keep">Giữ</option><option value="change">Chỉnh</option><option value="redo">Làm lại</option></select>
+    <button id="export" class="primary" title="Copy ghi chú dạng Markdown">Export ghi chú</button>
+    <span class="count" id="count"></span>
+  </div>
+</header>
+<main id="grid"></main>
+<div id="zoom"><img alt=""><p></p></div>
+<script src="catalog.js"></script>
+<script>
+(function () {
+  const data = window.CATALOG;
+  const grid = document.getElementById('grid');
+  if (!data) { grid.innerHTML = '<p class="empty">Không thấy catalog.js — chạy <code>-- --capture --catalog</code> trước.</p>'; return; }
+  const KEY = 'holemunch-catalog-notes';
+  const VERDICTS = { keep: 'Giữ', change: 'Chỉnh', redo: 'Làm lại' };
+  const SHOTS = [['landmark', 'Địa danh + linh thú'], ['guardian', 'Linh thú cận cảnh'], ['menu', 'Menu']];
+  let notes = {};
+  try { notes = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { notes = {}; }
+  const saveNotes = () => { try { localStorage.setItem(KEY, JSON.stringify(notes)); } catch (e) { /* private window */ } };
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const swatches = list => list.map(c => `<span class="swatch" style="background:#${esc(c)}"></span>`).join('');
+  const levels = data.levels;
+  document.getElementById('meta').textContent = `${levels.length} màn · chụp ${data.generated}`;
+
+  const fill = (id, values) => {
+    const select = document.getElementById(id);
+    [...new Map(values).entries()].forEach(([value, label]) => select.add(new Option(label, value)));
+  };
+  fill('f-region', levels.map(l => [l.region, l.region_name]));
+  fill('f-weather', levels.map(l => [l.weather, l.weather_name]));
+  fill('f-attack', levels.map(l => [l.guardian.attack, l.guardian.attack]));
+
+  function card(l) {
+    const n = notes[l.boss] || {};
+    const g = l.guardian;
+    const f = l.features;
+    const shots = SHOTS.filter(([key]) => l.shots[key]).map(([key, label]) => [l.shots[key], label]);
+    const caption = label => `#${l.number} ${esc(l.city)} · ${esc(label)}`;
+    return `<article class="card" data-boss="${esc(l.boss)}" data-verdict="${esc(n.verdict || '')}">
+      <img class="hero" loading="lazy" src="${esc(shots[0][0])}" alt="${esc(shots[0][1])}" data-caption="${caption(shots[0][1])}">
+      <div class="thumbs">${shots.map(([src, label], i) => `<button class="${i ? '' : 'on'}" data-src="${esc(src)}" data-caption="${caption(label)}"><img loading="lazy" src="${esc(src)}" alt="${esc(label)}"><span>${esc(label)}</span></button>`).join('')}</div>
+      <div class="body">
+        <div class="title"><span class="num">#${l.number}</span><b>${esc(l.landmark)}</b><span class="num">${esc(l.city)}</span></div>
+        <div class="tags">
+          <span class="tag">${esc(l.region_name)}</span>
+          <span class="tag">☁ ${esc(l.weather_name)}</span>
+          <span class="tag ${l.landmark_source === 'meshy' ? 'meshy' : ''}">Địa danh: ${esc(l.landmark_source)}</span>
+          <span class="tag ${g.source !== 'primitive' ? 'meshy' : ''}">Linh thú: ${esc(g.source)}</span>
+          ${l.rival ? '<span class="tag">Rival</span>' : ''}
+        </div>
+        <dl>
+          <dt>Linh thú</dt><dd>${swatches(g.colors)} ${esc(g.archetype)} · đòn ${esc(g.attack)} · ${esc(g.accessory)} · r=${g.radius}</dd>
+          <dt>Bản đồ</dt><dd>${l.cols}×${l.rows} · ${l.seconds}s (par ${l.par}s) · boss r=${l.boss_radius} · ăn ${Math.round(l.share * 100)}%</dd>
+          <dt>Tính năng</dt><dd>vàng ${f.gold} · chắn ${f.barriers} · hẻm ${f.shortcuts} · nguy hiểm ${f.danger}</dd>
+          <dt>Phố</dt><dd>${swatches(l.city_style.walls)} ${esc(l.city_style.style)} · cao tầng ${Math.round(l.city_style.towers * 100)}% (${esc(l.city_style.tower.join('/'))})</dd>
+          <dt>Mục tiêu</dt><dd>${l.goals.map(esc).join(' · ')}</dd>
+        </dl>
+        <div class="review">
+          <div class="verdicts">${Object.entries(VERDICTS).map(([v, label]) => `<button data-v="${v}" class="${n.verdict === v ? 'on' : ''}">${label}</button>`).join('')}</div>
+          <textarea placeholder="Ghi chú: nên đổi gì?">${esc(n.text || '')}</textarea>
+        </div>
+      </div>
+    </article>`;
+  }
+
+  const val = id => document.getElementById(id).value;
+  function render() {
+    const q = val('q').trim().toLowerCase();
+    const shown = levels.filter(l => {
+      const n = notes[l.boss] || {};
+      if (q && !`${l.city} ${l.landmark} ${l.boss}`.toLowerCase().includes(q)) return false;
+      if (val('f-region') && l.region !== val('f-region')) return false;
+      if (val('f-weather') && l.weather !== val('f-weather')) return false;
+      if (val('f-guardian') && l.guardian.source !== val('f-guardian')) return false;
+      if (val('f-landmark') && !l.landmark_source.startsWith(val('f-landmark'))) return false;
+      if (val('f-attack') && l.guardian.attack !== val('f-attack')) return false;
+      const verdict = val('f-verdict');
+      if (verdict && (verdict === 'none' ? n.verdict : n.verdict !== verdict)) return false;
+      return true;
+    });
+    grid.innerHTML = shown.length ? shown.map(card).join('') : '<p class="empty">Không có màn nào khớp bộ lọc.</p>';
+    document.getElementById('count').textContent = `${shown.length}/${levels.length} màn`;
+  }
+
+  const note = boss => (notes[boss] = notes[boss] || {});
+  grid.addEventListener('click', e => {
+    const thumb = e.target.closest('.thumbs button');
+    if (thumb) {
+      const hero = thumb.closest('.card').querySelector('.hero');
+      hero.src = thumb.dataset.src;
+      hero.dataset.caption = thumb.dataset.caption;
+      thumb.parentElement.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === thumb));
+      return;
+    }
+    const img = e.target.closest('.hero');
+    if (img) {
+      const zoom = document.getElementById('zoom');
+      zoom.querySelector('img').src = img.src;
+      zoom.querySelector('p').textContent = img.dataset.caption;
+      zoom.classList.add('open');
+      return;
+    }
+    const button = e.target.closest('.verdicts button');
+    if (!button) return;
+    const cardEl = button.closest('.card');
+    const entry = note(cardEl.dataset.boss);
+    entry.verdict = entry.verdict === button.dataset.v ? '' : button.dataset.v;
+    saveNotes();
+    cardEl.dataset.verdict = entry.verdict;
+    cardEl.querySelectorAll('.verdicts button').forEach(b => b.classList.toggle('on', b.dataset.v === entry.verdict));
+  });
+  grid.addEventListener('input', e => {
+    if (e.target.tagName !== 'TEXTAREA') return;
+    note(e.target.closest('.card').dataset.boss).text = e.target.value;
+    saveNotes();
+  });
+  document.getElementById('zoom').addEventListener('click', e => e.currentTarget.classList.remove('open'));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('zoom').classList.remove('open'); });
+  document.querySelectorAll('.filters select, #q').forEach(el => el.addEventListener('input', render));
+
+  document.getElementById('export').addEventListener('click', async e => {
+    const lines = levels.filter(l => notes[l.boss] && (notes[l.boss].verdict || notes[l.boss].text)).map(l => {
+      const n = notes[l.boss];
+      return `- #${l.number} ${l.city} · ${l.landmark} (${l.boss}) — ${VERDICTS[n.verdict] || 'chưa đánh giá'}${n.text ? ': ' + n.text.replace(/\n+/g, ' / ') : ''}`;
+    });
+    const text = lines.length ? lines.join('\n') : '(chưa có ghi chú)';
+    try { await navigator.clipboard.writeText(text); e.target.textContent = `Đã copy ${lines.length} dòng`; }
+    catch (err) { window.prompt('Copy ghi chú:', text); }
+    setTimeout(() => { e.target.textContent = 'Export ghi chú'; }, 2000);
+  });
+  render();
+})();
+</script>
+</body>
+</html>

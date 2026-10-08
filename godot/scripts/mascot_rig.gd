@@ -8,11 +8,14 @@ extends Node3D
 #   2. A Meshy model without a skeleton: the whole body bobs, leans, squashes and
 #      jumps, which works for any shape (four-legged guardians included).
 #   3. The toy primitive rig from mascot_specs.gd, whose limb pivots also swing.
-# Every model is normalised to a one-unit footprint standing on y = 0, facing +z,
-# and the game scales this node to the guardian's swallow radius.
+# Every model stands on y = 0 facing +z at the toy rig's size, and the game
+# scales this node to the guardian's swallow radius.
 const MascotSpecs = preload("res://scripts/mascot_specs.gd")
 const MODEL_DIR := "res://assets/mascots/"
-const FOOTPRINT := 1.0
+# The toy primitives are about two units tall and two across, so Meshy models are
+# scaled to that height; wide ones (wings, tails) are capped at MAX_WIDTH.
+const HEIGHT := 2.0
+const MAX_WIDTH := 2.4
 const DEFAULT_CLIPS := {"idle":"idle", "walk":"walk", "run":"run", "attack":"attack", "hit":"hit", "leap":"leap"}
 # Per-landmark fixes for hand-made models: {"id": {"walk":"Walking", "yaw":180}}.
 const CLIP_OVERRIDES := {}
@@ -71,11 +74,11 @@ func build_meshy(model: Node3D, id: String) -> void:
 		var wanted := str(settings.get(state, DEFAULT_CLIPS[state]))
 		if player.has_animation(wanted): clips[state] = wanted
 
-# Scale the model to a one-unit footprint and stand it on the ground, centred.
+# Scale the model to the toy rig's height and stand it on the ground, centred.
 func normalise(holder: Node3D, model: Node3D) -> void:
 	var box := bounds(model, Transform3D.IDENTITY)
-	if box.size.x <= 0.0 or box.size.z <= 0.0: return
-	var scale_value := FOOTPRINT/maxf(box.size.x, box.size.z)
+	if box.size.y <= 0.0 or box.size.x <= 0.0 or box.size.z <= 0.0: return
+	var scale_value := minf(HEIGHT/box.size.y, MAX_WIDTH/maxf(box.size.x, box.size.z))
 	model.scale = Vector3.ONE*scale_value
 	var centre := box.get_center()*scale_value
 	model.position = Vector3(-centre.x, -box.position.y*scale_value, -centre.z)

@@ -54,8 +54,14 @@ its landmark to conquer it, while dodging independent military defenders.
   and Sydney have Meshy guardians (`assets/mascots/<id>.scn`, auto-rigged,
   clips idle/walk/run/attack = Charged Spell Cast/hit/leap = Jump Attack via
   `tools/meshy/meshy.mjs mascots rig --actions idle=0,attack=125,hit=178,leap=86`,
-  baked by `tools/bake_mascots.gd`); the rest keep the toy rig.
-  `--mascot-capture --levels=0,4` shoots chosen cities.
+  baked by `tools/bake_mascots.gd`, scaled to the toy rig's two-unit height);
+  the rest keep the toy rig. `--mascot-capture --levels=0,4` shoots chosen cities.
+- **Level catalog** (`catalog_capture.gd`): `-- --capture --catalog` (optional
+  `--levels=0,4`) shoots every city (landmark with its guardian, guardian close
+  up, menu) into `test-output/catalog/` with each city's landmark, guardian,
+  weather, map and goal data. Review it with `node godot/tools/catalog/serve.js`
+  (http://localhost:8766): filters, a keep/change/redo verdict and notes per
+  city (kept in the browser), and Export copies the notes as Markdown.
 - **Ads** (`ads.gd`): a rewarded ad can add 15 s once per campaign round, only
   when time runs out with the hole at least 60% of the way to the landmark
   (6 s offer, then it gives up by itself); a result with coins can be doubled
