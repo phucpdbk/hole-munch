@@ -124,6 +124,33 @@ its landmark to conquer it, while dodging independent military defenders.
 - **Defence scales per continent** (`defense.gd`): warnings shrink from 1.25 s
   to 0.8 s, up to 5 simultaneous shots, opening grace drops from 8 s to 0,
   later gunners lead a moving hole, and each hit also shrinks the hole by 6%.
+- **National forces** (`army_forces.gd`, `army.gd`, `army_visual.gd`,
+  `army_models.gd`): every city fields its country's own force at the inner
+  crossings (not next to a roadblock), in place of the old tank-and-rifle
+  squads. About 30 countries each have their own colours (police uniform and cap band,
+  patrol car livery: stripe, two-tone or checker, light bar; soldier camo,
+  helmet, vehicle paint, one flag accent; no real insignia). The force grows
+  by city: police only (cities 1-2), then soldiers and a missile truck, rocket
+  troops (6+), flak guns (9+), tanks (17+), up to 18 soldiers, 7 rocket
+  troops, 3 missile trucks, 2 flak guns and 2 tanks. Every weapon shoots the
+  saucer, never the ground, with its own dodge: rifle bursts at where it is
+  (keep moving), slow rockets and tank rounds aimed a little ahead (sidestep),
+  flak aimed fully ahead that bursts in the air (turn), and the missile lock:
+  a saucer that stays below 1.2 u/s near a truck for 2.0 s (1.0 s late) gets a
+  red reticle and "LOCKED ON"; still after another 1.2 s (0.6 s late) a homing
+  missile flies in and always lands (a reel plus a second shrink). Damage
+  points drain over time; 10 reel the saucer like a defence blast. Guns share
+  the opening grace and hold fire while a guardian clings. Units are edible
+  (foot units from the start). `-- --capture --army-capture [--levels=0,8]`
+  shoots a volley, the lock and the missile per city;
+  `--script tools/check_army.gd` checks rosters, liveries and every weapon.
+  Vietnam's police and soldiers are Meshy characters (`army_soldiers.gd`,
+  `assets/soldiers/vn_police.scn`, `vn_soldier.scn`; `tools/meshy/meshy.mjs
+  soldiers all`, then `tools/bake_mascots.gd -- soldiers`): rigged, 3k triangles,
+  512 px textures, a rifle on the right-hand bone; they stand `alert`, hold the
+  first frame of `aim` while the saucer is in reach and play `panic` when the
+  hole is within 1.6 units. Other countries keep the primitive toy units.
+  `--script tools/preview_soldiers.gd` (windowed) writes a clip contact sheet.
 - **Landmark counter-attack** (from city 5): once the hole reaches 80% of the
   size it needs, the landmark fires volleys around it and a hidden squad of
   three rolls in from the map edge.

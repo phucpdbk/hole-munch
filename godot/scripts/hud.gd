@@ -90,6 +90,8 @@ var levels_button: BaseButton
 var styles_button: BaseButton
 var strike_shapes: Array = []
 var defense_status := ""
+# Missile lock on the saucer: {center, radius, progress 0..1} in screen pixels, or {}.
+var lock_reticle: Dictionary = {}
 var mode := "menu"
 var last_layout_mode := ""
 var score := 0
@@ -373,6 +375,25 @@ func draw_portrait_menu() -> void:
 	UiStyle.text(self, level_line(), Vector2(w/2, h-214), 15, MUTED, true, 0, body_font)
 	UiStyle.text(self, I18n.t("eat_then_take", boss_title), Vector2(w/2, h-188), 15, LIGHT, true, 0, body_font)
 
+# Missile lock: four red brackets close in on the saucer as the lock fills,
+# spinning and blinking faster near the end, with the fill drawn as an arc.
+func draw_lock(lock: Dictionary) -> void:
+	var center: Vector2 = lock.center
+	var progress: float = lock.progress
+	var now := Time.get_ticks_msec()/1000.0
+	var radius: float = maxf(26.0, lock.radius)*lerpf(2.0, 1.05, progress)
+	var blink := 0.55 + 0.45*absf(sin(now*lerpf(6.0, 18.0, progress)))
+	var red := Color(1.0, 0.18, 0.14, blink)
+	var spin := now*lerpf(1.0, 4.0, progress)
+	for k in 4:
+		var a := spin + k*PI/2
+		var corner := center + Vector2(cos(a), sin(a))*radius
+		var along := Vector2(cos(a + PI*0.75), sin(a + PI*0.75))*radius*0.35
+		var across := Vector2(cos(a - PI*0.75), sin(a - PI*0.75))*radius*0.35
+		draw_polyline(PackedVector2Array([corner + along, corner, corner + across]), red, 5.0, true)
+	draw_arc(center, radius*0.62, -PI/2, -PI/2 + TAU*progress, 40, Color(1.0, 0.25, 0.2, 0.9), 4.0, true)
+	draw_circle(center, 5.0, red)
+
 func draw_playing() -> void:
 	var w := size.x
 	var h := size.y
@@ -381,6 +402,7 @@ func draw_playing() -> void:
 		var outline: PackedVector2Array = strike.points.duplicate()
 		outline.append(outline[0])
 		draw_polyline(outline, Color("ff7866"), 3.0, true)
+	if not lock_reticle.is_empty(): draw_lock(lock_reticle)
 	if defense_status != "":
 		panel(Rect2(w/2+24, 36, 230, 40), Color("3b2836ed"), 14)
 		text_at(defense_status, Vector2(w/2+139, 62), 15, Color("ffbb9c"), true)

@@ -4,8 +4,17 @@
 //   mascots   -> assets/mascots_src/<id>.glb plus <id>@<clip>.glb animations after
 //                "rig" (Meshy auto-rigging + animation library; bake: tools/bake_mascots.gd)
 //   crafts    -> assets/crafts_src/<index>.glb  (bake: tools/bake_crafts.gd)
+//   soldiers  -> assets/soldiers_src/<id>.glb plus <id>@<clip>.glb after "rig" (army foot units;
+//                bake: tools/bake_mascots.gd soldiers)
 // Prompts live in tools/meshy/<kind>.json. Resumable: finished steps are kept in
 // each output folder's manifest.json, so re-running only does what is missing.
+//
+// Keys: tools/meshy/keys.local.json ({"acc1": "msy_...", "acc2": "msy_..."}, git-ignored;
+// see keys.example.json), else $env:MESHY_API_KEY. Each run reads every account's
+// balance; a new item starts on the first account with credits for its whole chain
+// (image -> model -> rig) and stays pinned to it, because later steps reuse that
+// account's task ids. An account that runs dry before an item starts is skipped.
+//   node tools/meshy/meshy.mjs crafts balance                           # credits per account
 //
 //   $env:MESHY_API_KEY = "msy_..."
 //   node tools/meshy/meshy.mjs mascots images --only onepillar,namsan   # review PNGs first
@@ -36,11 +45,26 @@ const KINDS = {
 			"three-quarter view from front-right slightly above, plain white background, no text overlay, game asset",
 	},
 	// Auto-rigging needs a two-legged character with clear limbs, facing the camera.
+	// The game draws fire, water and lightning itself (mascot_attacks.gd); an effect
+	// in the image gets baked into the mesh and sticks to the mouth or hands forever.
 	mascots: {
 		out: "mascots_src", polycount: 10000, rig: true,
 		style: "chibi toy mascot character, standing upright on two legs in a T-pose with arms spread out to the sides " +
-			"and legs slightly apart, clearly separated arms and legs, chunky simplified shapes, bright soft colors, " +
+			"and legs slightly apart, clearly separated arms and legs, mouth closed, empty open hands, " +
+			"no props, no weapons, no water, fire, smoke, sparks or other effects, chunky simplified shapes, bright soft colors, " +
 			"full body visible and centered, front view facing the camera, plain white background, no text overlay, game asset",
+	},
+	// Army foot units, rigged like the mascots but low-poly (up to two dozen on
+	// screen). No weapon in the image: the game attaches its own gun to the hand.
+	// Clips are fixed library ids (see "library"): idle and alert stances, three
+	// shooting candidates and a panic wave for when the hole closes in.
+	soldiers: {
+		out: "soldiers_src", polycount: 3000, rig: true,
+		actions: { idle: 0, alert: 2, shoot: 98, quickdraw: 232, aim: 585, raise: 334, panic: 291 },
+		style: "chibi toy soldier figure, standing upright on two legs in a T-pose with arms spread out to the sides " +
+			"and legs slightly apart, clearly separated arms and legs, empty open hands, no weapons, no props, no backpack, " +
+			"chunky simplified shapes, big head, bright soft colors, full body visible and centered, front view facing the camera, " +
+			"plain white background, no text overlay, game asset",
 	},
 	crafts: {
 		out: "crafts_src", polycount: 5000,
@@ -54,21 +78,39 @@ const KINDS = {
 const CLIP_PATTERNS = { idle: /idle/i, attack: /attack|punch|slash/i, hit: /hit|damage|hurt/i, leap: /jump/i };
 const RIG_HEIGHT_METERS = 1.2;
 
-const KEY = process.env.MESHY_API_KEY;
+// Estimated credits per step, from past runs (the API only reports some of them);
+// used to pick an account with enough left before an item starts.
+const COSTS = { image: 6, model: 36, rig: 5, clip: 3 };
+const KEYS_FILE = process.env.MESHY_KEYS_FILE ?? join(HERE, "keys.local.json");
+
 const args = process.argv.slice(2);
 const [kindName, command] = args;
 const kind = KINDS[kindName];
 const flag = (name) => args.includes(name);
 const option = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
-const commands = ["images", "models", "all", "status", ...(kind?.rig ? ["rig", "library"] : [])];
+const commands = ["images", "models", "all", "status", "balance", ...(kind?.rig ? ["rig", "library"] : [])];
 if (!kind || !commands.includes(command)) {
-	console.error("Usage: meshy.mjs landmarks|mascots|crafts images|models|all|status [--only id,id] [--redo]");
+	console.error("Usage: meshy.mjs landmarks|mascots|crafts|soldiers images|models|all|status|balance [--only id,id] [--redo]");
 	console.error("       meshy.mjs mascots rig|library [--only id,id] [--redo] [--actions idle=N,attack=N,hit=N,leap=N]");
 	process.exit(1);
 }
-if (!KEY) {
-	console.error("Set MESHY_API_KEY in the environment first.");
+const accounts = await loadAccounts();
+if (!accounts.length) {
+	console.error(`Add keys to ${KEYS_FILE} (see keys.example.json) or set MESHY_API_KEY first.`);
 	process.exit(1);
+}
+
+// [{label, key, available}] in file order; the key itself is never printed or saved.
+async function loadAccounts() {
+	if (existsSync(KEYS_FILE)) {
+		// Notepad and PowerShell may save a byte-order mark first.
+		const keys = JSON.parse((await readFile(KEYS_FILE, "utf8")).replace(/^﻿/, ""));
+		return Object.entries(keys)
+			.filter(([, key]) => typeof key === "string" && key.trim())
+			.map(([label, key]) => ({ label, key: key.trim(), available: 0 }));
+	}
+	const key = process.env.MESHY_API_KEY;
+	return key ? [{ label: "default", key, available: 0 }] : [];
 }
 
 const OUT = join(ASSETS, kind.out);
@@ -100,18 +142,73 @@ async function api(account, method, path, body) {
 			continue;
 		}
 		const text = await response.text();
-		if (!response.ok) throw new Error(`${method} ${path} -> ${response.status}: ${text.slice(0, 300)}`);
+		if (!response.ok) {
+			const error = new Error(`[${account.label}] ${method} ${path} -> ${response.status}: ${text.slice(0, 300)}`);
+			if (response.status === 402) {
+				account.available = 0;
+				error.outOfCredits = true;
+			}
+			throw error;
+		}
 		return JSON.parse(text);
 	}
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function waitFor(endpoint, id, label) {
+async function refreshBalances() {
+	for (const account of accounts) {
+		try {
+			account.available = Number((await api(account, "GET", "/balance")).balance) || 0;
+		} catch (error) {
+			account.available = 0;
+			console.error(`  ${account.label}: balance unavailable (${error.message.split(": ").pop().slice(0, 80)})`);
+		}
+	}
+}
+
+const balances = () => accounts.map((account) => `${account.label}=${account.available}`).join(" ");
+const clipNames = () => Object.keys(kind.actions ?? CLIP_PATTERNS);
+const rigCost = () => COSTS.rig + COSTS.clip * clipNames().length;
+const chainCost = () => COSTS.image + COSTS.model + (kind.rig ? rigCost() : 0);
+// Credits held back this run for items that started a chain on their account.
+const reserved = {};
+
+// Items made before accounts were tracked belong to the first key (the original one).
+function pinnedAccount(id, entry) {
+	const label = entry.account ?? accounts[0].label;
+	const account = accounts.find((candidate) => candidate.label === label);
+	if (!account) throw new Error(`${id}: started on account "${label}", which is not in keys.local.json`);
+	return account;
+}
+
+// A new chain takes the first account with credits for all of it and reserves them.
+function startChain(id, skip = []) {
+	const need = chainCost();
+	const account = accounts.find((candidate) => !skip.includes(candidate) && candidate.available >= need);
+	if (!account) throw new Error(`${id}: no account has ${need} credits left (${balances()})`);
+	account.available -= need;
+	reserved[id] = need;
+	return account;
+}
+
+// A later step stays on the item's account, paid from its reservation or its balance.
+function continueChain(id, entry, cost) {
+	const account = pinnedAccount(id, entry);
+	const held = Math.min(reserved[id] ?? 0, cost);
+	reserved[id] = (reserved[id] ?? 0) - held;
+	if (account.available < cost - held) {
+		throw new Error(`${id}: account "${account.label}" has ${account.available} credits, needs ${cost - held}; top it up or --redo the item`);
+	}
+	account.available -= cost - held;
+	return account;
+}
+
+async function waitFor(account, endpoint, id, label) {
 	const started = Date.now();
 	let lastProgress = -1;
 	while (Date.now() - started < TASK_TIMEOUT_MS) {
-		const task = await api("GET", `/${endpoint}/${id}`);
+		const task = await api(account, "GET", `/${endpoint}/${id}`);
 		if (task.status === "SUCCEEDED") return task;
 		if (task.status === "FAILED" || task.status === "CANCELED") {
 			throw new Error(`${label}: ${endpoint} ${task.status} ${task.task_error?.message ?? ""}`);
@@ -192,20 +289,20 @@ async function makeModel(id) {
 let library;
 async function animationLibrary() {
 	if (library) return library;
-	const response = await api("GET", "/animations/library");
+	const response = await api(accounts[0], "GET", "/animations/library");
 	const list = Array.isArray(response) ? response : response.result ?? response.data ?? response.animations ?? [];
 	library = list.map((entry) => ({ id: entry.action_id ?? entry.id, name: String(entry.name ?? entry.action_name ?? "") }));
 	return library;
 }
 
 async function clipActions() {
-	const chosen = {};
+	const chosen = { ...(kind.actions ?? {}) };
 	for (const pair of (option("--actions") ?? "").split(",").filter(Boolean)) {
 		const [clip, id] = pair.split("=");
 		chosen[clip.trim()] = Number(id);
 	}
 	const entries = await animationLibrary();
-	for (const [clip, pattern] of Object.entries(CLIP_PATTERNS)) {
+	for (const [clip, pattern] of Object.entries(kind.actions ? {} : CLIP_PATTERNS)) {
 		if (chosen[clip] !== undefined) continue;
 		const match = entries.find((entry) => pattern.test(entry.name));
 		if (match) chosen[clip] = match.id;

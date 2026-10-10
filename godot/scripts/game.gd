@@ -28,7 +28,13 @@ const UpdateCheck = preload("res://scripts/update_check.gd")
 const DailyGames = preload("res://scripts/daily_games.gd")
 const MapFeatures = preload("res://scripts/map_features.gd")
 const PlayGames = preload("res://scripts/play_games.gd")
+const SpawnPoints = preload("res://scripts/spawn_points.gd")
 const Notify = preload("res://scripts/notify.gd")
+const Showtime = preload("res://scripts/showtime.gd")
+const StreetEvents = preload("res://scripts/street_events.gd")
+const Army = preload("res://scripts/army.gd")
+const ArmyForces = preload("res://scripts/army_forces.gd")
+const ArmySoldiers = preload("res://scripts/army_soldiers.gd")
 # Seconds a carry-in power from the daily mini-game lasts (time adds seconds).
 const CARRY_SECONDS := 12.0
 const CARRY_TIME := 10.0
@@ -155,6 +161,8 @@ var rim: MeshInstance3D
 var wall: MeshInstance3D
 var defense = preload("res://scripts/defense.gd").new()
 var defense_visual = preload("res://scripts/defense_visual.gd").new()
+var army = Army.new()
+var army_visual = preload("res://scripts/army_visual.gd").new()
 var craft_meshes := {}
 var displayed_craft := -1
 var saucer: MeshInstance3D
@@ -238,12 +246,19 @@ func _ready() -> void:
 	mechanics = Mechanics.new()
 	add_child(mechanics)
 	add_child(defense_visual)
+	add_child(army_visual)
 	daily = DailyGames.new()
 	add_child(daily)
 	fx = Fx.new()
 	add_child(fx)
 	sfx = Sfx.new()
 	add_child(sfx)
+	showtime = Showtime.new()
+	showtime.enabled = not test_mode
+	add_child(showtime)
+	events = StreetEvents.new()
+	events.enabled = not test_mode
+	add_child(events)
 	load_level(campaign.selected)
 	var layer := CanvasLayer.new()
 	add_child(layer)
@@ -374,6 +389,7 @@ func load_level(index: int) -> void:
 	models.foliage = Color(palette[4])
 	models.boss_style = level.boss
 	models.region_style = level.style
+	models.army_look = ArmyForces.look(level)
 	models.city_profile = CityProfiles.profile(level.boss)
 	city_blocks.plan(layout, models.city_profile, has_farms(), 4819 + campaign.selected*137 + 1)
 	features.plan(layout, city_blocks.districts, campaign.selected, 4819 + campaign.selected*137 + 11, SPAWN)
@@ -538,17 +554,12 @@ func make_city() -> void:
 	features.build(self, rng)
 	make_zone_labels()
 	make_opening(rng)
-	# Small squads guard the central plaza; eat them to silence their attacks.
-	# Which corner each squad starts at changes from city to city.
-	var flip: bool = campaign.selected%2 == 1
-	var swap: bool = campaign.selected%4 >= 2
-	for i in Challenges.defender_count(campaign.selected):
-		var road_x: float = layout.crossings_x[0] if (i%2 == 0) != flip else layout.crossings_x[-1]
-		var road_z: float = layout.crossings_z[-1] if (i < 3) != swap else layout.crossings_z[0]
-		var tank := i%3 == 0
-		var guard := add_item("patrol_tank" if tank else "soldier",Vector3(road_x,0.16,road_z+i*0.5),1.5 if tank else 0.36)
-		guard.defender = true
+	# The country's own force (army_forces.gd) holds the crossings; eat its
+	# units to silence them.
+	ArmyForces.place(self, ArmyForces.force(level))
+	ArmySoldiers.dress(self, ArmyForces.country(level), models.army_look)
 	make_reinforcements()
+	events.build(self)
 	make_boss()
 	mechanics.setup(self, is_landmark(), 4819 + campaign.selected*137 + 7)
 
@@ -723,8 +734,10 @@ func set_item_transform(item: Dictionary) -> void:
 # The landmark model is built at MODEL_BOSS and the guardian mascot at one unit.
 func model_scale(item: Dictionary) -> float:
 	if item.get("is_boss", false): return boss_radius/MODEL_BOSS
-	if item.has("node"): return item.radius
-	return 1.0
+	# Army units swell for a beat when they fire.
+	var kick := 1.0 + float(item.get("kick", 0.0))*Army.KICK
+	if item.has("node"): return item.radius*kick
+	return kick
 
 func set_item_basis(item: Dictionary, basis: Basis, visible := true) -> void:
 	var transform := Transform3D(basis, item.position)
@@ -891,6 +904,7 @@ func reset_stats() -> void:
 # the far corner, a little faster on later continents.
 func reset_hazards() -> void:
 	defense.reset(items, not is_landmark(), campaign.selected, 1 if run_kind == "daily" else 0)
+	army.reset(items, ArmyForces.force(level))
 	if not is_instance_valid(rival): return
 	var region := int(level.region) + (1 if run_kind == "daily" else 0)
 	var speed := RIVAL_SPEED + region*RIVAL_SPEED_STEP
@@ -1074,8 +1088,19 @@ func step(dt: float, input: Vector2) -> void:
 	if input.length() > 0.05: started = true
 	animate_world(dt)
 	if not started: return
+	if showtime.busy():
+		conquest_step(dt)
+		return
 	if defense.update(dt,hole_position,campaign.selected,hole_velocity): take_hit()
-	remaining = maxf(0, remaining-dt)
+	# Army guns shoot at the saucer itself; they share the opening grace and
+	# hold fire while the player taps a clinging guardian loose.
+	var hold: bool = defense.grace > 0 or mechanics.guardian_clinging()
+	if army.update(dt, saucer.position, hole_velocity, saucer.scale.x*1.3, hold): army_hit()
+	if army.pinged: saucer_wobble = maxf(saucer_wobble, 0.3)
+	if army.fired and not defense.fired: sfx.play("shot")
+	if army.launched: sfx.play("shot", 0.5)
+	# The clock waits while the player taps a clinging guardian loose.
+	if not mechanics.guardian_clinging(): remaining = maxf(0, remaining-dt)
 	if defense.fired: sfx.play("shot")
 	if remaining <= 10 and remaining > 0 and int(ceil(remaining)) != last_tick:
 		last_tick = int(ceil(remaining))
@@ -1099,9 +1124,18 @@ func step(dt: float, input: Vector2) -> void:
 	update_floaters(dt)
 	update_boss(dt)
 	mechanics.update(self, dt)
+	events.update(self, dt)
 	if run_kind == "daily": daily.update(self, dt)
 	for unit in defense.units:
 		if Traffic.is_active(unit.item): set_item_transform(unit.item)
+	for gunner in army.gunners + army.trucks:
+		if Traffic.is_active(gunner.item): set_item_transform(gunner.item)
+	# Meshy soldiers: alert, aiming while the saucer is in reach, panic up close.
+	for gunner in army.gunners:
+		var unit: Dictionary = gunner.item
+		if not unit.has("node") or not Traffic.is_active(unit): continue
+		var near := Vector2(unit.position.x - hole_position.x, unit.position.z - hole_position.z).length() < radius + 1.6
+		unit.node.animate("panic" if near else "aim" if gunner.engaged else "alert")
 	advance_falls(dt)
 	if magnet_level() > 0: pull_small_items(dt)
 	for item in items:
@@ -1320,7 +1354,7 @@ static func combo_seconds(count: int) -> float:
 	return 0.0
 
 # A hit costs time, breaks the combo and shrinks the hole a little.
-func take_hit() -> void:
+func take_hit(from := Vector3.INF) -> void:
 	remaining = maxf(0,remaining-HIT_SECONDS)
 	combo = 0
 	combo_time = 0.0
@@ -1332,8 +1366,18 @@ func take_hit() -> void:
 	saucer_wobble = 1.0
 	fx.shake = maxf(fx.shake, 0.55)
 	var source: Dictionary = defense.last_hit.get("source", {})
-	var from: Vector3 = source.get("position", hole_position - hole_velocity)
+	if from == Vector3.INF: from = source.get("position", hole_position - hole_velocity)
 	mechanics.knock_back(hole_position - from, HIT_KNOCK)
+
+# Army rounds reel the saucer like a blast; a missile also shrinks the hole a
+# second step and shakes harder.
+func army_hit() -> void:
+	take_hit(army.last_from)
+	if not army.heavy: return
+	target_radius = maxf(float(stats.start_radius), target_radius*HIT_SHRINK)
+	fx.shake = 1.0
+	fx.puff(saucer.position, 1.6, 1.0)
+	sfx.play("rumble")
 
 static func combo_multiplier(count: int) -> float:
 	return 3.0 if count >= 30 else 2.0 if count >= 16 else 1.5 if count >= 8 else 1.0
@@ -1501,7 +1545,7 @@ func growth() -> float:
 
 func run_summary(won: bool) -> Dictionary:
 	return {"won":won, "completion":completion(), "best_combo":best_combo, "remaining":remaining,
-		"hits":defense.hits, "defenders_eaten":defenders_eaten, "rival_eaten":rival_eaten}
+		"hits":defense.hits + army.hits, "defenders_eaten":defenders_eaten, "rival_eaten":rival_eaten}
 
 # --- Daily challenge and endless survival ----------------------------------------
 func begin_special(kind: String, index: int) -> void:
@@ -1618,7 +1662,14 @@ func update_view(dt: float) -> void:
 
 func update_hud() -> void:
 	defense_visual.update(defense,mode in ["playing","paused"])
-	hud.defense_status = "" if run_kind == "daily" else I18n.t("def_hit") if defense.slow > 0 else I18n.t("def_dodge") if not defense.strikes.is_empty() else I18n.t("def_count", defense.active_count())
+	army_visual.update(army, mode in ["playing","paused"] and not showtime.busy())
+	var locked: bool = mode == "playing" and army.lock.progress > 0
+	hud.lock_reticle = {}
+	if locked:
+		var center := camera.unproject_position(saucer.position)
+		var edge := camera.unproject_position(saucer.position + camera.global_basis.x*saucer.scale.x*1.6)
+		hud.lock_reticle = {"center":center, "radius":center.distance_to(edge), "progress":army.lock.progress}
+	hud.defense_status = "" if run_kind == "daily" else I18n.t("def_lock") if locked else I18n.t("def_hit") if defense.slow > 0 else I18n.t("def_dodge") if not defense.strikes.is_empty() else I18n.t("def_count", defense.active_count() + army.active_count())
 	hud.strike_shapes.clear()
 	if mode == "playing":
 		for strike in defense.strikes:

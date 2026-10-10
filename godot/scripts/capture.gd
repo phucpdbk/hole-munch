@@ -162,6 +162,10 @@ func run(game, campaign_mode: bool) -> void:
 		await daily_preview()
 		g.get_tree().quit()
 		return
+	if "--army-capture" in OS.get_cmdline_user_args():
+		await army_preview()
+		g.get_tree().quit()
+		return
 	if "--defense-capture" in OS.get_cmdline_user_args():
 		await defense_preview()
 		g.get_tree().quit()
@@ -272,6 +276,40 @@ func defense_preview() -> void:
 	g.reset_round()
 	assert(g.defense.hits == 0 and g.defense.strikes.is_empty())
 	print("DEFENSE INTEGRATION: telegraph, damage and retry passed")
+
+# National forces (army.gd) round a still saucer: a volley, the missile lock
+# reticle closing and the missile in flight, per city (`--levels=0,8` to pick).
+func army_preview() -> void:
+	var levels: Array = [0, 2, 8, 17, 24, 33, 40]
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--levels="): levels = Array(arg.trim_prefix("--levels=").split(",")).map(func(v): return int(v))
+	for index in levels:
+		g.load_level(index)
+		g.reset_round()
+		g.playing = true; g.mode = "playing"; g.started = true; g.remaining = 99.0
+		g.rival.active = false
+		g.defense.grace = 0.0
+		if g.mechanics.mascot: g.mechanics.mascot.cooldown = INF
+		var anchors: Array = g.items.filter(func(item): return item.get("unit", "") == "missile")
+		if anchors.is_empty(): anchors = g.items.filter(func(item): return item.get("unit", "") == "car")
+		g.hole_position = Vector3(anchors[0].position.x + 4.5, 0, anchors[0].position.z)
+		for gunner in g.army.gunners: gunner.cooldown = randf_range(0.0, 0.8)
+		for frame in 30: await g.get_tree().process_frame
+		await snapshot("army-%02d-volley" % index)
+		if g.army.trucks.is_empty(): continue
+		# Guns quiet so the knock-backs do not keep breaking the lock.
+		for gunner in g.army.gunners: gunner.cooldown = INF
+		for unit in g.defense.units: unit.cooldown = INF
+		for frame in 90: await g.get_tree().process_frame
+		for frame in 300:
+			await g.get_tree().process_frame
+			if g.army.lock.progress > 0.55: break
+		await snapshot("army-%02d-lock" % index)
+		for frame in 200:
+			await g.get_tree().process_frame
+			if g.army.shots.any(func(s): return s.kind == "missile" and s.time > 0.45): break
+		await snapshot("army-%02d-missile" % index)
+		print("ARMY CAPTURE %d %s: units=%d hits=%d" % [index, g.ArmyForces.country(g.level), g.army.active_count(), g.army.hits])
 
 # Gameplay-zoom street views of several landmark cities, hole on a crossing.
 func street_preview() -> void:

@@ -9,15 +9,28 @@ extends SceneTree
 # so mascot_rig.gd plays them by state name with no extra mapping. Textures
 # are shrunk to 1024 px lossy WebP to keep the APK small.
 #   Godot --headless --path . --script res://tools/bake_mascots.gd [-- onepillar namsan]
+# Army foot units (army_soldiers.gd) bake the same way from assets/soldiers_src into
+# assets/soldiers/, with 512 px textures since up to two dozen share the screen:
+#   Godot --headless --path . --script res://tools/bake_mascots.gd -- soldiers [vn_soldier]
 const MeshyBake = preload("res://tools/meshy_bake.gd")
-const SOURCE := "res://assets/mascots_src/"
-const TARGET := "res://assets/mascots/"
-const LOOPING := ["idle", "walk", "run"]
+const LOOPING := ["idle", "walk", "run", "alert", "aim", "shoot", "panic"]
+var SOURCE := "res://assets/mascots_src/"
+var TARGET := "res://assets/mascots/"
+var texture_size: int = MeshyBake.TEXTURE_SIZE
 
 func _initialize() -> void:
+	var ids: Array = Array(OS.get_cmdline_user_args())
+	if not ids.is_empty() and ids[0] == "soldiers":
+		ids.pop_front()
+		SOURCE = "res://assets/soldiers_src/"
+		TARGET = "res://assets/soldiers/"
+		texture_size = 512
+	if ids.is_empty():
+		for file in DirAccess.get_files_at(SOURCE):
+			if file.get_extension() == "glb" and not file.contains("@"): ids.append(file.get_basename())
 	DirAccess.make_dir_recursive_absolute(TARGET)
 	var failed := 0
-	for id in MeshyBake.requested_ids(SOURCE):
+	for id in ids:
 		var error := bake(id)
 		print(id, " : ", error_string(error))
 		if error != OK: failed += 1
@@ -84,10 +97,10 @@ func shrink_textures(node: Node) -> void:
 				material.albedo_texture = compressed(material.albedo_texture.get_image())
 	for child in node.get_children(): shrink_textures(child)
 
-static func compressed(source: Image) -> Texture2D:
+func compressed(source: Image) -> Texture2D:
 	var image := source.duplicate()
 	if image.is_compressed(): image.decompress()
-	if image.get_width() > MeshyBake.TEXTURE_SIZE: image.resize(MeshyBake.TEXTURE_SIZE, MeshyBake.TEXTURE_SIZE, Image.INTERPOLATE_LANCZOS)
+	if image.get_width() > texture_size: image.resize(texture_size, texture_size, Image.INTERPOLATE_LANCZOS)
 	image.generate_mipmaps()
 	var texture := PortableCompressedTexture2D.new()
 	texture.keep_compressed_buffer = true

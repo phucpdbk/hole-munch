@@ -37,6 +37,7 @@ const S := {
 	"endless_city": ["VÔ TẬN · THÀNH PHỐ %d", "ENDLESS · CITY %d", "INFINITO · CIUDAD %d", "INFINITO · CIDADE %d", "SANS FIN · VILLE %d", "TANPA AKHIR · KOTA %d"],
 	"def_hit": ["TRÚNG ĐÒN · CHẬM", "HIT · SLOWED", "IMPACTO · LENTO", "ATINGIDO · LENTO", "TOUCHÉ · RALENTI", "KENA · MELAMBAT"],
 	"def_dodge": ["NÉ VÙNG ĐỎ!", "DODGE THE RED!", "¡ESQUIVA EL ROJO!", "DESVIE DO VERMELHO!", "ÉVITE LE ROUGE !", "HINDARI ZONA MERAH!"],
+	"def_lock": ["BỊ NGẮM! DI CHUYỂN!", "LOCKED ON! MOVE!", "¡FIJADO! ¡MUÉVETE!", "NA MIRA! MEXA-SE!", "VERROUILLÉ ! BOUGE !", "TERKUNCI! BERGERAK!"],
 	"def_count": ["PHÒNG THỦ: %d", "DEFENDERS: %d", "DEFENSORES: %d", "DEFENSORES: %d", "DÉFENSEURS : %d", "PENJAGA: %d"],
 	"hungry": ["ĐANG ĐÓI! ĂN NGAY KẺO CO LẠI", "HUNGRY! EAT OR YOU'LL SHRINK", "¡HAMBRE! COME O ENCOGERÁS", "COM FOME! COMA OU VAI ENCOLHER", "AFFAMÉ ! MANGE OU TU RÉTRÉCIS", "LAPAR! MAKAN ATAU MENGECIL"],
 	"boss_down": ["Đã hạ %s!", "%s is down!", "¡%s cayó!", "%s caiu!", "%s est tombé !", "%s tumbang!"],

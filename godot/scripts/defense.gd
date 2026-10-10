@@ -47,6 +47,8 @@ func reset(items: Array, military_boss: bool, level: int, extra_region := 0) -> 
 	age = 0.0
 	fired = false
 	for item in items:
+		# National forces (army.gd) shoot at the saucer on their own.
+		if item.get("army",false): continue
 		if item.get("defender",false) or (military_boss and item.get("is_boss",false)):
 			add_unit(item)
 

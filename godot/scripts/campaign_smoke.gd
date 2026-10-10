@@ -169,12 +169,14 @@ func check_levels(g) -> void:
 		g.on_play()
 		var info: Dictionary = g.level
 		check(is_equal_approx(g.remaining, float(info.seconds)) and g.boss_radius >= g.MIN_BOSS and g.boss_radius <= g.MAX_BOSS + g.FINALE_BOSS, "level %d config applied (boss %.1f, %ds)" % [i+1, g.boss_radius, info.seconds])
-		# City/prop batches plus bombs, barriers and danger-zone kinds (the guardian has its own node).
-		check(g.batches.size() <= 34, "level %d render batches bounded (%d)" % [i+1, g.batches.size()])
+		# City/prop batches plus bombs, barriers, danger-zone kinds and up to seven
+		# national-force unit kinds (the guardian has its own node).
+		check(g.batches.size() <= 41, "level %d render batches bounded (%d)" % [i+1, g.batches.size()])
 		var wanted: Dictionary = g.MapFeatures.counts(i)
 		var f = g.features
 		check(f.gold_blocks.size() == wanted.gold and f.danger_blocks.size() == wanted.danger and f.shortcuts.size() == wanted.shortcuts \
 			and f.barriers.size() <= wanted.barriers and (wanted.barriers == 0 or f.barriers.size() > 0), "level %d map features (%d gold, %d blocks, %d alleys, %d danger)" % [i+1, f.gold_blocks.size(), f.barriers.size(), f.shortcuts.size(), f.danger_blocks.size()])
+		check_spawns(g, i)
 		var boss_mesh: Mesh = g.batches[g.items[g.boss_index].batch].mesh
 		check(g.is_landmark() and g.minions.is_empty(),"level %d objective is a landmark, never a military unit" % (i+1))
 		check(boss_mesh.get_surface_count() == 1 and boss_mesh.get_aabb().size.y > 1.5, "level %d boss mesh is built" % (i+1))
@@ -489,6 +491,32 @@ func bench_rival(g) -> void:
 			g.step(0.05, Vector2.ZERO)
 			race += 0.05
 		print("BOT %d %.0f %d" % [i, race, g.level.seconds])
+
+# The greedy par route from the drop point farthest from the landmark, against the
+# timer: "SPAWN <level> <route s> <par s> <timer s>".
+func bench_spawns(g) -> void:
+	for i in Campaign.level_count():
+		g.load_level(i)
+		var spots: Array = g.SpawnPoints.candidates(g)
+		spots.sort_custom(func(a, b): return g.SpawnPoints.flat(a.at, g.BOSS_HOME) > g.SpawnPoints.flat(b.at, g.BOSS_HOME))
+		g.reset_round()
+		g.SpawnPoints.place_opening(g, spots[0])
+		for item in g.items: if item.has("opening_origin"): item.position = item.origin
+		g.hole_position = spots[0].at
+		g.playing = true; g.mode = "playing"; g.started = true
+		g.defense.grace = INF
+		g.rival.active = false
+		g.remaining = 300.0
+		var route := 0.0
+		var boss: Dictionary = g.items[g.boss_index]
+		while g.playing and not g.boss_down and route < 300.0:
+			var target: Dictionary = g.Rival.best_target(g.items, boss, g.hole_position, g.radius)
+			if not target.is_empty():
+				var offset := Vector3(target.position.x - g.hole_position.x, 0, target.position.z - g.hole_position.z)
+				g.hole_position += offset.limit_length((5.8 + minf(g.radius, 4.0)*0.45)*float(g.stats.speed)*0.05)
+			g.step(0.05, Vector2.ZERO)
+			route += 0.05
+		print("SPAWN %d %.0f %d %.0f" % [i+1, route, Campaign.PAR_SECONDS[i], g.level.seconds])
 
 func check_panels(g) -> void:
 	g.go_menu()

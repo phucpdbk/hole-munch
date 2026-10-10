@@ -19,6 +19,10 @@ const StreetModels = preload("res://scripts/street_models.gd")
 var city_profile: Dictionary = CityProfiles.profile(CityProfiles.DEFAULT)
 const Landmarks = preload("res://scripts/landmarks.gd")
 const RegionModels = preload("res://scripts/region_models.gd")
+const ArmyModels = preload("res://scripts/army_models.gd")
+const ArmyForces = preload("res://scripts/army_forces.gd")
+# Colours of the city's national force (army_forces.gd), set per level.
+var army_look: Dictionary = ArmyForces.LOOKS.vn
 const Campaign = preload("res://scripts/campaign.gd")
 const FARM_RADIUS = {"cow":1.0,"pig":0.72,"chicken":0.28,"tree_oak":0.72,"fence_simple":0.65,"crops_cornStageD":0.4,"crops_wheatStageB":0.3,"tent_smallOpen":1.6,"pumpkin":0.3}
 
@@ -130,6 +134,9 @@ func toy(kind: String, variant: int = 0) -> ArrayMesh:
 	if kind in ["shop", "tower"]:
 		var street = StreetModels.new(self)
 		cache[key] = bake(street.shop(city_profile, variant) if kind == "shop" else street.tower(city_profile, variant), snow_material)
+		return cache[key]
+	if kind.begins_with("army_"):
+		cache[key] = bake(ArmyModels.new(self).unit(kind.trim_prefix("army_"), army_look))
 		return cache[key]
 	var region = RegionModels.new(self)
 	match kind:
