@@ -108,8 +108,8 @@ var craft := 0
 var skin := 0
 var effect := 0
 var trail := 0
-# Bought looks per slot (indices); journey rewards are owned without being listed.
-var owned := {"skins":[0], "effects":[0], "trails":[0]}
+# Bought looks per slot (indices); index 0 of each slot is free.
+var owned := {"crafts":[0], "skins":[0], "effects":[0], "trails":[0]}
 var best := 0
 var coins := 0
 var upgrades := {}
@@ -126,10 +126,18 @@ var endless := {"best":0, "stage":0}
 var streak := {"count":0, "last":""}
 # The once-a-day reminder (notify.gd); the player can switch it off.
 var reminders := true
+# Sound effects volume, 0 (muted) to 1, set in the language & sound panel.
+var volume := 1.0
 # Intro pages and feature tips already shown (see intro.gd), and the UI language.
 var seen: Array[String] = []
 var lang := ""
 var unlock_all_for_testing := bool(ProjectSettings.get_setting("application_custom/testing/unlock_all_levels", false))
+# Test mode (debug builds, toggled in game.gd): every city open, coins topped up
+# after each purchase, and its own save file so the real progress is untouched.
+const TEST_COINS := 999999
+const SAVE_PATH := "user://prototype_save.json"
+const TEST_SAVE_PATH := "user://test_save.json"
+var test_mode := false
 
 static func level_count() -> int:
 	return REGIONS.size()*CITIES_PER_REGION
@@ -249,6 +257,7 @@ func buy(id: String) -> bool:
 	if coins < cost: return false
 	coins -= cost
 	upgrades[id] += 1
+	top_up()
 	return true
 
 # --- Cosmetic shop (cosmetics.gd) --------------------------------------------
@@ -261,27 +270,29 @@ func cities_taken() -> int:
 func reward_progress(track: String) -> int:
 	return total_stars() if track == "stars" else cities_taken()
 
-func reward_earned(slot: String, index: int) -> bool:
-	var reward := Cosmetics.reward_for(slot, index)
-	return not reward.is_empty() and reward_progress(reward[2]) >= int(reward[3])
-
 func owns(slot: String, index: int) -> bool:
-	return index in owned[slot] or reward_earned(slot, index)
+	return index in owned[slot]
 
 func buy_look(slot: String, index: int) -> bool:
-	if owns(slot, index) or Cosmetics.reward_only(slot, index): return false
+	if owns(slot, index): return false
 	var cost := Cosmetics.price(slot, index)
 	if coins < cost: return false
 	coins -= cost
 	owned[slot] = owned[slot] + [index]
+	top_up()
 	return true
 
 func equipped(slot: String) -> int:
-	return skin if slot == "skins" else effect if slot == "effects" else trail
+	match slot:
+		"crafts": return craft
+		"skins": return skin
+		"effects": return effect
+	return trail
 
 func equip(slot: String, index: int) -> bool:
 	if index < 0 or index >= Cosmetics.count(slot) or not owns(slot, index): return false
-	if slot == "skins": skin = index
+	if slot == "crafts": craft = index
+	elif slot == "skins": skin = index
 	elif slot == "effects": effect = index
 	else: trail = index
 	return true
@@ -311,23 +322,12 @@ func reward_parts(won: bool, stars: int, eaten_points: int, best_combo := 0) -> 
 		"stars":stars*15 if won else 0, "win":10 + selected*2 if won else 0,
 		"multiplier":combo_mul*float(stats().coin_mul)}
 
-# The closest journey reward not earned yet: {slot, index, track, need, have}, or {}.
-func next_journey_reward() -> Dictionary:
-	var best: Dictionary = {}
-	for entry in Cosmetics.REWARDS:
-		var have := reward_progress(entry[2])
-		if have >= int(entry[3]): continue
-		var missing: int = int(entry[3]) - have
-		if best.is_empty() or missing < int(best.need) - int(best.have):
-			best = {"slot":entry[0], "index":entry[1], "track":entry[2], "need":int(entry[3]), "have":have}
-	return best
-
 func data() -> Dictionary:
 	# A temporary preview selection must not become a permanent unlock.
-	return {"version":8, "selected":mini(selected,unlocked), "unlocked":unlocked, "medals":medals, "goals":goals,
+	return {"version":9, "selected":mini(selected,unlocked), "unlocked":unlocked, "medals":medals, "goals":goals,
 		"craft":craft, "skin":skin, "effect":effect, "trail":trail, "owned":owned.duplicate(true), "best":best, "coins":coins, "upgrades":upgrades.duplicate(),
 		"daily":daily.duplicate(), "items":items.duplicate(), "endless":endless.duplicate(), "seen":seen.duplicate(), "lang":lang,
-		"streak":streak.duplicate(), "reminders":reminders}
+		"streak":streak.duplicate(), "reminders":reminders, "volume":volume}
 
 func restore(value: Variant) -> void:
 	if not value is Dictionary: return
@@ -370,9 +370,18 @@ func restore(value: Variant) -> void:
 			var level = saved_upgrades.get(u[0], 0)
 			if level is float or level is int: upgrades[u[0]] = clampi(int(level), 0, u[4])
 	restore_records(value)
-	# Rewards depend on progress, so equipped looks are checked once it is loaded.
+	if int(value.get("version", 0)) < 9: keep_legacy_looks()
+	# Legacy rewards depend on progress, so equipped looks are checked once it is loaded.
 	for slot in Cosmetics.SLOTS:
 		if not owns(slot, equipped(slot)): equip(slot, 0)
+
+# Before version 9 saucers were free and some looks were journey rewards: the
+# saucer in use and every reward already earned stay owned.
+func keep_legacy_looks() -> void:
+	if craft not in owned.crafts: owned.crafts = owned.crafts + [craft]
+	for reward in Cosmetics.LEGACY_REWARDS:
+		if reward_progress(reward[2]) >= int(reward[3]) and reward[1] not in owned[reward[0]]:
+			owned[reward[0]] = owned[reward[0]] + [reward[1]]
 
 # Every look was free before version 6: keep what was equipped as owned. Later
 # saves list bought indices, which must be in range and are never duplicated.
@@ -398,6 +407,7 @@ func restore_owned(value: Dictionary) -> void:
 func restore_settings(value: Dictionary) -> void:
 	if value.get("lang") is String and value.lang in I18n.LANGS: lang = value.lang
 	if value.get("reminders") is bool: reminders = value.reminders
+	if value.get("volume") is float or value.get("volume") is int: volume = clampf(float(value.volume), 0.0, 1.0)
 	var saved_streak = value.get("streak", {})
 	if saved_streak is Dictionary and saved_streak.get("last") is String and saved_streak.last.length() <= 10 \
 			and (saved_streak.get("count") is float or saved_streak.get("count") is int):
@@ -491,8 +501,8 @@ func record_daily(date: String, score: int, won: bool) -> bool:
 
 # --- Daily streak --------------------------------------------------------------
 # A finished daily round (won or not) keeps the streak; skipping a day resets it.
-# Each new day pays coins that grow over a week; every seventh day also gives the
-# first effect not owned yet (or STREAK_WEEK_COINS once all are owned).
+# Each new day pays coins that grow over a week; every seventh day adds
+# STREAK_WEEK_COINS (looks are only ever bought with coins).
 const STREAK_COINS := [20, 30, 40, 50, 60, 80, 120]
 const STREAK_WEEK_COINS := 300
 
@@ -505,19 +515,13 @@ func streak_days(date: String) -> int:
 	return int(streak.count) if streak.last in [date, day_before(date)] else 0
 
 # Called when a daily round ends. Returns {} or the day's streak reward:
-# {"day":n, "coins":c, "effect":index or -1}. Coins are added here.
+# {"day":n, "coins":c}. Coins are added here.
 func advance_streak(date: String) -> Dictionary:
 	if streak.last == date: return {}
 	var count := int(streak.count) + 1 if streak.last == day_before(date) else 1
 	streak = {"count":count, "last":date}
-	var gift := {"day":count, "coins":int(STREAK_COINS[(count-1)%STREAK_COINS.size()]), "effect":-1}
-	if count%STREAK_COINS.size() == 0:
-		for index in Cosmetics.display_order("effects"):
-			if not owns("effects", index) and not Cosmetics.reward_only("effects", index):
-				gift.effect = index
-				break
-		if gift.effect >= 0: owned.effects = owned.effects + [gift.effect]
-		else: gift.coins += STREAK_WEEK_COINS
+	var gift := {"day":count, "coins":int(STREAK_COINS[(count-1)%STREAK_COINS.size()])}
+	if count%STREAK_COINS.size() == 0: gift.coins += STREAK_WEEK_COINS
 	coins += gift.coins
 	return gift
 
@@ -554,9 +558,21 @@ func region_progress(region_index: int) -> int:
 		if medals[region_index*CITIES_PER_REGION+i] > 0: count += 1
 	return count
 
+func save_path() -> String:
+	return TEST_SAVE_PATH if test_mode else SAVE_PATH
+
 func save_progress() -> void:
-	var file := FileAccess.open("user://prototype_save.tmp", FileAccess.WRITE)
+	var path := save_path()
+	var file := FileAccess.open(path + ".tmp", FileAccess.WRITE)
 	if not file: return
 	file.store_string(JSON.stringify(data()))
 	file.close()
-	DirAccess.rename_absolute("user://prototype_save.tmp", "user://prototype_save.json")
+	DirAccess.rename_absolute(path + ".tmp", path)
+
+func enable_test_mode() -> void:
+	test_mode = true
+	unlock_all_for_testing = true
+	top_up()
+
+func top_up() -> void:
+	if test_mode: coins = TEST_COINS

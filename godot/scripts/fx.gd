@@ -27,8 +27,12 @@ const TRAIL_LOOKS := [
 	["star", ["ffffff", "ffd23f"], 0.0, 0.7],
 	["circle", ["ffffff"], -0.8, 1.3],
 	["flame", ["ff6a00", "ff9d1a", "ffd23f"], 1.2, 0.6],
-	["circle", "rainbow", 0.0, 0.9],
+	[],
 ]
+# Fire and rainbow are painted on the ground (ground_trail.gd); fire also sheds a
+# few flames, the rainbow nothing.
+const GROUND_TRAILS := {4:"fire", 5:"rainbow"}
+const GroundTrail = preload("res://scripts/ground_trail.gd")
 
 var puffs: Array[CPUParticles3D] = []
 var next_puff := 0
@@ -40,8 +44,12 @@ var shake := 0.0
 var flash := 0.0
 var trail_particles: CPUParticles3D
 var trail_style := 0
+var ground_trail: MeshInstance3D
 
 func _ready() -> void:
+	ground_trail = GroundTrail.new()
+	ground_trail.top_level = true
+	add_child(ground_trail)
 	for i in PUFFS: puffs.append(make_puff())
 	for i in RINGS: rings.append(make_ring())
 	confetti = make_confetti()
@@ -74,6 +82,7 @@ func configure(effect: int, trail: int, tint: Color) -> void:
 		p.angular_velocity_min = -240 if look[3] else 0
 		p.angular_velocity_max = 240 if look[3] else 0
 	trail_style = clampi(trail, 0, TRAIL_LOOKS.size()-1)
+	ground_trail.configure(GROUND_TRAILS.get(trail_style, ""))
 	var trail_look: Array = TRAIL_LOOKS[trail_style]
 	if not trail_look.is_empty():
 		trail_particles.mesh = look_mesh(trail_look[0])
@@ -138,7 +147,8 @@ func move_trail(at: Vector3, moving: bool, hole_radius: float) -> void:
 	trail_particles.emission_ring_inner_radius = hole_radius*0.75
 	trail_particles.scale_amount_min = 0.6 + hole_radius*0.25
 	trail_particles.scale_amount_max = 1.0 + hole_radius*0.35
-	trail_particles.emitting = moving and trail_style > 0
+	trail_particles.emitting = moving and not TRAIL_LOOKS[trail_style].is_empty()
+	ground_trail.follow(at, moving, hole_radius)
 
 func set_frozen(value: bool) -> void:
 	for child in get_children():
@@ -288,6 +298,7 @@ func clear() -> void:
 			child.emitting = false
 			child.visible = false
 	pending.clear()
+	ground_trail.clear()
 	shake = 0.0
 	flash = 0.0
 	for ring in rings:
@@ -295,6 +306,7 @@ func clear() -> void:
 		ring.node.visible = false
 
 func update(dt: float) -> void:
+	ground_trail.update(dt)
 	shake = maxf(0.0, shake - dt * 1.4)
 	flash = maxf(0.0, flash - dt * 2.5)
 	for ring in rings:

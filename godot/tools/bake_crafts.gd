@@ -12,7 +12,7 @@ const CRAFT_RADIUS := 1.6
 # Crafts are small on screen; keep fewer triangles than a landmark.
 const MIN_TRIANGLES := 1500
 # Per-craft yaw fix (degrees) when Meshy's front does not face the camera (+z).
-const YAW := {}
+const YAW := {"10":-45.0, "11":-45.0}
 
 func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(TARGET)

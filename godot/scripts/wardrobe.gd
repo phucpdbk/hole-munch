@@ -2,13 +2,12 @@ extends Control
 
 # Full-screen panels opened from the menu: the invasion journey (a 3D map per
 # continent, journey_map.gd), the upgrade shop, the hole's wardrobe and the
-# language picker.
+# settings panel (language and sound).
 const Campaign = preload("res://scripts/campaign.gd")
 const UiStyle = preload("res://scripts/ui_style.gd")
 const UiButton = preload("res://scripts/ui_button.gd")
 const I18n = preload("res://scripts/i18n.gd")
 const JourneyMap = preload("res://scripts/journey_map.gd")
-const Fleet = preload("res://scripts/fleet.gd")
 const Cosmetics = preload("res://scripts/cosmetics.gd")
 const LookCard = preload("res://scripts/look_card.gd")
 const WARDROBE_TABS := ["crafts", "skins", "effects", "trails"]
@@ -138,29 +137,24 @@ func build_wardrobe(w: float, h: float) -> void:
 		button("", Rect2(arrows+Vector2(54, 0), Vector2(46, 42)), func(): turn_look_page(1), false, look_page == pages-1, "right")
 
 func look_order() -> Array:
-	return range(Fleet.NAMES.size()) if tab == "crafts" else Cosmetics.display_order(tab)
+	return Cosmetics.display_order(tab)
 
 func turn_look_page(delta: int) -> void:
 	look_page += delta
 	rebuild()
 
-# Button text and state for one card, following the 2D shop: Equipped, Equip,
-# a coin price, or the journey progress for reward-only looks.
+# Button text and state for one card, following the 2D shop: Equipped, Equip or
+# a coin price. Every look, saucers included, is bought with coins.
 func card_state(index: int) -> Dictionary:
 	var campaign = game.campaign
-	var is_equipped: bool = index == (campaign.craft if tab == "crafts" else campaign.equipped(tab))
-	if is_equipped: return {"label":I18n.t("equipped"), "enabled":false, "equipped":true, "icon":"tick"}
-	if tab == "crafts" or campaign.owns(tab, index): return {"label":I18n.t("equip"), "enabled":true, "equipped":false, "icon":""}
-	if Cosmetics.reward_only(tab, index):
-		var reward := Cosmetics.reward_for(tab, index)
-		var label := I18n.t("reward_stars" if reward[2] == "stars" else "reward_landmarks", [campaign.reward_progress(reward[2]), reward[3]])
-		return {"label":label, "enabled":false, "equipped":false, "icon":"lock"}
+	if index == campaign.equipped(tab): return {"label":I18n.t("equipped"), "enabled":false, "equipped":true, "icon":"tick"}
+	if campaign.owns(tab, index): return {"label":I18n.t("equip"), "enabled":true, "equipped":false, "icon":""}
 	var cost := Cosmetics.price(tab, index)
 	return {"label":str(cost), "enabled":campaign.coins >= cost, "equipped":false, "icon":"coin"}
 
 # Tapping an owned look equips it; tapping an affordable one buys and equips it.
 func pick_look(index: int) -> void:
-	if tab != "crafts" and not game.campaign.owns(tab, index):
+	if not game.campaign.owns(tab, index):
 		if not game.campaign.buy_look(tab, index): return
 		game.sfx.play("grow")
 	equip(index)
@@ -181,6 +175,23 @@ func build_language(w: float, h: float) -> void:
 		var rect := Rect2(left + (i%columns)*(cell+16), 130 + (i/columns)*76, cell, 62)
 		var b := button(I18n.NAMES[code], rect, func(): pick_language(code), code == I18n.lang, false, "tick" if code == I18n.lang else "")
 		b.font_size = 20
+	var row := sound_row()
+	var volume: float = game.campaign.volume
+	button("-", Rect2(row.position, Vector2(56, row.size.y)), func(): change_volume(-0.1), false, volume <= 0.0).font_size = 28
+	button("+", Rect2(row.end.x - 56, row.position.y, 56, row.size.y), func(): change_volume(0.1), false, volume >= 1.0).font_size = 28
+
+# The volume stepper sits under the language buttons: [-] speaker + bar [+].
+func sound_row() -> Rect2:
+	var columns := 2 if size.x > size.y else 1
+	var cell := minf(300.0, (size.x - 80)/columns)
+	var width := cell*columns + 16*(columns-1)
+	var rows := ceili(I18n.LANGS.size()/float(columns))
+	return Rect2((size.x - width)/2, 130 + rows*76 + 44, width, 56)
+
+func change_volume(delta: float) -> void:
+	game.set_volume(game.campaign.volume + delta)
+	game.sfx.play("click")
+	rebuild()
 
 func pick_language(code: String) -> void:
 	game.set_language(code)
@@ -193,8 +204,7 @@ func buy(id: String) -> void:
 	rebuild()
 
 func equip(index: int) -> void:
-	if tab == "crafts": game.campaign.craft = index
-	elif not game.campaign.equip(tab, index): return
+	if not game.campaign.equip(tab, index): return
 	game.apply_style()
 	game.persist()
 	preview_time = 1.0
@@ -232,8 +242,22 @@ func _draw() -> void:
 		UiStyle.text(self, str(game.campaign.coins), Vector2(size.x-176, 56), 22, UiStyle.GOLD, false, 0, UiStyle.font(800))
 
 func draw_language() -> void:
-	UiStyle.draw_icon(self, "language", Vector2(52, 62), 48)
-	title_at(I18n.t("lang_title"), Vector2(88, 74))
+	UiStyle.draw_icon(self, "settings", Vector2(52, 62), 44)
+	title_at(I18n.t("settings_title"), Vector2(88, 74))
+	label_at(I18n.t("language"), Vector2(sound_row().position.x, 118), 18, UiStyle.MUTED)
+	var row := sound_row()
+	var volume: float = game.campaign.volume
+	label_at(I18n.t("sound"), row.position + Vector2(0, -12), 18, UiStyle.MUTED)
+	var bar := Rect2(row.position.x + 66, row.position.y, row.size.x - 132, row.size.y)
+	UiStyle.card(self, bar, Color("1f3852"), 16)
+	UiStyle.draw_icon(self, "sound" if volume > 0.0 else "mute", bar.position + Vector2(28, bar.size.y/2), 30)
+	var steps := 10
+	var track := Rect2(bar.position.x + 52, bar.position.y + 20, bar.size.x - 116, 16)
+	var step_w := (track.size.x - (steps-1)*3)/steps
+	for k in steps:
+		var on := k < roundi(volume*steps)
+		draw_style_box(UiStyle.flat(UiStyle.MINT if on else Color("3a5367"), 4), Rect2(track.position.x + k*(step_w+3), track.position.y, step_w, track.size.y))
+	UiStyle.text(self, "%d%%" % roundi(volume*100), Vector2(bar.end.x - 34, bar.position.y + 36), 16, UiStyle.LIGHT, true, 0, UiStyle.font(800))
 
 func draw_shop() -> void:
 	UiStyle.draw_icon(self, "upgrade", Vector2(50, 62), 46)

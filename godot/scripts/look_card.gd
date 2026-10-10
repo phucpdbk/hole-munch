@@ -105,10 +105,24 @@ func draw_craft(center: Vector2) -> void:
 
 func draw_trail(center: Vector2) -> void:
 	var look: Array = Fx.TRAIL_LOOKS[index]
+	if Fx.GROUND_TRAILS.get(index) == "rainbow":
+		draw_rainbow(center)
+		return
 	if look.is_empty():
 		UiStyle.text(self, "Ø", center + Vector2(0, 11), 30, UiStyle.LIGHT, true)
 		return
 	draw_shapes(center, [look[0], look[1]])
+
+# The rainbow sheds no particles (it is painted on the ground), so sketch the
+# band itself: shimmering stripes arcing over the tile.
+func draw_rainbow(center: Vector2) -> void:
+	var stripes: int = Fx.RAINBOW.size()
+	var base := center + Vector2(0, PREVIEW*0.26)
+	var band := 2.6
+	for i in stripes:
+		var r := PREVIEW*0.42 - i*band
+		var colour: Color = Fx.RAINBOW[i].lightened(0.15 + 0.15*sin(clock*3.0 - i*0.6))
+		draw_arc(base, r, PI + 0.12, TAU - 0.12, 24, colour, band + 0.6, true)
 
 # A small cluster of the effect's particle sprites in its own colours.
 func draw_shapes(center: Vector2, look: Array) -> void:

@@ -1,7 +1,13 @@
 extends RefCounted
 
-const NAMES = ["Trinh sát bạc", "Đĩa sao Thổ", "Đĩa tàng hình", "Đĩa hoàng kim", "Đĩa băng lam", "Tên lửa bạc", "Tên lửa đỏ", "Tên lửa đôi"]
-const COLORS = ["77e6dc","b09aff","ffd15c","7cbcff","ff9bbf","78dbe8","ff8974","ffb34c"]
+const NAMES = ["Trinh sát bạc", "Đĩa sao Thổ", "Đĩa tàng hình", "Đĩa hoàng kim", "Đĩa băng lam", "Tên lửa bạc", "Tên lửa đỏ", "Tên lửa đôi",
+	"Đĩa donut", "Phi thuyền bạch tuộc", "Phi thuyền vịt vàng", "Cá voi vũ trụ", "Đĩa pha lê"]
+const COLORS = ["77e6dc","b09aff","ffd15c","7cbcff","ff9bbf","78dbe8","ff8974","ffb34c","ff8fc8","c39bff","ffd84a","7cc8ff","e6f4ff"]
+# Round saucers spin as they hover; rockets and creature-shaped ships keep facing
+# the camera and only sway (game.gd).
+const SPINS = [true, true, true, true, true, false, false, false, true, false, false, false, true]
+# Upright rockets, which the wardrobe thumbnails shrink and lean to fit.
+const ROCKETS = [5, 6, 7]
 var m
 var parts: Array = []
 
@@ -79,4 +85,9 @@ func build(models, index: int) -> ArrayMesh:
 			part("ball",Vector3(0,0.3,0.62),Vector3(0.3,0.3,0.09),"71d6e9")
 			for x in [-1,1]: part("box",Vector3(x*0.7,-0.55,0),Vector3(0.2,0.9,0.75),c,Vector3(0,0,x*-0.35))
 			part("point",Vector3(0,-1.3,0),Vector3(0.4,0.9,0.4),"ffcd66",Vector3(PI,0,0))
+		_:
+			# Later crafts ship as Meshy bakes; this plain saucer only covers a missing bake.
+			part("smooth",Vector3.ZERO,Vector3(1.65,0.22,1.65),"e8ecf2")
+			part("hemi",Vector3(0,0.15,0),Vector3(0.8,0.75,0.8),c)
+			part("ring",Vector3(0,-0.08,0),Vector3(1.55,0.18,1.55),c)
 	return m.bake(parts)

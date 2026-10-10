@@ -204,6 +204,7 @@ func toy(kind: String, variant: int = 0) -> ArrayMesh:
 				for z in [-0.38, 0.38]:
 					parts.append(piece("cylinder", Vector3(x, 0.23, z), Vector3(0.23, 0.14, 0.23), Color("354355"), Vector3(PI/2, 0, 0)))
 			parts.append(piece("box", Vector3(0.77, 0.44, 0), Vector3(0.06, 0.14, 0.58), Color("fff0b3")))
+		"jamcar": parts = jam_vehicle(variant)
 		"person":
 			parts.append(piece("cylinder", Vector3(0, 0.38, 0), Vector3(0.14, 0.4, 0.14), color))
 			parts.append(piece("ball", Vector3(0, 0.7, 0), Vector3(0.16, 0.17, 0.16), Color("efd1b0")))
@@ -224,6 +225,48 @@ func toy(kind: String, variant: int = 0) -> ArrayMesh:
 	cache[key] = bake(parts)
 	if kind in ["house","tree"]: cache[key].surface_set_material(0,snow_material)
 	return cache[key]
+
+# Rush-hour vehicles (street_events.gd), all facing +x like the traffic cars:
+# 0 yellow cab, 1 London black cab, 2 red double-decker, 3 tuk-tuk, 4 school bus.
+func jam_vehicle(variant: int) -> Array:
+	var parts: Array = []
+	var glass := Color("accfd9")
+	var tyre := Color("354355")
+	match variant:
+		2, 4:
+			var paint := Color("d7263d") if variant == 2 else Color("f5b700")
+			var tall := 1.5 if variant == 2 else 1.0
+			parts.append(piece("box", Vector3(0, 0.25 + tall/2, 0), Vector3(2.5, tall, 0.95), paint))
+			for row in (2 if variant == 2 else 1):
+				parts.append(piece("box", Vector3(-0.05, 0.75 + row*0.62, 0), Vector3(2.3, 0.3, 0.97), glass))
+			if variant == 4:
+				parts.append(piece("box", Vector3(0, 0.5, 0), Vector3(2.52, 0.06, 0.97), Color("1c1c1c")))
+				parts.append(piece("box", Vector3(1.4, 0.48, 0), Vector3(0.35, 0.4, 0.85), paint))
+			for x in [-0.8, 0.8]:
+				for z in [-0.45, 0.45]:
+					parts.append(piece("cylinder", Vector3(x, 0.25, z), Vector3(0.28, 0.16, 0.28), tyre, Vector3(PI/2, 0, 0)))
+		3:
+			parts.append(piece("box", Vector3(0, 0.42, 0), Vector3(1.0, 0.5, 0.7), Color("2f9e5b")))
+			parts.append(piece("box", Vector3(-0.05, 0.98, 0), Vector3(1.05, 0.08, 0.78), Color("ffd23f")))
+			for z in [-0.33, 0.33]:
+				parts.append(piece("box", Vector3(-0.4, 0.75, z), Vector3(0.05, 0.5, 0.05), Color("1c1c1c")))
+			parts.append(piece("cylinder", Vector3(0.42, 0.18, 0), Vector3(0.18, 0.1, 0.18), tyre, Vector3(PI/2, 0, 0)))
+			for z in [-0.32, 0.32]:
+				parts.append(piece("cylinder", Vector3(-0.32, 0.18, z), Vector3(0.18, 0.1, 0.18), tyre, Vector3(PI/2, 0, 0)))
+		_:
+			var paint := Color("ffc928") if variant == 0 else Color("23252b")
+			parts.append(piece("box", Vector3(0, 0.38, 0), Vector3(1.5, 0.42, 0.77), paint))
+			parts.append(piece("box", Vector3(-0.1, 0.72, 0), Vector3(0.8, 0.36, 0.66), glass))
+			parts.append(piece("box", Vector3(-0.1, 0.93, 0), Vector3(0.86, 0.1, 0.75), paint))
+			# Roof sign, plus the yellow cab's checker band.
+			parts.append(piece("box", Vector3(-0.1, 1.05, 0), Vector3(0.3, 0.14, 0.5), Color("fff3c4") if variant == 0 else Color("ffb347")))
+			if variant == 0:
+				parts.append(piece("box", Vector3(0, 0.46, 0), Vector3(1.52, 0.07, 0.79), Color("1c1c1c")))
+			for x in [-0.48, 0.48]:
+				for z in [-0.38, 0.38]:
+					parts.append(piece("cylinder", Vector3(x, 0.23, z), Vector3(0.23, 0.14, 0.23), tyre, Vector3(PI/2, 0, 0)))
+			parts.append(piece("box", Vector3(0.77, 0.44, 0), Vector3(0.06, 0.14, 0.58), Color("fff0b3")))
+	return parts
 
 # Shrink a baked mesh so its ground footprint fits the swallow radius.
 # Baked by tools/bake_landmarks.gd from Meshy GLBs; null falls back to primitives.

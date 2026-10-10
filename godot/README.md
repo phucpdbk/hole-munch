@@ -1,5 +1,8 @@
 # Hole Munch — Earth Invasion (Godot playtest)
 
+Android store builds: see [ANDROID-RELEASE.md](ANDROID-RELEASE.md) for the API 36
+release AAB pipeline, AdMob IDs, upload signing, consent/privacy and verification.
+
 An alien saucer drops a black hole on Earth. Swallow each city, grow, then swallow
 its landmark to conquer it, while dodging independent military defenders.
 
@@ -42,20 +45,61 @@ its landmark to conquer it, while dodging independent military defenders.
 - **Opening street** (`game.gd` `make_opening`): start radius 0.95, a bench at
   each end of the starter snacks, and one of four shapes per city (row, east or
   west L, split street); defender squads also change corner per city.
+- **Random drop point** (`spawn_points.gd`): each campaign/endless round (retries
+  too) the saucer drops onto a random inner street segment, clear of the
+  landmark, its guardian, the rival's corner and the bombs; the opening cones
+  move with it as a row on that street. Daily games, smoke and captures keep the
+  designed opening street. `-- --campaign-smoke --spawn-bench` times the par
+  route from each city's farthest drop point (all still finish 40 s+ early).
 - **Guardian boss fight** (`mascot.gd`, `mascot_attacks.gd`, `mascot_rig.gd`):
   the guardian walks only along streets and its plaza (`mascot_roads.gd`, never
   through blocks; a leap flies over one but lands on a street): it patrols the
-  crossings, hunts a nearby hole and runs home when the
+  crossings, hunts the hole within 22 units by the shortest street route
+  (Dijkstra over the crossings), circles it at its style's range (stomp up close,
+  beams at about 5.5) and leads a moving saucer by 0.6 s. When the streets go
+  more than 1.6× the straight distance round a block, it hops the roofs (every
+  3 s at most), lands beside the hole and strikes 0.35 s later. Attacks come
+  every 2.3 s × the continent's defence scale. It runs home when the
   hole nears the landmark (minimap diamond). It takes three bites: the first two
   knock it away (hearts on the HUD). Attacks: fire, water and lightning beams up
-  at the saucer, a leap that rams it, a stomp ring and a charge. A hit rocks the
+  at the saucer (`shaders/attack_beam.gdshader`: flowing water, flickering fire,
+  a cored bolt; splash, embers or sparks where they hit, a charge glow before),
+  a leap that rams it, a stomp ring and a charge. A hit rocks the
   saucer, shakes the camera and shoves the hole. `-- --capture --guardian-capture`
   shoots every style. Hà Nội (Chùa Một Cột), Agra, Paris, New York (Liberty)
   and Sydney have Meshy guardians (`assets/mascots/<id>.scn`, auto-rigged,
   clips idle/walk/run/attack = Charged Spell Cast/hit/leap = Jump Attack via
   `tools/meshy/meshy.mjs mascots rig --actions idle=0,attack=125,hit=178,leap=86`,
   baked by `tools/bake_mascots.gd`, scaled to the toy rig's two-unit height);
-  the rest keep the toy rig. `--mascot-capture --levels=0,4` shoots chosen cities.
+  the rest keep the toy rig. `--mascot-capture --levels=0,4` shoots chosen cities
+  (idle, windup, attack and mid-beam frames). Meshy prompts must not ask for
+  effects ("spray water"): Meshy bakes them into the mesh.
+- **Showtime** (`showtime.gd`), the clip-friendly moments: the guardian's last
+  bite leaves it hanging on the far rim (mascot `cling`) with a TAP TAP TAP prompt;
+  six taps (or 3.2 s) drop it, the hole holds still and the clock waits meanwhile.
+  A campaign landmark goes down in a held cinematic: it trembles, loose food
+  near the hole is vacuumed in (score only, no completion), the camera swings
+  round and in while the saucer climbs out of the shot, the landmark tips in,
+  the hole burps and a "<CITY> CONQUERED!" banner plays before the result. People
+  and cars at the rim shout lines from `shout_people`/`shout_cars`. Smoke runs switch it
+  off (`showtime.enabled`); `check_showtime` in `smoke.gd` covers it.
+- **Street events** (`street_events.gd`, campaign and endless only): RUSH HOUR
+  rolls a jam of 16 local vehicles (`models.gd` `jam_vehicle`: yellow cab, London
+  cab, double-decker, tuk-tuk, school bus; two kinds per continent) onto a street
+  near the hole once it can eat a cab, from 10 s in. They are bonus food: score
+  and growth, never completion. Two gate pairs per round stand across inner
+  streets, a green ×1.5 and a red −30%; the half the hole's centre drives
+  through fires and the pair folds away. ×1.5 stops at 90% of the size the
+  landmark needs. Off in smoke runs; `check_street_events` covers them.
+- **Ad clips** (`ad_capture.gd`, `tools/make-ads.ps1`): portrait 720×1280 AVIs
+  plus key-frame PNGs in `test-output/ads/`, English by default (`-Lang es` etc.),
+  HUD hidden (score popups drawn by showtime instead). Presets `conquer` (drive
+  into the landmark), `cling` (tap the guardian loose), `growth` (the whole city
+  on autopilot at 1.6× speed), `rushhour` (the jam rolls in and gets eaten) and
+  `gates` (through ×1.5, then into −30%);
+  default cities Paris, New York and Sydney (`-Levels 8,24,40`). The script
+  swaps in a temporary portrait `override.cfg`; with ffmpeg on PATH it also
+  writes MP4s.
 - **Level catalog** (`catalog_capture.gd`): `-- --capture --catalog` (optional
   `--levels=0,4`) shoots every city (landmark with its guardian, guardian close
   up, menu) into `test-output/catalog/` with each city's landmark, guardian,
@@ -93,7 +137,7 @@ its landmark to conquer it, while dodging independent military defenders.
 - **Daily challenge** (THỬ THÁCH NGÀY): one city per date for everyone, with a
   rival and one continent tougher defence; the first win of the day pays ×1.5.
 - **Daily streak**: a finished daily round keeps it; days 1–7 pay 20–120 coins
-  and every seventh day an effect not owned yet. Shown beside today's mini-game.
+  and every seventh day adds a 300-coin bonus. Shown beside today's mini-game.
 - **Daily leaderboard** (`play_games.gd`): Android only, with the GodotPlayGameServices
   addon v3.4.0 (godot-sdk-integrations/godot-play-game-services, release
   `addons.zip` into `addons/`, enable it, set the game id in the Android export
@@ -131,19 +175,32 @@ its landmark to conquer it, while dodging independent military defenders.
   continent (at most one card per start, the landmark card only when nothing new
   needs explaining; seen cards are saved).
 - **Result screen**: each goal with its numbers (50%/75%), where the coins came
-  from, a bar toward the closest journey reward, and RETRY FOR ★ on a won city
-  that still misses a star.
+  from, and RETRY FOR ★ on a won city that still misses a star.
+- **Shop** (`cosmetics.gd`, `wardrobe.gd`): saucers, hole skins, bite effects
+  and trails are all bought with coins; the first of each is free. Journey
+  rewards are gone: saves before version 9 keep the saucer in use and every
+  reward already earned, and the 7-day streak pays a coin bonus. Fire and
+  rainbow trails are painted on the ground behind the hole (`ground_trail.gd`,
+  `shaders/ground_trail.gdshader`); `-- --capture --trail-capture` shoots each.
 - **UI look**: Baloo 2 (titles/buttons) and Nunito (body), both OFL with full
   Vietnamese, in `assets/fonts`; chunky 3D buttons (`ui_button.gd`); icons baked
   from the local POLYGON Icons pack (`assets/icons/README.md`).
-- Save version 8 stores progress, per-goal stars, coins, upgrades and the daily
+- Save version 9 stores progress, per-goal stars, coins, upgrades and the daily
   and endless records, the streak and reminder switch, plus the chosen language
   and seen intro cards. Version 4 star counts become their first goals. Older
   native saves keep best score and cosmetics; their stars become 25 coins each.
 
-All 48 levels are temporarily selectable via
+**Test mode** (debug builds only): tap the HOLE MUNCH title on the menu seven
+times to switch it on or off (a red TEST MODE label shows). It opens all 48
+cities, refills coins to 999999 after every purchase and plays on its own save
+(`user://test_save.json`), so the real progress is never touched. All levels can
+also be opened for every build with
 `application_custom/testing/unlock_all_levels=true` in `project.godot`.
-Set it to `false` to restore normal locks.
+
+The launcher icon is the classic app's duck: `node tools/make-godot-icons.mjs`
+(from the repo root) crops `assets/hole-munch-cover.png` into `assets/app_icon`.
+All 13 saucers are Meshy models (`assets/crafts`); the plainer ones are cheap and the
+creature and crystal ships (donut to crystal, 3500–12000 coins) are the prizes.
 
 Earth defense squads mark red attack zones and fire visible projectiles. Dodge them
 or swallow the attacker to cancel its shot. Hits cost 2 seconds, shrink the hole
@@ -250,8 +307,17 @@ build the branch locally without publishing.
 
 `tools/meshy/meshy.mjs` turns the prompts in `tools/meshy/<kind>.json` into GLBs
 (text-to-image, then image-to-3d). Review the PNGs before paying for models.
-Every step is resumable through the output folder's `manifest.json`. The key is
-read only from `MESHY_API_KEY`; never put it in the game or the repo.
+Every step is resumable through the output folder's `manifest.json`. Keys never go
+in the game or the repo: list several accounts in the git-ignored
+`tools/meshy/keys.local.json` (`{"acc1": "msy_...", "acc2": "msy_..."}`, see
+`keys.example.json`; put the original key first, it owns items made before
+accounts were tracked), or set one in `MESHY_API_KEY`. Each run reads every
+account's balance (`meshy.mjs <kind> balance`). A new item starts on the first
+account with credits for its whole chain (about 42 for a landmark or saucer, 59
+for a rigged guardian) and stays on it, since later steps reuse that account's
+task ids; `status` shows each item's account. An account that runs out before an
+item starts hands it to the next one; one that runs out mid-chain stops that
+item until it is topped up or the item is redone with `--redo`.
 
 ```powershell
 $env:MESHY_API_KEY = "msy_..."
@@ -268,7 +334,7 @@ Then bake (headless Godot, `--script res://tools/<tool>.gd [-- ids]`):
 |---|---|---|---|---|
 | Landmarks | `assets/landmarks_src/<id>.glb` | `bake_landmarks.gd` | `assets/landmarks/<id>.res` + `_albedo.res` | primitive landmark (`landmarks.gd`) |
 | Guardians | `assets/mascots_src/<id>.glb` + `<id>@<clip>.glb` | `bake_mascots.gd` | `assets/mascots/<id>.scn` | primitive rig (`mascot_specs.gd`) |
-| Saucers | `assets/crafts_src/<index>.glb` (0–7, `fleet.gd` NAMES) | `bake_crafts.gd` | `assets/crafts/<index>.res` + `_albedo.res` | primitive craft (`fleet.gd`) |
+| Saucers | `assets/crafts_src/<index>.glb` (0–12, `fleet.gd` NAMES) | `bake_crafts.gd` | `assets/crafts/<index>.res` + `_albedo.res` | primitive craft (`fleet.gd`) |
 
 - **Facing**: models face +z (toward the camera). Fix a bad bake with that tool's
   `YAW` table; for a hand-made guardian GLB, use `CLIP_OVERRIDES` in `mascot_rig.gd`.

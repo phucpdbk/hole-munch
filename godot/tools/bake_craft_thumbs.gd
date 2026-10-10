@@ -48,7 +48,7 @@ func bake_all() -> void:
 		# Rockets stand tall: shrink them and lean them a little to fit the square.
 		# The object shader clips everything below y = 0 (the ground), so every
 		# craft sits above it and the camera aims at its middle.
-		if index >= 5:
+		if index in Fleet.ROCKETS:
 			holder.rotation_degrees = Vector3(0, -25, -20)
 			holder.scale = Vector3.ONE*0.62
 			holder.position = Vector3(0, 1.7, 0)

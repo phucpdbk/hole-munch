@@ -34,6 +34,10 @@ func _ready() -> void:
 	sounds.lose = render(lose)
 	sounds.tick = render([{"freq":1000, "dur":0.05, "type":"square", "vol":0.06}])
 	sounds.shot = render([{"freq":180,"to":45,"dur":0.12,"type":"saw","vol":0.13},{"freq":1300,"to":180,"dur":0.035,"type":"square","vol":0.06}])
+	# The landmark trembling, then the hole's satisfied burp.
+	sounds.rumble = render([{"freq":70, "to":45, "dur":0.9, "type":"saw", "vol":0.16}, {"freq":55, "to":38, "dur":0.9, "type":"square", "vol":0.07}])
+	sounds.burp = render([{"freq":150, "to":75, "dur":0.22, "type":"saw", "vol":0.22}, {"freq":120, "to":60, "dur":0.32, "type":"square", "vol":0.14, "delay":0.12}])
+	sounds.honk = render([{"freq":440, "dur":0.16, "type":"square", "vol":0.1}, {"freq":550, "dur":0.16, "type":"square", "vol":0.08}, {"freq":440, "dur":0.22, "type":"square", "vol":0.1, "delay":0.22}, {"freq":550, "dur":0.22, "type":"square", "vol":0.08, "delay":0.22}])
 	sounds.click = render([{"freq":600, "to":900, "dur":0.06, "type":"triangle", "vol":0.15}])
 
 # Bigger objects make deeper pops, as in the 2D game.

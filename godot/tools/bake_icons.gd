@@ -13,7 +13,7 @@ const ICONS := {
 	"play":"Play_01", "pause":"Pause_01", "home":"Home_01", "replay":"Replay_01", "next":"Fast_Forward_01",
 	"map":"Location_01", "globe":"Planet_01", "upgrade":"Wrench_Hammer_01", "wardrobe":"Clothes_Hat_01",
 	"daily":"Calendar_01", "endless":"Hourglass_01", "close":"X_01", "left":"Arrow_05", "right":"Arrow_05",
-	"coin":"Coin_02", "star":"Star_01", "trophy":"Trophy_01", "lock":"Padlock_01", "language":"Chat_01",
+	"coin":"Coin_02", "star":"Star_01", "trophy":"Trophy_01", "lock":"Padlock_01", "language":"Chat_01", "settings":"Gear_01",
 	"help":"QuestionMark_01", "clock":"Stopwatch_01", "shield":"Shield_01", "bomb":"Bomb_01",
 	"magnet":"Magnet_01", "skull":"Skull_01", "target":"Crosshair_01", "fire":"Fire_01", "bolt":"Lightning_01",
 	"medal":"Medal_02", "tick":"Tick_01", "flag":"Flag_01", "crown":"Crown_01", "food":"Food_Burger_01",

@@ -8,6 +8,15 @@ var sample_frames: Array[float] = []
 func run(game, campaign_mode: bool) -> void:
 	g = game
 	DirAccess.make_dir_recursive_absolute("res://test-output")
+	if "--privacy-capture" in OS.get_cmdline_user_args():
+		g.go_menu()
+		await frames(20)
+		await snapshot("privacy-menu")
+		g.hud.privacy_requested.emit()
+		await frames(10)
+		await snapshot("privacy-dialog")
+		g.get_tree().quit()
+		return
 	if "--perf-large" in OS.get_cmdline_user_args():
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 		g.load_level(47)
@@ -40,6 +49,29 @@ func run(game, campaign_mode: bool) -> void:
 	# Each guardian attack style mid-shot at the saucer, then a hit wobble.
 	if "--guardian-capture" in OS.get_cmdline_user_args():
 		await guardian_preview()
+		g.get_tree().quit()
+		return
+	# Every trail mid-run, the ground-painted fire and rainbow included.
+	if "--trail-capture" in OS.get_cmdline_user_args():
+		g.load_level(0)
+		for trail in range(1, preload("res://scripts/cosmetics.gd").count("trails")):
+			g.campaign.trail = trail
+			g.apply_style()
+			g.reset_round()
+			g.playing = true; g.mode = "playing"; g.started = true
+			g.defense.grace = INF
+			g.hole_position = Vector3(-12.0, 0, 9.0)
+			# Capture has no drag, so the run steers the hole and feeds the trail itself.
+			for i in 80:
+				g.hole_position += (Vector3(1, 0, 0) if i < 45 else Vector3(0.6, 0, -0.8))*0.12
+				g.fx.move_trail(g.hole_position, true, g.radius)
+				await frames(1)
+			await snapshot("trail-%d" % trail)
+		g.get_tree().quit()
+		return
+	# Portrait ad clips under the movie maker (ad_capture.gd, tools/make-ads.ps1).
+	if "--ad-capture" in OS.get_cmdline_user_args():
+		await preload("res://scripts/ad_capture.gd").new().run(g, self)
 		g.get_tree().quit()
 		return
 	# Review page of every city: shots plus landmark, guardian and weather data.
@@ -77,7 +109,6 @@ func run(game, campaign_mode: bool) -> void:
 		await snapshot("map-menu")
 		g.on_play()
 		g.started = true
-		g.defense.grace = INF
 		var spots := {"gold":g.features.gold_blocks[0], "block":Vector2(g.features.barriers[0].position.x, g.features.barriers[0].position.z),
 			"danger":g.features.danger_blocks[0], "alley":g.features.shortcut_blocks[0]}
 		for name in spots:
@@ -108,6 +139,11 @@ func run(game, campaign_mode: bool) -> void:
 			await snapshot("mascot-%02d-%s-windup" % [index+1, g.level.boss])
 			await frames(28)
 			await snapshot("mascot-%02d-%s-attack" % [index+1, g.level.boss])
+			# Fire, water and lightning: wait for the beam to reach the saucer.
+			for i in 90:
+				if g.defense.strikes.any(func(s): return s.source == guardian and s.get("style", "") != "" and s.time < s.flight*0.6): break
+				await frames(1)
+			await snapshot("mascot-%02d-%s-beam" % [index+1, g.level.boss])
 		g.get_tree().quit()
 		return
 	# Rain, fog (veil and hidden minimap), snow and storm mid-round (`--weather-capture`).
@@ -137,7 +173,9 @@ func run(game, campaign_mode: bool) -> void:
 			await frames(40)
 			await snapshot("landscape-"+panel)
 			if panel == "crafts":
-				for i in 8:
+				var crafts: int = preload("res://scripts/fleet.gd").NAMES.size()
+				g.campaign.owned.crafts = range(crafts)
+				for i in crafts:
 					g.wardrobe.equip(i)
 					await frames(15)
 					await snapshot("craft-%d" % i)
@@ -188,7 +226,6 @@ func daily_preview() -> void:
 		g.daily_override = type
 		g.start_daily()
 		g.started = true
-		g.defense.grace = INF
 		g.target_radius = 1.6
 		for i in 150:
 			g.hole_position.x = lerpf(g.hole_position.x, -6.0, 0.02)
@@ -285,6 +322,10 @@ func ui_preview() -> void:
 	g.open_panel("crafts")
 	await frames(20)
 	await snapshot("ui-%s-wardrobe" % lang)
+	g.close_panel()
+	g.open_panel("trails")
+	await frames(20)
+	await snapshot("ui-%s-trails" % lang)
 	g.close_panel()
 	g.on_play()
 	g.started = true

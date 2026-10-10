@@ -1,21 +1,23 @@
 extends RefCounted
 
-# Coin prices and journey rewards for the hole's looks, ported from the 2D shop
-# (src/cosmetics.js, src/progression.js). Indices match Campaign.SKINS, EFFECTS
-# and TRAILS because saves store them; SKIN_ORDER is only the shop's display order.
-const SLOTS := ["skins", "effects", "trails"]
-# A price of REWARD means the item cannot be bought, only earned on the journey.
-const REWARD := -1
+# Coin prices for the saucer and the hole's looks, ported from the 2D shop
+# (src/cosmetics.js). Every look is bought with coins; index 0 of each slot is
+# free. Indices match Fleet.NAMES, Campaign.SKINS, EFFECTS and TRAILS because
+# saves store them; SKIN_ORDER is only the shop's display order.
+const SLOTS := ["crafts", "skins", "effects", "trails"]
 const PRICES := {
-	"skins": [0, 300, 800, 1000, 1200, 1500, 5000, 3000, 2000, REWARD, REWARD, REWARD, 500],
+	# Plain saucers are cheap; the creature and crystal ships are the prizes.
+	"crafts": [0, 400, 700, 1000, 1200, 1500, 1800, 2400, 3500, 4500, 6000, 8000, 12000],
+	"skins": [0, 300, 800, 1000, 1200, 1500, 5000, 3000, 2000, 3500, 7000, 2500, 500],
 	"effects": [0, 200, 300, 400, 600, 800, 1000],
 	"trails": [0, 250, 400, 600, 800, 1200],
 }
-# Cheapest first, journey rewards last, as in the 2D shop.
-const SKIN_ORDER := [0, 1, 12, 2, 3, 4, 5, 8, 7, 6, 11, 9, 10]
-# [slot, index, track, need]: "stars" counts medals, "landmarks" cities whose
-# landmark was swallowed. An earned reward is owned even if it also has a price.
-const REWARDS := [
+# Cheapest first, as in the 2D shop.
+const SKIN_ORDER := [0, 1, 12, 2, 3, 4, 5, 8, 11, 7, 9, 6, 10]
+# Before version 9 these looks were earned on the journey instead of bought:
+# [slot, index, track, need] with "stars" = medals and "landmarks" = cities taken.
+# Old saves that had earned one keep it (Campaign.restore_owned).
+const LEGACY_REWARDS := [
 	["effects", 1, "stars", 6],
 	["skins", 11, "stars", 18],
 	["trails", 5, "stars", 36],
@@ -32,14 +34,6 @@ static func count(slot: String) -> int:
 
 static func price(slot: String, index: int) -> int:
 	return int(PRICES[slot][index])
-
-static func reward_only(slot: String, index: int) -> bool:
-	return price(slot, index) == REWARD
-
-static func reward_for(slot: String, index: int) -> Array:
-	for reward in REWARDS:
-		if reward[0] == slot and reward[1] == index: return reward
-	return []
 
 static func display_order(slot: String) -> Array:
 	if slot == "skins": return SKIN_ORDER

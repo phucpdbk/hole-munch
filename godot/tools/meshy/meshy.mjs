@@ -87,11 +87,12 @@ if (!existsSync(join(OUT, ".gdignore"))) await writeFile(join(OUT, ".gdignore"),
 const manifest = existsSync(MANIFEST) ? JSON.parse(await readFile(MANIFEST, "utf8")) : {};
 const saveManifest = () => writeFile(MANIFEST, JSON.stringify(manifest, null, 2));
 
-async function api(method, path, body) {
+// 402 means the account is out of credits: it is marked empty and the error says so.
+async function api(account, method, path, body) {
 	for (let attempt = 0; ; attempt++) {
 		const response = await fetch(API + path, {
 			method,
-			headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
+			headers: { Authorization: `Bearer ${account.key}`, "Content-Type": "application/json" },
 			body: body ? JSON.stringify(body) : undefined,
 		});
 		if (response.status === 429 && attempt < 6) {
@@ -136,12 +137,26 @@ async function makeImage(id) {
 	const entry = (manifest[id] ??= {});
 	if (entry.imageTask && !flag("--redo")) return;
 	const prompt = `${prompts[id]}. ${kind.style}`;
-	const { result } = await api("POST", "/text-to-image", {
-		ai_model: IMAGE_MODEL, prompt, aspect_ratio: "1:1", remove_background: true,
-	});
-	const task = await waitFor("text-to-image", result, id);
+	// The image starts the chain: an account that turns out empty hands it to the next.
+	const tried = [];
+	let account;
+	let result;
+	while (!result) {
+		account = startChain(id, tried);
+		try {
+			({ result } = await api(account, "POST", "/text-to-image", {
+				ai_model: IMAGE_MODEL, prompt, aspect_ratio: "1:1", remove_background: true,
+			}));
+		} catch (error) {
+			if (!error.outOfCredits) throw error;
+			console.error(`  ${id}: account "${account.label}" is out of credits, trying the next one`);
+			tried.push(account);
+		}
+	}
+	Object.assign(entry, { account: account.label, imageTask: result, prompt, modelTask: undefined, glb: undefined, rigTask: undefined, clips: undefined });
+	await saveManifest();
+	const task = await waitFor(account, "text-to-image", result, id);
 	await download(task.image_urls[0], join(OUT, `${id}.png`));
-	Object.assign(entry, { imageTask: result, prompt, modelTask: undefined, glb: undefined, rigTask: undefined, clips: undefined });
 	credit(entry, task);
 	await saveManifest();
 	console.log(`✓ image ${id}`);
@@ -151,7 +166,8 @@ async function makeModel(id) {
 	const entry = manifest[id];
 	if (!entry?.imageTask) throw new Error(`${id}: run "images" first`);
 	if (entry.glb && !flag("--redo")) return;
-	const { result } = await api("POST", "/image-to-3d", {
+	const account = continueChain(id, entry, COSTS.model);
+	const { result } = await api(account, "POST", "/image-to-3d", {
 		input_task_id: entry.imageTask,
 		ai_model: "latest",
 		should_remesh: true,
@@ -164,7 +180,7 @@ async function makeModel(id) {
 	});
 	entry.modelTask = result;
 	await saveManifest();
-	const task = await waitFor("image-to-3d", result, id);
+	const task = await waitFor(account, "image-to-3d", result, id);
 	await download(task.model_urls.glb, join(OUT, `${id}.glb`));
 	if (task.thumbnail_url) await download(task.thumbnail_url, join(OUT, `${id}_preview.png`));
 	Object.assign(entry, { glb: `${id}.glb`, rigTask: undefined, clips: undefined });
@@ -203,12 +219,13 @@ async function makeRig(id) {
 	const entry = manifest[id];
 	if (!entry?.modelTask || !entry.glb) throw new Error(`${id}: run "models" first`);
 	if (entry.clips && !flag("--redo")) return;
+	const account = continueChain(id, entry, rigCost());
 	if (!entry.rigTask || flag("--redo")) {
-		const { result } = await api("POST", "/rigging", { input_task_id: entry.modelTask, height_meters: RIG_HEIGHT_METERS });
+		const { result } = await api(account, "POST", "/rigging", { input_task_id: entry.modelTask, height_meters: RIG_HEIGHT_METERS });
 		entry.rigTask = result;
 		await saveManifest();
 	}
-	const rig = await waitFor("rigging", entry.rigTask, id);
+	const rig = await waitFor(account, "rigging", entry.rigTask, id);
 	credit(entry, rig);
 	const results = rig.result ?? {};
 	await download(results.rigged_character_glb_url, join(OUT, `${id}.glb`));
@@ -217,8 +234,8 @@ async function makeRig(id) {
 	if (basic.walking_glb_url) { await download(basic.walking_glb_url, join(OUT, `${id}@walk.glb`)); clips.push("walk"); }
 	if (basic.running_glb_url) { await download(basic.running_glb_url, join(OUT, `${id}@run.glb`)); clips.push("run"); }
 	for (const [clip, actionId] of Object.entries(await clipActions())) {
-		const { result } = await api("POST", "/animations", { rig_task_id: entry.rigTask, action_id: actionId });
-		const task = await waitFor("animations", result, `${id}@${clip}`);
+		const { result } = await api(account, "POST", "/animations", { rig_task_id: entry.rigTask, action_id: actionId });
+		const task = await waitFor(account, "animations", result, `${id}@${clip}`);
 		credit(entry, task);
 		const url = task.result?.animation_glb_url ?? task.animation_glb_url;
 		if (!url) { console.error(`  ${id}@${clip}: no GLB in the result`); continue; }
@@ -242,11 +259,15 @@ async function runAll(step) {
 	return failures;
 }
 
+await refreshBalances();
+console.log(`Credits: ${balances()} (a new ${kindName} item needs about ${chainCost()})`);
+if (command === "balance") process.exit(0);
 if (command === "status") {
 	for (const id of ids) {
 		const entry = manifest[id] ?? {};
 		const rigged = kind.rig ? ` clips:${entry.clips?.join("+") ?? "-"}` : "";
-		console.log(`${id.padEnd(16)} image:${entry.imageTask ? "yes" : "-"} glb:${entry.glb ? "yes" : "-"}${rigged} credits:${entry.credits ?? 0}`);
+		const account = entry.imageTask ? ` account:${entry.account ?? accounts[0].label}` : "";
+		console.log(`${id.padEnd(16)} image:${entry.imageTask ? "yes" : "-"} glb:${entry.glb ? "yes" : "-"}${rigged} credits:${entry.credits ?? 0}${account}`);
 	}
 	process.exit(0);
 }

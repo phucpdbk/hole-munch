@@ -391,6 +391,9 @@ func guardian_yields(game, item: Dictionary) -> bool:
 	if item != guardian or mascot == null: return true
 	return mascot.bite(game)
 
+func guardian_clinging() -> bool:
+	return mascot != null and mascot.state == "cling"
+
 func guardian_biteable(item: Dictionary) -> bool:
 	return item != guardian or mascot == null or mascot.can_be_bitten()
 

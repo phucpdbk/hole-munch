@@ -3,6 +3,11 @@ extends RefCounted
 # Translation table for i18n.gd. Columns: vi, en, es, pt, fr, id.
 # An empty cell falls back to English. Keep "%" placeholders in the same order.
 const S := {
+	"privacy": ["RIÊNG TƯ", "PRIVACY", "PRIVACIDAD", "PRIVACIDADE", "CONFIDENTIALITÉ", "PRIVASI"],
+	"privacy_policy": ["Chính sách riêng tư", "Privacy policy", "Política de privacidad", "Política de privacidade", "Politique de confidentialité", "Kebijakan privasi"],
+	"privacy_choices": ["Lựa chọn quảng cáo", "Advertising choices", "Opciones de publicidad", "Opções de publicidade", "Choix publicitaires", "Pilihan iklan"],
+	"privacy_retry": ["Kiểm tra lại lựa chọn quảng cáo", "Check advertising choices again", "Revisar opciones publicitarias", "Verificar opções de publicidade", "Revérifier les choix publicitaires", "Periksa kembali pilihan iklan"],
+	"privacy_note": ["Tiến trình được lưu trên thiết bị. Bạn có thể quản lý lựa chọn quảng cáo tại đây khi có sẵn.", "Progress is saved on your device. Manage advertising choices here when available.", "El progreso se guarda en tu dispositivo. Gestiona aquí las opciones publicitarias disponibles.", "O progresso fica no dispositivo. Gerencie aqui as opções de publicidade disponíveis.", "La progression est enregistrée sur votre appareil. Gérez ici les choix publicitaires disponibles.", "Progres tersimpan di perangkat. Kelola pilihan iklan di sini jika tersedia."],
 	# --- Menu and buttons ---------------------------------------------------------
 	"play": ["CHƠI NGAY", "PLAY", "JUGAR", "JOGAR", "JOUER", "MAIN"],
 	"resume": ["TIẾP TỤC", "RESUME", "CONTINUAR", "CONTINUAR", "REPRENDRE", "LANJUTKAN"],
@@ -20,6 +25,7 @@ const S := {
 	"take_target": ["CHIẾM %s", "TAKE %s", "CONQUISTA %s", "CONQUISTE %s", "OBJECTIF : %s", "REBUT %s"],
 	"eat_then_take": ["Nuốt thành phố, rồi chiếm %s", "Eat the city, then take %s", "Devora la ciudad y conquista %s", "Devore a cidade e conquiste %s", "Dévore la ville, puis prends %s", "Telan kota, lalu rebut %s"],
 	"with_rival": [" · CÓ HỐ ĐỐI THỦ", " · RIVAL HOLE", " · HOYO RIVAL", " · BURACO RIVAL", " · TROU RIVAL", " · LUBANG SAINGAN"],
+	"sound": ["ÂM LƯỢNG", "SOUND", "SONIDO", "SOM", "SON", "SUARA"],
 	"language": ["NGÔN NGỮ", "LANGUAGE", "IDIOMA", "IDIOMA", "LANGUE", "BAHASA"],
 	"how_to_play": ["CÁCH CHƠI", "HOW TO PLAY", "CÓMO JUGAR", "COMO JOGAR", "COMMENT JOUER", "CARA MAIN"],
 	# --- In-round HUD ---------------------------------------------------------------
@@ -50,6 +56,18 @@ const S := {
 	"gate": ["Cần %d★ để mở %s (đang có %d★)", "Need %d★ to open %s (you have %d★)", "Necesitas %d★ para abrir %s (tienes %d★)", "Precisa de %d★ para abrir %s (tem %d★)", "Il faut %d★ pour ouvrir %s (tu as %d★)", "Butuh %d★ untuk membuka %s (punya %d★)"],
 	# --- Floating callouts ---------------------------------------------------------
 	"counter": ["%s PHẢN CÔNG!", "%s STRIKES BACK!", "¡%s CONTRAATACA!", "%s CONTRA-ATACA!", "%s CONTRE-ATTAQUE !", "%s MENYERANG BALIK!"],
+	# --- Showtime: the guardian on the rim, the conquest banner, panicked shouts ------
+	"guardian_cling": ["NÓ BÁM MÉP HỐ!", "IT'S HANGING ON!", "¡SE AGARRA AL BORDE!", "ESTÁ SE SEGURANDO!", "IL S'ACCROCHE !", "DIA BERPEGANGAN!"],
+	"guardian_drop": ["RƠI RỒI! BYE BYE~", "DOWN IT GOES! BYE~", "¡ADIÓS! ¡ABAJO!", "TCHAU! LÁ VAI!", "BYE BYE ! IL TOMBE !", "DADAH! JATUH!"],
+	"tap_drop": ["CHẠM LIÊN TỤC!", "TAP TAP TAP!", "¡TOCA RÁPIDO!", "TOQUE RÁPIDO!", "TAPE VITE !", "KETUK TERUS!"],
+	"burp": ["Ợ~!", "BURP!", "¡BURP!", "ARROTO!", "ROT !", "SENDAWA!"],
+	"shout_people": ["Má ơi!|Cứu với!|Chạy đi!|Ối giời ơi!|Đừng mà!|Ai cứu tui!", "Help!|Run!|Nooo!|Mommy!|Not today!|AAAH!", "¡Socorro!|¡Corre!|¡Nooo!|¡Mamá!|¡AAAH!", "Socorro!|Corre!|Nãooo!|Mãe!|AAAH!", "Au secours !|Cours !|Nooon !|Maman !|AAAH !", "Tolong!|Lari!|Tidaaak!|Mamaa!|AAAH!"],
+	"shout_cars": ["Bíp bíp!|Xe tui!|Phanh!|Còn trả góp!", "Beep beep!|My car!|Brakes!|Still paying it off!", "¡Bip bip!|¡Mi coche!|¡Frena!", "Bi bi!|Meu carro!|Freia!", "Tut tut !|Ma voiture !|Freine !", "Tin tin!|Mobilku!|Rem!|Masih nyicil!"],
+	"shout_jam": ["Bíp bíp!|Tránh ra!|Trễ giờ rồi!|Kẹt quá!", "HONK!|Move it!|I'm late!|Beep beep!|Come ON!", "¡PIIII!|¡Muévete!|¡Llego tarde!|¡Vamos!", "BIIII!|Anda logo!|Tô atrasado!|Vai!", "TUUUT !|Avance !|Je suis en retard !|Allez !", "TIIIN!|Minggir!|Telat nih!|Ayo!"],
+	# --- Street events: rush hour and the size gates ---------------------------------
+	"rush_hour": ["GIỜ CAO ĐIỂM!", "RUSH HOUR!", "¡HORA PUNTA!", "HORA DO RUSH!", "HEURE DE POINTE !", "JAM SIBUK!"],
+	"gate_big": ["TO GẤP RƯỠI!", "SIZE ×1.5!", "¡TAMAÑO ×1.5!", "TAMANHO ×1.5!", "TAILLE ×1.5 !", "UKURAN ×1.5!"],
+	"gate_small": ["TEO MẤT 30%!", "SHRUNK −30%!", "¡ENCOGIDO −30%!", "ENCOLHEU −30%!", "RÉTRÉCI −30 % !", "MENYUSUT −30%!"],
 	"ate_rival": ["NUỐT HỐ ĐỐI THỦ! +%d", "RIVAL SWALLOWED! +%d", "¡RIVAL DEVORADO! +%d", "RIVAL DEVORADO! +%d", "RIVAL AVALÉ ! +%d", "SAINGAN DITELAN! +%d"],
 	"combo_time": ["COMBO %d · +%d GIÂY", "COMBO %d · +%d S", "COMBO %d · +%d S", "COMBO %d · +%d S", "COMBO %d · +%d S", "KOMBO %d · +%d DTK"],
 	"bigger": ["LỚN HƠN!", "BIGGER!", "¡MÁS GRANDE!", "MAIOR!", "PLUS GROS !", "MAKIN BESAR!"],
@@ -71,7 +89,6 @@ const S := {
 	"result_line": ["%s điểm · %s món đã nuốt · Dọn %d%% · Combo %d", "%s points · %s eaten · %d%% cleared · Combo %d", "%s puntos · %s devorados · %d%% limpio · Combo %d", "%s pontos · %s devorados · %d%% limpo · Combo %d", "%s points · %s avalés · %d%% nettoyé · Combo %d", "%s poin · %s ditelan · %d%% bersih · Kombo %d"],
 	"coins_line": ["+%d xu · Tổng %d xu", "+%d coins · Total %d", "+%d monedas · Total %d", "+%d moedas · Total %d", "+%d pièces · Total %d", "+%d koin · Total %d"],
 	"coin_parts": ["Ăn %d · Sao %d · Thắng %d · Giờ %d · ×%s", "Food %d · Stars %d · Win %d · Time %d · ×%s", "Comida %d · Estrellas %d · Victoria %d · Tiempo %d · ×%s", "Comida %d · Estrelas %d · Vitória %d · Tempo %d · ×%s", "Repas %d · Étoiles %d · Victoire %d · Temps %d · ×%s", "Makan %d · Bintang %d · Menang %d · Waktu %d · ×%s"],
-	"next_reward": ["Quà tiếp: %s", "Next reward: %s", "Siguiente premio: %s", "Próximo prêmio: %s", "Prochaine récompense : %s", "Hadiah berikutnya: %s"],
 	"retry_stars": ["CHƠI LẠI LẤY ★", "RETRY FOR ★", "REPETIR POR ★", "DE NOVO POR ★", "REJOUER POUR ★", "ULANG DEMI ★"],
 	"streak_days": ["CHUỖI %d NGÀY", "%d-DAY STREAK", "RACHA DE %d DÍAS", "SEQUÊNCIA DE %d DIAS", "SÉRIE DE %d JOURS", "BERUNTUN %d HARI"],
 	"streak_gift": ["CHUỖI %d NGÀY · +%d XU", "%d-DAY STREAK · +%d COINS", "RACHA DE %d DÍAS · +%d MONEDAS", "SEQUÊNCIA DE %d DIAS · +%d MOEDAS", "SÉRIE DE %d JOURS · +%d PIÈCES", "BERUNTUN %d HARI · +%d KOIN"],
@@ -196,8 +213,6 @@ const S := {
 	"equip": ["Trang bị", "Equip", "Equipar", "Equipar", "Équiper", "Pakai"],
 	"equipped": ["Đang dùng", "Equipped", "Equipado", "Equipado", "Équipé", "Dipakai"],
 	"journey_reward": ["Quà hành trình", "Journey reward", "Premio del viaje", "Prêmio da jornada", "Récompense", "Hadiah perjalanan"],
-	"reward_stars": ["%d/%d sao", "%d/%d stars", "%d/%d estrellas", "%d/%d estrelas", "%d/%d étoiles", "%d/%d bintang"],
-	"reward_landmarks": ["%d/%d thành phố", "%d/%d cities", "%d/%d ciudades", "%d/%d cidades", "%d/%d villes", "%d/%d kota"],
 	"journey": ["HÀNH TRÌNH XÂM LĂNG", "INVASION JOURNEY", "RUTA DE INVASIÓN", "ROTA DA INVASÃO", "ROUTE DE L'INVASION", "RUTE INVASI"],
 	"test_all_open": ["TEST · Đã mở tất cả %d thành phố", "TEST · All %d cities open", "PRUEBA · %d ciudades abiertas", "TESTE · %d cidades abertas", "TEST · %d villes ouvertes", "UJI · %d kota terbuka"],
 	"total_stars": ["Tổng %d★ · mỗi châu lục mới cần thêm %d★", "%d★ total · each new continent needs %d★ more", "%d★ en total · cada continente pide %d★ más", "%d★ no total · cada continente pede %d★ a mais", "%d★ au total · chaque continent demande %d★ de plus", "Total %d★ · tiap benua baru butuh %d★ lagi"],
@@ -207,7 +222,7 @@ const S := {
 	"shop_tip": ["Nhận xu sau mỗi màn · Nhiều sao hơn, nhiều xu hơn", "Earn coins every round · more stars, more coins", "Gana monedas cada ronda · más estrellas, más monedas", "Ganhe moedas a cada rodada · mais estrelas, mais moedas", "Des pièces à chaque manche · plus d'étoiles, plus de pièces", "Dapat koin tiap ronde · makin banyak bintang, makin banyak koin"],
 	"locked": ["Chưa mở", "Locked", "Bloqueada", "Bloqueada", "Verrouillée", "Terkunci"],
 	"need_stars": ["Cần %d★", "Need %d★", "Necesitas %d★", "Precisa de %d★", "Il faut %d★", "Butuh %d★"],
-	"lang_title": ["CHỌN NGÔN NGỮ", "CHOOSE LANGUAGE", "ELIGE IDIOMA", "ESCOLHA O IDIOMA", "CHOISIS TA LANGUE", "PILIH BAHASA"],
+	"settings_title": ["CÀI ĐẶT", "SETTINGS", "AJUSTES", "CONFIGURAÇÕES", "PARAMÈTRES", "PENGATURAN"],
 	"goals": ["MỤC TIÊU", "GOALS", "OBJETIVOS", "OBJETIVOS", "OBJECTIFS", "TARGET"],
 	"seconds": ["%d giây", "%d s", "%d s", "%d s", "%d s", "%d dtk"],
 	"rival_city": ["Có hố đối thủ", "Rival hole", "Hoyo rival", "Buraco rival", "Trou rival", "Lubang saingan"],
@@ -356,6 +371,11 @@ const S := {
 	"craft5": ["Tên lửa bạc", "Silver Rocket", "Cohete plateado", "Foguete prateado", "Fusée argentée", "Roket Perak"],
 	"craft6": ["Tên lửa đỏ", "Red Rocket", "Cohete rojo", "Foguete vermelho", "Fusée rouge", "Roket Merah"],
 	"craft7": ["Tên lửa đôi", "Twin Rocket", "Cohete doble", "Foguete duplo", "Fusée double", "Roket Kembar"],
+	"craft8": ["Đĩa donut", "Donut Saucer", "Platillo dona", "Disco donut", "Soucoupe donut", "Piring Donat"],
+	"craft9": ["Phi thuyền bạch tuộc", "Octopus Ship", "Nave pulpo", "Nave polvo", "Vaisseau pieuvre", "Kapal Gurita"],
+	"craft10": ["Phi thuyền vịt vàng", "Rubber Duck Ship", "Nave patito", "Nave patinho", "Vaisseau canard", "Kapal Bebek"],
+	"craft11": ["Cá voi vũ trụ", "Space Whale", "Ballena espacial", "Baleia espacial", "Baleine spatiale", "Paus Angkasa"],
+	"craft12": ["Đĩa pha lê", "Crystal Saucer", "Platillo de cristal", "Disco de cristal", "Soucoupe de cristal", "Piring Kristal"],
 	# Names follow the 2D shop (src/locales-shop.js, src/locales-journey.js).
 	"skin0": ["Cổ điển", "Classic", "Clásico", "Clássico", "Classique", "Klasik"],
 	"skin1": ["Kẹo gậy", "Candy Cane", "Bastón de caramelo", "Bengala doce", "Sucre d’orge", "Permen Tongkat"],

@@ -123,12 +123,13 @@ func animate(dt: float, pose: Dictionary) -> void:
 	var squash: float = pose.squash
 	var air: float = pose.air
 	var hurt: float = pose.hurt
+	var flail: float = pose.get("flail", 0.0)
 	var bob := absf(sin(stride))*0.1 if running else sin(clock*2.6)*0.035
 	var shrink := crouch*0.22 + squash*0.25
 	position = Vector3(0, bob - crouch*0.08, pose.lunge*0.35)
 	scale = Vector3(1.0 + shrink*0.6, 1.0 - shrink + air*0.12, 1.0 + shrink*0.6)
 	# Lean into a run, shake while winding up, tumble when bitten.
-	rotation = Vector3(-crouch*0.12 + (0.12 if running else 0.0) - air*0.3, sin(clock*30.0)*hurt*0.35, sin(clock*40.0)*0.04*crouch + sin(clock*22.0)*hurt*0.25)
+	rotation = Vector3(-crouch*0.12 + (0.12 if running else 0.0) - air*0.3, sin(clock*30.0)*hurt*0.35, sin(clock*40.0)*0.04*crouch + sin(clock*22.0)*hurt*0.25 + sin(clock*25.0)*flail*0.2)
 	visible = hurt <= 0.0 or fmod(clock, 0.16) < 0.11
 	if source == "animated": play_state(pose)
 	elif source == "primitive": swing_limbs(pose, running)
@@ -136,8 +137,8 @@ func animate(dt: float, pose: Dictionary) -> void:
 func play_state(pose: Dictionary) -> void:
 	var state: String = pose.state
 	var wanted := "idle"
-	if pose.hurt > 0.0: wanted = "hit"
-	elif state == "leap": wanted = "leap"
+	if pose.hurt > 0.0 or pose.get("flail", 0.0) > 0.0: wanted = "hit"
+	elif state in ["leap", "hop"]: wanted = "leap"
 	elif state in ["windup", "charge"]: wanted = "attack"
 	elif pose.moving > 3.0: wanted = "run"
 	elif pose.moving > 0.1: wanted = "walk"
@@ -149,7 +150,9 @@ func play_state(pose: Dictionary) -> void:
 func swing_limbs(pose: Dictionary, running: bool) -> void:
 	var crouch: float = pose.crouch
 	var air: float = pose.air
-	var swing := sin(stride)*0.8 if running else 0.0
+	var flail: float = pose.get("flail", 0.0)
+	# Clinging to the rim: legs kick fast and the arms reach up over the edge.
+	var swing := sin(stride)*0.8 if running else sin(clock*24.0)*0.9*flail
 	for group in pivots:
 		var pivot: Node3D = pivots[group]
 		match group:
@@ -162,6 +165,6 @@ func swing_limbs(pose: Dictionary, running: bool) -> void:
 					var flap := sin(clock*(16.0 if busy else 3.0))*(0.7 if busy else 0.15)
 					pivot.rotation = Vector3(0, 0, sign*(flap + crouch*0.6))
 				else:
-					pivot.rotation = Vector3(-crouch*2.2 - swing*sign*0.6 - air*2.4, 0, sign*(0.1 + sin(clock*2.0)*0.05))
+					pivot.rotation = Vector3(-crouch*2.2 - swing*sign*0.6 - air*2.4 - minf(1.0, flail*3.0)*2.8, 0, sign*(0.1 + sin(clock*2.0)*0.05))
 			"head": pivot.rotation = Vector3(-crouch*0.25 + pose.lunge*0.3, sin(clock*1.3)*0.25*(1.0 - crouch), 0)
 			"tail": pivot.rotation = Vector3(0, sin(clock*(9.0 if running else 3.5))*0.45, 0)

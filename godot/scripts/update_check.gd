@@ -14,6 +14,8 @@ const ALLOWED_URLS := ["https://", "market://"]
 
 func _ready() -> void:
 	if OS.get_name() != "Android": return
+	# Production updates come from Google Play, never the prototype APK feed.
+	if not OS.is_debug_build(): return
 	var http := HTTPRequest.new()
 	http.timeout = TIMEOUT
 	add_child(http)

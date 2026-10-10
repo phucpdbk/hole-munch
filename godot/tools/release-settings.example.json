@@ -1,0 +1,10 @@
+{
+  "package_id": "com.phucp.holemunch",
+  "app_name": "Hole Munch",
+  "version_code": 13,
+  "version_name": "1.0.0",
+  "audience": "general_not_child_directed",
+  "admob_app_id": "",
+  "rewarded_unit": "",
+  "interstitial_unit": ""
+}

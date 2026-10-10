@@ -111,6 +111,16 @@ var run_kind := "campaign"
 var campaign_level := 0
 var endless_stage := 0
 var endless_rng := RandomNumberGenerator.new()
+# The saucer drops onto a random inner street each round (spawn_points.gd).
+var spawn_rng := RandomNumberGenerator.new()
+var spawn := SPAWN
+# Debug builds: tapping the menu title TEST_TAPS times toggles test mode
+# (Campaign.enable_test_mode); the flag file keeps it across launches.
+const TEST_FLAG := "user://test_mode.flag"
+const TEST_TAPS := 7
+const TEST_TAP_GAP := 0.8
+var title_taps := 0
+var last_title_tap := -10.0
 var endless_advance := false
 # Today's daily mini-game (scripts/daily_games.gd); tests may force a type.
 var daily: Node3D
@@ -153,6 +163,10 @@ var rival_saucer: MeshInstance3D
 var rival_beam: MeshInstance3D
 var fx: Fx
 var sfx: Sfx
+var showtime: Showtime
+var events: StreetEvents
+# Steering from a script instead of a finger (ad capture's autopilot).
+var bot_input := Vector2.ZERO
 var lamp_materials := {}
 var pulse := 0.0
 var tier := 0
@@ -206,11 +220,15 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	test_mode = "--smoke" in args or "--campaign-smoke" in args
 	capture_mode = "--capture" in args or "--campaign-capture" in args
+	spawn_rng.randomize()
 	UiStyle.install_theme()
 	make_environment()
-	if not test_mode and not capture_mode and FileAccess.file_exists("user://prototype_save.json"):
-		campaign.restore(JSON.parse_string(FileAccess.get_file_as_string("user://prototype_save.json")))
+	campaign.test_mode = OS.is_debug_build() and FileAccess.file_exists(TEST_FLAG) and not test_mode and not capture_mode
+	if not test_mode and not capture_mode and FileAccess.file_exists(campaign.save_path()):
+		campaign.restore(JSON.parse_string(FileAccess.get_file_as_string(campaign.save_path())))
+	if campaign.test_mode: campaign.enable_test_mode()
 	setup_language(args)
+	apply_volume()
 	best = campaign.best
 	weather = Weather.new()
 	add_child(weather)
@@ -247,6 +265,12 @@ func _ready() -> void:
 	layer.add_child(wardrobe)
 	ads = Ads.new()
 	add_child(ads)
+	var privacy_panel := preload("res://scripts/privacy_panel.gd").new()
+	privacy_panel.ads = ads
+	layer.add_child(privacy_panel)
+	hud.privacy_requested.connect(func():
+		clear_drag()
+		privacy_panel.open())
 	hud.revive_requested.connect(accept_revive)
 	hud.give_up_requested.connect(decline_revive)
 	hud.double_requested.connect(double_reward)
@@ -285,6 +309,15 @@ func setup_language(args: PackedStringArray) -> void:
 	elif test_mode or capture_mode: I18n.set_lang("vi")
 	else: I18n.set_lang(campaign.lang if campaign.lang != "" else I18n.system_lang())
 	if campaign.lang == "" and not test_mode and not capture_mode: campaign.lang = I18n.lang
+
+func set_volume(value: float) -> void:
+	campaign.volume = clampf(snappedf(value, 0.1), 0.0, 1.0)
+	apply_volume()
+	persist()
+
+func apply_volume() -> void:
+	AudioServer.set_bus_mute(0, campaign.volume <= 0.0)
+	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(campaign.volume, 0.001)))
 
 func set_language(code: String) -> void:
 	I18n.set_lang(code)
@@ -546,7 +579,7 @@ func make_opening(rng: RandomNumberGenerator) -> void:
 			for i in range(18): cones.append(Vector3(-7.0+i*0.82, 0.07, 9.0))
 			for i in range(16): walkers.append(Vector3(-6.4+i*0.8, 0.16, 6.9))
 			benches.assign([Vector3(-7.0, 0.16, 6.4), Vector3(7.0, 0.16, 6.4)])
-	for at in cones: add_item("cone", at, 0.2)
+	for at in cones: add_item("cone", at, 0.2).opening_origin = at
 	for i in walkers.size():
 		var walker := add_item("person", walkers[i], 0.22, i%4)
 		Traffic.make_walker(walker, Vector2(0.28, 0.1), rng.randf_range(0.25, 0.4), rng.randf_range(0, TAU))
@@ -779,6 +812,7 @@ func make_beam(color: Color) -> MeshInstance3D:
 	return ray
 
 func reset_round() -> void:
+	pick_spawn()
 	reset_stats()
 	defense.roads_x = layout.crossings_x
 	defense.roads_z = layout.crossings_z
@@ -801,11 +835,20 @@ func reset_round() -> void:
 	animate_world(0.0)
 	for item in items: set_item_transform(item)
 
+# A random inner street per campaign/endless round; the daily mini-games, smoke
+# tests and captures keep the designed opening street so they stay repeatable.
+func pick_spawn() -> void:
+	var spot := {"at":SPAWN, "axis":Vector3.RIGHT, "length":18.0}
+	if run_kind != "daily" and not test_mode and not capture_mode:
+		spot = SpawnPoints.pick(self, spawn_rng)
+	spawn = spot.at
+	SpawnPoints.place_opening(self, spot)
+
 # The menu city is already fresh, so starting from the menu keeps traffic flowing.
 func reset_stats() -> void:
 	radius = float(stats.start_radius)
 	target_radius = radius
-	hole_position = SPAWN
+	hole_position = spawn
 	remaining = float(level.seconds) + float(stats.bonus_time)
 	score = 0
 	eaten = 0
@@ -837,6 +880,8 @@ func reset_stats() -> void:
 	reset_hazards()
 	mechanics.reset(self, level.weather, 991 + campaign.selected*31)
 	if fx: fx.clear()
+	if showtime: showtime.reset(self)
+	if events: events.reset(self)
 	started = false
 	paused = false
 	camera_target = hole_position
@@ -940,11 +985,28 @@ func _notification(what: int) -> void:
 		elif mode in ["paused", "result"]: go_menu()
 		else: get_tree().quit()
 
+func _input(event: InputEvent) -> void:
+	if mode != "menu" or not OS.is_debug_build() or wardrobe.visible: return
+	var tap: bool = (event is InputEventScreenTouch or event is InputEventMouseButton) and event.pressed
+	if not tap or not hud.title_rect().has_point(event.position): return
+	title_taps = title_taps + 1 if elapsed - last_title_tap < TEST_TAP_GAP else 1
+	last_title_tap = elapsed
+	if title_taps >= TEST_TAPS: toggle_test_mode()
+
+# Test mode keeps its own save, so switching restarts the game on the other file.
+func toggle_test_mode() -> void:
+	persist()
+	if campaign.test_mode: DirAccess.remove_absolute(TEST_FLAG)
+	else: FileAccess.open(TEST_FLAG, FileAccess.WRITE).store_string("on")
+	get_tree().reload_current_scene()
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		if wardrobe.visible: close_panel()
 		else: toggle_pause()
 	if mode != "playing": return
+	var tapped: bool = (event is InputEventScreenTouch or event is InputEventMouseButton) and event.pressed
+	if tapped or (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE): tap_guardian()
 	if event is InputEventScreenTouch:
 		if event.pressed and touch_id == -1:
 			touch_id = event.index
@@ -960,6 +1022,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion and dragging and touch_id == -1:
 		update_drag(event.position)
 
+# A guardian hanging on the rim lets go after enough taps (mascot.gd "cling").
+func tap_guardian() -> void:
+	if mechanics.guardian_clinging(): mechanics.mascot.tug(self)
+
 func update_drag(point: Vector2) -> void:
 	drag_delta = point - drag_origin
 	if drag_delta.length() > 62:
@@ -971,6 +1037,7 @@ func move_direction() -> Vector2:
 		float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT)) - float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)),
 		float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN)) - float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP)))
 	if direction.length() > 0: return direction.normalized()
+	if bot_input != Vector2.ZERO: return bot_input.limit_length()
 	return (drag_delta / 54.0).limit_length() if dragging and drag_delta.length() > 5 else Vector2.ZERO
 
 func _process(delta: float) -> void:
@@ -990,6 +1057,10 @@ func _process(delta: float) -> void:
 		animate_world(dt)
 		advance_falls(dt)
 	if not paused: mechanics.animate(dt)
+	if not paused:
+		showtime.update_shouts(dt, mode == "playing")
+		showtime.track(dt)
+	if mode == "result": showtime.idle(dt)
 	fx.set_frozen(paused)
 	if not paused: fx.update(delta)
 	weather.update(delta, hole_position, paused, radius if mode in ["playing", "paused", "revive"] else 0.0)
@@ -1052,6 +1123,16 @@ func step(dt: float, input: Vector2) -> void:
 	elif remaining <= 0 and (boss_down or items[boss_index].fall < 0):
 		if not boss_down and can_offer_revive(): offer_revive()
 		else: finish(boss_down)
+
+# The landmark's conquest (showtime.gd) holds the round: no clock, shots or
+# steering until the landmark is down and its banner has played.
+func conquest_step(dt: float) -> void:
+	radius = lerpf(radius, target_radius, 1.0-exp(-dt*8.0))
+	bite_time = maxf(0, bite_time-dt*2.5)
+	pulse = maxf(0, pulse-dt*2.0)
+	update_floaters(dt)
+	advance_falls(dt)
+	if showtime.update(dt) and boss_down: finish(true)
 
 # Every piece of original map food is gone (bonus minions and reinforcements aside).
 func map_cleared() -> bool:
@@ -1172,7 +1253,10 @@ func start_fall(item: Dictionary, centre: Vector3) -> void:
 
 func swallow(item: Dictionary) -> void:
 	var is_boss: bool = item.get("is_boss", false)
-	start_fall(item, hole_position)
+	# A campaign landmark goes down in the conquest cinematic, which starts its fall.
+	var conquest: bool = is_boss and showtime.enabled and run_kind == "campaign" and is_landmark()
+	if conquest: showtime.start_conquer(self, item)
+	else: start_fall(item, hole_position)
 	item.sink = "player"
 	if item.get("defender", false): defenders_eaten += 1
 	if run_kind == "endless" and not is_boss:
@@ -1191,6 +1275,7 @@ func swallow(item: Dictionary) -> void:
 	if is_boss:
 		score += BOSS_BONUS
 		add_floater(item.position, "+%d" % BOSS_BONUS, true)
+		if conquest: return
 		fx.burst(item.position, radius)
 		slowmo = BOSS_SLOWMO
 		sfx.play("boss")
@@ -1297,7 +1382,6 @@ func finish(won: bool) -> void:
 			var gift: Dictionary = campaign.advance_streak(date)
 			if not gift.is_empty():
 				var line := I18n.t("streak_gift", [int(gift.day), int(gift.coins)])
-				if int(gift.effect) >= 0: line += " · " + Campaign.effect_name(int(gift.effect))
 				record_note = line + " · " + record_note
 		"endless":
 			reward = campaign.endless_reward(score, endless_stage)
@@ -1313,7 +1397,6 @@ func finish(won: bool) -> void:
 	if run_kind == "campaign":
 		var parts: Dictionary = campaign.reward_parts(won, hud.stars, eaten_points, best_combo)
 		hud.coin_parts = I18n.t("coin_parts", [roundi(parts.food), parts.stars, parts.win, time_coins, ("%.2f" % parts.multiplier).trim_suffix("0").trim_suffix(".0")])
-	hud.next_reward = campaign.next_journey_reward()
 	campaign.coins += reward
 	# Reminders are offered after the first win, never at launch.
 	if won and "reminder_asked" not in campaign.seen and notify.available():
@@ -1477,12 +1560,16 @@ func advance_endless() -> void:
 func update_view(dt: float) -> void:
 	# The menu frames the boss slightly low so the title does not cover it.
 	var target := Vector3(0, boss_radius*0.7, 0.5) if mode == "menu" else hole_position
+	# The conquest swings the camera round and in on the landmark (showtime.gd).
+	var shot: float = showtime.blend if mode in ["playing", "result"] else 0.0
+	if shot > 0.0: target = target.lerp(showtime.focus, shot)
 	camera_target = camera_target.lerp(target,1.0-exp(-dt*6.0))
 	var look := camera_target + fx.shake_offset(elapsed)
-	camera.position = look + CAMERA_OFFSET
+	camera.position = look + CAMERA_OFFSET.rotated(Vector3.UP, showtime.angle*shot)
 	camera.look_at(look)
 	var menu_zoom := 21.0 + boss_radius*1.7
 	var zoom: float = 12.0 if mode == "customize" else menu_zoom if mode == "menu" else (21.0+radius*1.8)*mechanics.view_scale()
+	if shot > 0.0: zoom = lerpf(zoom, showtime.size, shot)
 	camera.size = lerpf(camera.size, zoom, 1.0-exp(-dt*3.0))
 	# Leave the right half free for the landscape wardrobe controls.
 	var preview_offset := 5.8 if mode == "customize" and get_viewport().get_visible_rect().size.x > get_viewport().get_visible_rect().size.y else 0.0
@@ -1499,13 +1586,15 @@ func update_view(dt: float) -> void:
 	# The rim pulses on each bite and more strongly on each growth step.
 	rim.scale = Vector3.ONE*(1.0+pulse*0.08+bite_time*0.12)
 	var hover := (1.8 if mode == "customize" else 3.4 + radius*0.9) + sin(elapsed*2.0)*0.15
+	# In the conquest the saucer climbs out of the shot to leave the landmark in view.
+	hover += shot*(4.0 + radius*1.6)
 	saucer.visible = mode != "customize" or wardrobe.tab == "crafts"
 	beam.visible = saucer.visible
 	if not paused: saucer_wobble = maxf(0.0, saucer_wobble - dt*WOBBLE_FADE)
 	var reel := saucer_wobble*saucer_wobble
 	saucer.position = hole_position + Vector3(sin(elapsed*13.0)*reel*0.6, hover - reel*0.8, cos(elapsed*11.0)*reel*0.6)
 	saucer.scale = Vector3.ONE*(0.55 + radius*0.28)
-	saucer.rotation = Vector3(sin(elapsed*17.0)*reel*0.55, elapsed*0.8 if campaign.craft < 5 else 0.5+sin(elapsed*1.3)*0.16, cos(elapsed*14.0)*reel*0.45)
+	saucer.rotation = Vector3(sin(elapsed*17.0)*reel*0.55, elapsed*0.8 if preload("res://scripts/fleet.gd").SPINS[campaign.craft] else 0.5+sin(elapsed*1.3)*0.16, cos(elapsed*14.0)*reel*0.45)
 	beam.position = hole_position + Vector3(0, hover*0.5, 0)
 	beam.scale = Vector3(radius*(0.9 + bite_time*0.3), hover, radius*(0.9 + bite_time*0.3))
 	var rival_shown: bool = rival.active and mode in ["playing", "paused", "result"]

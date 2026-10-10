@@ -31,6 +31,18 @@ var last_interstitial_ms := -INTERSTITIAL_GAP_MS
 var last_rewarded_ms := -REWARDED_QUIET_MS
 var showing := false
 
+func privacy_options_required() -> bool:
+	return backend != null and backend.privacy_options_required()
+
+func privacy_busy() -> bool:
+	return showing or (backend != null and backend.consent_busy)
+
+func show_privacy_options() -> void:
+	if backend != null and not privacy_busy(): backend.show_privacy_options()
+
+func retry_consent() -> void:
+	if backend != null and not privacy_busy(): backend.request_consent()
+
 # On Android the AdMob bridge takes over from the debug simulation. It is loaded
 # by path so desktop runs and headless tests never parse the SDK wrappers.
 func _ready() -> void:

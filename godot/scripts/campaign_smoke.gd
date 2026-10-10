@@ -14,6 +14,10 @@ func run(g) -> void:
 		bench_rival(g)
 		g.get_tree().quit()
 		return
+	if "--spawn-bench" in OS.get_cmdline_user_args():
+		bench_spawns(g)
+		g.get_tree().quit()
+		return
 	check_progress()
 	check_goals_and_modes()
 	# `--quick` skips the slow 48-city sweep while iterating on other checks.
@@ -109,7 +113,7 @@ func check_progress() -> void:
 	var smallest_shop: float = 0.95 + 0.07
 	check(maxed*0.85 < smallest_shop, "a maxed size upgrade (%.2f) cannot eat a shop from the start" % maxed)
 	check_looks()
-	progress.owned = {"skins":[0, 7], "effects":[0, 3], "trails":[0, 3]}
+	progress.owned = {"crafts":[0, 2], "skins":[0, 7], "effects":[0, 3], "trails":[0, 3]}
 	progress.skin = 7; progress.effect = 3; progress.trail = 3
 	var restored = Campaign.new()
 	restored.restore(JSON.parse_string(JSON.stringify(progress.data())))
@@ -123,7 +127,7 @@ func check_progress() -> void:
 	check(sizes[0] == 9 and sizes[count-1] == 35 and sizes[30] == 25 and sizes[23] > sizes[0], "maps grow from 3×3 to 5×7")
 	check(sizes[7] > sizes[6], "continent finale uses a bigger map")
 
-# Coin shop and journey rewards for hole looks (cosmetics.gd), as in the 2D game.
+# Coin shop for the saucer and hole looks (cosmetics.gd), as in the 2D game.
 func check_looks() -> void:
 	var Cosmetics = preload("res://scripts/cosmetics.gd")
 	var shop = Campaign.new()
@@ -136,12 +140,18 @@ func check_looks() -> void:
 	shop.coins = 350
 	check(shop.buy_look("skins", 1) and shop.coins == 50 and shop.owns("skins", 1) and shop.equip("skins", 1) and shop.skin == 1, "buying a skin spends its price and lets it be equipped")
 	check(not shop.buy_look("skins", 1) and shop.coins == 50, "an owned look is never charged twice")
+	check(Cosmetics.count("crafts") == preload("res://scripts/fleet.gd").NAMES.size() and not shop.owns("crafts", 1) and not shop.equip("crafts", 1), "saucers have prices and start locked")
 	shop.coins = 99999
-	check(not shop.buy_look("skins", 11) and not shop.owns("skins", 11), "journey skins cannot be bought")
+	check(shop.buy_look("skins", 11) and shop.buy_look("crafts", 2) and shop.equip("crafts", 2) and shop.craft == 2, "former journey skins and saucers are bought with coins")
 	for i in 6: shop.medals[i] = 3
-	check(shop.owns("skins", 11) and shop.owns("effects", 1) and not shop.owns("trails", 5), "18 stars earn the comet skin and confetti")
-	shop.unlocked = 6
-	check(shop.cities_taken() == 6 and shop.owns("skins", 9) and not shop.owns("skins", 10), "six cities earn the explorer skin")
+	check(not shop.owns("effects", 1), "stars no longer unlock looks")
+	var legacy = Campaign.new()
+	legacy.restore({"version":8, "craft":3, "medals":[3, 3, 3, 3, 3, 3], "unlocked":6})
+	check(legacy.owns("crafts", 3) and legacy.craft == 3 and legacy.owns("skins", 11) and legacy.owns("skins", 9) and legacy.owns("effects", 1) and not legacy.owns("skins", 10), "an old save keeps its saucer and earned journey looks")
+	var tester = Campaign.new()
+	tester.enable_test_mode()
+	check(tester.coins == Campaign.TEST_COINS and tester.can_select(Campaign.level_count()-1) and tester.save_path() == Campaign.TEST_SAVE_PATH, "test mode opens every city with its own save")
+	check(tester.buy_look("trails", 5) and tester.buy("size") and tester.coins == Campaign.TEST_COINS, "test mode coins never run out")
 	var old = Campaign.new()
 	old.restore({"version":5, "skin":3, "effect":2, "trail":3})
 	check(old.skin == 3 and old.effect == 5 and old.trail == 5 and old.owns("skins", 3) and old.owns("effects", 5) and old.owns("trails", 5), "looks equipped before the shop stay owned")
@@ -205,6 +215,25 @@ func check_levels(g) -> void:
 			g.on_play()
 			check(g.campaign.selected == i+1 and g.score == 0, "next button loads a fresh level")
 
+# Random drop points sit on inner streets, clear of the landmark, and the opening
+# cones follow them onto that street without reaching a crossing.
+func check_spawns(g, i: int) -> void:
+	var spots: Array = g.SpawnPoints.candidates(g)
+	var layout = g.layout
+	var on_street := spots.all(func(spot): return spot.at.is_equal_approx(g.SPAWN) \
+		or (spot.axis == Vector3.RIGHT and spot.at.z in layout.crossings_z) or (spot.axis == Vector3.BACK and spot.at.x in layout.crossings_x))
+	check(spots.size() >= 4 and on_street, "level %d has %d random drop streets" % [i+1, spots.size()])
+	var spot: Dictionary = spots[-1]
+	g.SpawnPoints.place_opening(g, spot)
+	var cones: Array = g.items.filter(func(item): return item.has("opening_origin"))
+	var half: float = spot.length*0.5 - g.SpawnPoints.CONE_MARGIN + 0.01
+	var lined := cones.all(func(cone):
+		var offset: Vector3 = (cone.origin - spot.at)*Vector3(1, 0, 1)
+		return absf(offset.dot(spot.axis)) <= half and is_zero_approx(offset.cross(spot.axis).length()))
+	check(not cones.is_empty() and lined, "level %d opening cones line the drop street" % (i+1))
+	g.SpawnPoints.place_opening(g, spots[0])
+	check(cones.all(func(cone): return cone.origin == cone.opening_origin), "level %d designed opening restored" % (i+1))
+
 func check_goals_and_modes() -> void:
 	var progress = Campaign.new()
 	progress.unlock_all_for_testing = false
@@ -246,9 +275,8 @@ func check_services(g) -> void:
 	check(Notify.delay_until_tomorrow({"hour":20, "minute":0, "second":0}) == 23*3600 and Notify.delay_until_tomorrow({"hour":0, "minute":0, "second":0}) == 43*3600, "the reminder lands at 19:00 the next day")
 	check(Notify.message(4)[0].contains("4") and Notify.message(1)[0] != Notify.message(4)[0], "a streak gets its own reminder text")
 	check(not g.notify.available() and not g.hud.reminder_button.visible, "without the notification addon there is no reminder switch")
-
-# Days in a row with a finished daily: coins grow over a week, day 7 gives an
-# effect, a skipped day starts over, and the same day never pays twice.
+# Days in a row with a finished daily: coins grow over a week, day 7 adds a
+# coin bonus (never a free look), a skipped day starts over, and the same day never pays twice.
 func check_streak(progress) -> void:
 	check(Campaign.day_before("2026-03-01") == "2026-02-28" and Campaign.day_before("2027-01-01") == "2026-12-31", "the day before crosses months and years")
 	progress.streak = {"count":0, "last":""}
@@ -257,8 +285,8 @@ func check_streak(progress) -> void:
 	var gifts: Array = []
 	for day in range(1, 8): gifts.append(progress.advance_streak("2026-11-%02d" % day))
 	check(progress.streak.count == 7 and gifts[0].coins == Campaign.STREAK_COINS[0] and gifts[6].day == 7, "seven days in a row count up")
-	check(gifts[6].effect >= 0 and progress.owns("effects", gifts[6].effect) and progress.owned.effects.size() == owned_before + 1, "day seven gives an effect")
-	check(progress.coins - coins_before == Campaign.STREAK_COINS.reduce(func(a, b): return a + b), "each day pays its coins")
+	check(gifts[6].coins == int(Campaign.STREAK_COINS[6]) + Campaign.STREAK_WEEK_COINS and progress.owned.effects.size() == owned_before, "day seven pays a coin bonus, not a free look")
+	check(progress.coins - coins_before == Campaign.STREAK_COINS.reduce(func(a, b): return a + b) + Campaign.STREAK_WEEK_COINS, "each day pays its coins")
 	check(progress.advance_streak("2026-11-07").is_empty(), "a second daily the same day pays nothing")
 	check(progress.streak_days("2026-11-08") == 7 and progress.streak_days("2026-11-09") == 0, "the streak shows until a day is skipped")
 	check(progress.advance_streak("2026-11-10").day == 1, "a skipped day starts the streak over")
@@ -492,4 +520,4 @@ func check_panels(g) -> void:
 		g.campaign.trail = skin%Campaign.TRAILS.size()
 		g.apply_style()
 		check(g.rim_shader.get_shader_parameter("style") == skin, "skin %d equips" % skin)
-	check(g.fx.get_child_count() == 19, "cosmetic changes reuse fixed particle pools")
+	check(g.fx.get_child_count() == 20, "cosmetic changes reuse fixed particle pools and the ground trail")

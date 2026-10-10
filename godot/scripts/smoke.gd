@@ -81,7 +81,7 @@ func run(game) -> void:
 	check(g.boss_down and g.mode=="result" and g.hud.won and g.remaining > 20,"swallowing the boss wins the round at once")
 	# The test keeps stepping after the result, so the clock may have moved on since.
 	check(g.time_coins >= int(g.remaining)*g.CLEAR_COINS and g.time_coins > 40,"seconds left on the clock pay coins")
-	check(g.hud.goal_progress.size() == g.goal_list.size() and g.hud.coin_parts != "" and not g.hud.next_reward.is_empty(), "the result shows goal progress, coin sources and the next reward")
+	check(g.hud.goal_progress.size() == g.goal_list.size() and g.hud.coin_parts != "", "the result shows goal progress and coin sources")
 	var city: int = g.campaign.selected
 	g.retry_city()
 	check(g.mode == "playing" and g.campaign.selected == city and not g.boss_down, "retry replays the same city")
@@ -307,6 +307,11 @@ func check_guardian_fight() -> void:
 	check(mascot.state == "hunt" and guardian.position.x > home.x + 1.0, "the guardian leaves the landmark to hunt a nearby hole")
 	check(g.hud.guardian_max == mascot.HP and g.minimap_data().has("guardian"), "the HUD shows the guardian's hearts and the minimap its position")
 	check_guardian_streets(mascot, guardian)
+	check_guardian_routes(mascot.Roads)
+	check_guardian_hop(mascot, guardian)
+	g.reset_round()
+	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
+	g.defense.grace = 99.0
 	var full: float = guardian.radius
 	var bites := 0
 	for attempt in 8:
@@ -316,13 +321,13 @@ func check_guardian_fight() -> void:
 		var hp_before: int = mascot.hp
 		for i in 5: g.step(0.02, Vector2.ZERO)
 		if mascot.hp < hp_before or guardian.fall >= 0: bites += 1
-		for i in int(mascot.STAGGER/0.02) + 2: g.step(0.02, Vector2.ZERO)
+		for i in int((mascot.STAGGER + mascot.THROW_TIME)/0.02) + 2: g.step(0.02, Vector2.ZERO)
 	for i in 60: g.step(0.02, Vector2.ZERO)
 	check(bites == mascot.HP and not g.mechanics.shield_up(), "the guardian falls on the third bite (%d bites)" % bites)
 	g.reset_round()
 	check(mascot.hp == mascot.HP and is_equal_approx(g.mechanics.guardian.radius, full), "a new round heals the guardian")
-	# At the dead end of a street by the map edge, the knock runs back along the
-	# street toward the middle instead of pinning it under the hole.
+	# A bite throws the guardian clear of the rim, even from the dead end of a
+	# street by the map edge, and it lands back on a street.
 	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
 	var street: float = g.layout.crossings_z[-1]
 	var corner := Vector3(g.layout.move_x - 0.5, guardian.position.y, street)
@@ -330,10 +335,159 @@ func check_guardian_fight() -> void:
 	g.radius = full/g.EAT_RATIO + 0.3; g.target_radius = g.radius
 	g.hole_position = Vector3(corner.x - 0.4, 0, corner.z - 0.4)
 	for i in 3: g.step(0.02, Vector2.ZERO)
-	for i in int(mascot.KNOCK_TIME/0.02): g.step(0.02, Vector2.ZERO)
-	check(mascot.hp == mascot.HP - 1 and guardian.position.x < corner.x - 1.0 and is_equal_approx(guardian.position.z, street), "a cornered guardian is knocked back along its street")
+	check(mascot.hp == mascot.HP - 1 and mascot.state == "thrown" and not mascot.can_be_bitten(), "a bitten guardian is thrown and cannot be bitten mid-air")
+	for i in int(mascot.THROW_TIME/0.02) + 2: g.step(0.02, Vector2.ZERO)
+	var gap := Vector2(guardian.position.x - g.hole_position.x, guardian.position.z - g.hole_position.z).length()
+	check(gap >= g.radius + guardian.radius and is_equal_approx(guardian.position.y, mascot.home.y) and g.Mechanics.Mascot.Roads.walkable(g.layout, guardian.position) and not mascot.can_be_bitten(),
+		"a cornered guardian lands on a street clear of the hole, still protected (gap %.1f, hole %.1f)" % [gap, g.radius])
+	# A big hole must not swallow its three hearts in a row: the throw clears its rim too.
+	for i in int(mascot.STAGGER/0.02) + 2: g.step(0.02, Vector2.ZERO)
+	g.radius = 5.0; g.target_radius = 5.0
+	g.hole_position = Vector3(guardian.position.x, 0, guardian.position.z)
+	for i in 3: g.step(0.02, Vector2.ZERO)
+	for i in int(mascot.THROW_TIME/0.02) + 2: g.step(0.02, Vector2.ZERO)
+	gap = Vector2(guardian.position.x - g.hole_position.x, guardian.position.z - g.hole_position.z).length()
+	check(mascot.hp == mascot.HP - 2 and gap >= g.radius + guardian.radius, "a big hole throws the guardian past its rim (gap %.1f)" % gap)
+	check_showtime()
+	check_street_events()
 	g.reset_round()
 	g.load_level(0)
+
+# Street events (street_events.gd), off elsewhere in smoke: the rush-hour jam rolls
+# in as bonus food, and a gate pair grows or shrinks the hole once.
+func check_street_events() -> void:
+	var events = g.events
+	g.load_level(24)
+	events.enabled = true
+	g.reset_round()
+	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
+	g.defense.grace = 99.0
+	g.rival.active = false
+	check(events.jam.size() == events.JAM_CARS and events.jam.all(func(car): return car.hidden and car.bonus), "the rush-hour jam waits hidden as bonus food")
+	check(events.gates.size() == events.GATE_PAIRS*2, "gate pairs stand across the streets")
+	g.target_radius = 1.2; g.radius = 1.2
+	events.round_time = events.JAM_AFTER
+	g.step(0.02, Vector2.ZERO)
+	check(events.jam_state == "rolling", "rush hour starts once the hole can eat a cab")
+	for i in 100: g.step(0.02, Vector2.ZERO)
+	var shown: Array = events.jam.filter(func(car): return not car.hidden and not car.eaten)
+	check(events.jam_state == "parked" and shown.size() >= 8, "the jam parks bumper to bumper (%d cars)" % shown.size())
+	var points: int = g.eaten_points
+	g.swallow(shown[0])
+	check(g.eaten_points == points and g.score > 0, "jam vehicles score but never count toward completion")
+	# Drive through the green gate of the first pair, then the red one of the next.
+	for good in [true, false]:
+		var gate: Dictionary = events.gates.filter(func(other): return other.good == good and not other.used)[0]
+		var before: float = g.target_radius
+		events.last_hole = gate.at - gate.along*1.0 + gate.across*gate.side*0.8
+		g.hole_position = gate.at + gate.along*1.0 + gate.across*gate.side*0.8
+		events.check_gates(g)
+		var cap: float = g.boss_radius/g.EAT_RATIO*events.GATE_CAP
+		var wanted: float = minf(before*events.GATE_GROW, cap) if good else maxf(float(g.stats.start_radius), before*events.GATE_SHRINK)
+		check(is_equal_approx(g.target_radius, wanted) and events.gates.filter(func(other): return other.pair == gate.pair).all(func(other): return other.used),
+			"a %s gate changes the size once and folds its pair (%.2f -> %.2f)" % ["green" if good else "red", before, g.target_radius])
+	events.enabled = false
+
+# Shortest street routes on a large map: from one side of a city block to the
+# far side, every step stays on a street and the walk is no longer than going
+# round the block's nearer end.
+func check_guardian_routes(Roads) -> void:
+	var layout = g.MapLayout.make(5, 5)
+	layout.vary_districts(26)
+	var xs: Array = Roads.roads_x(layout)
+	var zs: Array = Roads.roads_z(layout)
+	var a := Vector3(xs[0], 0, (zs[0] + zs[1])*0.5)
+	var b := Vector3(xs[1], 0, (zs[0] + zs[1])*0.5 + 2.0)
+	var plan: Dictionary = Roads.plan(layout, a, b)
+	var shortest: float = (xs[1] - xs[0]) + minf(a.z - zs[0], zs[1] - a.z)*2.0 + 2.0
+	var at := a
+	var off := 0
+	var walked := 0.0
+	for i in 400:
+		if at.distance_to(b) < 0.05: break
+		var next: Vector3 = Roads.next_point(layout, at, b)
+		var step: Vector3 = (next - at).limit_length(0.25)
+		at += step
+		walked += step.length()
+		if not Roads.walkable(layout, at): off += 1
+	check(at.distance_to(b) < 0.05 and off == 0 and walked <= shortest + 0.5 and absf(plan.length - walked) < 0.5,
+		"the guardian walks round a block by the shortest streets (%.1f, best %.1f, %d off)" % [walked, shortest, off])
+
+# A hole across a block, where the streets go the long way round: the guardian
+# hops the roofs, lands on a street nearer the hole and strikes soon after.
+func check_guardian_hop(mascot, guardian: Dictionary) -> void:
+	var Roads = mascot.Roads
+	g.reset_round()
+	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
+	g.defense.grace = 0.0
+	g.rival.active = false
+	var target := Vector3.ZERO
+	for x in range(-int(g.layout.move_x), int(g.layout.move_x), 2):
+		for z in range(-int(g.layout.move_z), int(g.layout.move_z), 2):
+			var spot := Vector3(x, 0, z)
+			var gap: float = Vector2(spot.x - guardian.position.x, spot.z - guardian.position.z).length()
+			if gap < 9.0 or gap > 15.0 or Roads.walkable(g.layout, spot): continue
+			if Roads.plan(g.layout, guardian.position, spot).length > gap*2.0:
+				target = spot
+				break
+		if target != Vector3.ZERO: break
+	check(target != Vector3.ZERO, "the map has a spot the streets reach only the long way round")
+	if target == Vector3.ZERO: return
+	g.hole_position = target
+	var hopped := false
+	var struck := false
+	for i in 150:
+		g.step(0.02, Vector2.ZERO)
+		hopped = hopped or mascot.state == "hop"
+		if hopped and mascot.state in ["windup", "recover", "charge", "leap"]:
+			struck = true
+			break
+	var gap: float = Vector2(guardian.position.x - target.x, guardian.position.z - target.z).length()
+	check(hopped and struck and Roads.walkable(g.layout, guardian.position) and gap < 10.0, "a guardian hops the roofs to a hole the streets go round, then strikes (gap %.1f, hopped %s, struck %s, %s)" % [gap, hopped, struck, mascot.state])
+
+# Showtime (showtime.gd), off elsewhere in smoke: the last bite leaves the guardian
+# on the rim until tapped loose, and the landmark goes down in a held cinematic.
+func check_showtime() -> void:
+	g.showtime.enabled = true
+	g.reset_round()
+	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
+	var mascot = g.mechanics.mascot
+	var guardian: Dictionary = g.mechanics.guardian
+	mascot.hp = 1
+	g.defense.grace = 99.0
+	g.radius = guardian.radius/g.EAT_RATIO + 0.3; g.target_radius = g.radius
+	g.hole_position = Vector3(guardian.position.x, 0, guardian.position.z)
+	for i in 3: g.step(0.02, Vector2.ZERO)
+	check(mascot.state == "cling" and g.mechanics.shield_up() and not mascot.can_be_bitten(), "the last bite leaves the guardian clinging to the rim")
+	var clock: float = g.remaining
+	for i in mascot.CLING_TAPS:
+		g.tap_guardian()
+		g.step(0.02, Vector2(1, 0))
+	check(absf(g.hole_position.x - guardian.position.x) < g.radius, "the hole holds still while the guardian clings")
+	for i in 30: g.step(0.02, Vector2.ZERO)
+	check(not g.mechanics.shield_up() and clock - g.remaining < 0.7, "enough taps drop the guardian and the shield, the clock held meanwhile")
+	# Untouched, it lets go by itself.
+	g.reset_round()
+	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
+	mascot.hp = 1
+	g.radius = guardian.radius/g.EAT_RATIO + 0.3; g.target_radius = g.radius
+	g.hole_position = Vector3(guardian.position.x, 0, guardian.position.z)
+	for i in int((mascot.CLING_MAX + 1.0)/0.02): g.step(0.02, Vector2.ZERO)
+	check(not g.mechanics.shield_up(), "an untapped guardian lets go by itself")
+	# The conquest: the round holds, nearby food is pulled in, then the result.
+	var boss: Dictionary = g.items[g.boss_index]
+	g.target_radius = g.boss_radius/g.EAT_RATIO + 0.1; g.radius = g.target_radius
+	g.hole_position = Vector3(boss.position.x, 0, boss.position.z)
+	g.step(0.02, Vector2.ZERO)
+	var left: float = g.remaining
+	for i in 4: g.step(0.02, Vector2.ZERO)
+	check(g.showtime.busy() and g.mode == "playing" and boss.fall < 0, "swallowing the landmark starts the conquest")
+	var limit := int((g.showtime.TREMBLE + g.showtime.FALL + g.showtime.BANNER + 1.0)/0.02)
+	for i in limit:
+		if g.mode != "playing": break
+		g.step(0.02, Vector2.ZERO)
+	check(g.mode == "result" and g.hud.won and is_equal_approx(g.remaining, left) and not g.showtime.busy(), "the conquest ends in a win with the clock held (%s, %.2f/%.2f)" % [g.mode, g.remaining, left])
+	g.showtime.enabled = false
 
 # Gold districts, roadblocks, shortcuts and danger zones (scripts/map_features.gd).
 func check_features() -> void:

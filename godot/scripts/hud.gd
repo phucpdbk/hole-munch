@@ -17,6 +17,7 @@ signal double_requested
 signal update_requested
 signal board_requested
 signal reminder_requested
+signal privacy_requested
 const UiStyle = preload("res://scripts/ui_style.gd")
 const UiButton = preload("res://scripts/ui_button.gd")
 const I18n = preload("res://scripts/i18n.gd")
@@ -27,6 +28,7 @@ var minimap := {}
 var daily_button: BaseButton
 var endless_button: BaseButton
 var help_button: BaseButton
+var privacy_button: BaseButton
 var language_button: BaseButton
 var revive_button: BaseButton
 var give_up_button: BaseButton
@@ -54,7 +56,6 @@ var goal_mask := 0
 # the closest journey reward ({slot, index, track, need, have} or {}).
 var goal_progress: Array = []
 var coin_parts := ""
-var next_reward: Dictionary = {}
 var retry_button: BaseButton
 var rival_growth := -1.0
 var daily_won := false
@@ -148,7 +149,9 @@ func _ready() -> void:
 	endless_button.pressed.connect(func(): endless_requested.emit())
 	help_button = make_button("help", Color("35546d"))
 	help_button.pressed.connect(func(): help_requested.emit())
-	language_button = make_button("language", Color("35546d"))
+	privacy_button = make_button("lock", Color("35546d"))
+	privacy_button.pressed.connect(func(): privacy_requested.emit())
+	language_button = make_button("settings", Color("35546d"))
 	language_button.pressed.connect(func(): language_requested.emit())
 	revive_button = make_button("clock", Color("f6cb70"), true)
 	revive_button.pressed.connect(func(): revive_requested.emit())
@@ -183,6 +186,7 @@ func layout() -> void:
 	if not is_instance_valid(play_button): return
 	var w := size.x
 	var h := size.y
+	place(privacy_button, Rect2(w-230, h-146, 202, 48) if w > h else Rect2(18, 12, 150, 44), 14)
 	place(pause_button, Rect2(w - 84, 36, 58, 58))
 	place(help_button, Rect2(w - 296, 26, 50, 50))
 	place(language_button, Rect2(w - 238, 26, 50, 50))
@@ -227,6 +231,8 @@ func retry_wanted() -> bool:
 	return mode == "result" and run_kind == "campaign" and won and stars < 3 and has_next
 
 func sync() -> void:
+	privacy_button.visible = mode in ["menu", "paused"]
+	privacy_button.text = I18n.t("privacy")
 	var layout_key := mode + str(retry_wanted()) + str(can_double) + str(board_ready)
 	if last_layout_mode != layout_key:
 		layout()
@@ -299,6 +305,12 @@ func draw_coins(right: float, top: float) -> void:
 func draw_title(pos: Vector2, font_size: int, centered := false) -> void:
 	UiStyle.text(self, "HOLE MUNCH", pos + Vector2(0, 4), font_size, Color(0.02, 0.06, 0.12, 0.5), centered, 0, title_font)
 	UiStyle.text(self, "HOLE MUNCH", pos, font_size, LIGHT, centered, 6, title_font)
+	if playtest: UiStyle.text(self, "TEST MODE", pos + Vector2(0, -font_size - 8) if centered else pos + Vector2(250, -font_size), 14, Color("ff6b6b"), centered, 0, title_font)
+
+# Where the menu title sits, for game.gd's test-mode taps.
+func title_rect() -> Rect2:
+	if size.x > size.y: return Rect2(20, 60, 400, 64)
+	return Rect2(size.x/2 - 190, 100, 380, 64)
 
 func level_line() -> String:
 	return I18n.t("level_line", [weather_title, int(seconds), map_title])
@@ -476,28 +488,9 @@ func draw_campaign_result() -> void:
 	UiStyle.draw_icon(self, "coin", Vector2(right + 14, 184), 26)
 	text_at(line, Vector2(right + 32, 191), 18, GOLD)
 	if coin_parts != "": UiStyle.text(self, coin_parts, Vector2(right, 215), 12, MUTED, false, 0, body_font)
-	draw_next_reward(Rect2(right, 232, 330, 28))
 	UiStyle.text(self, result_sub(), Vector2(w/2, 290), 14, MUTED, true, 0, body_font)
 	if gate_note != "" and won and not has_next and not last_city:
 		UiStyle.text(self, gate_note, Vector2(w/2, 304), 13, Color("ffb3a6"), true, 0, body_font)
-
-# The closest journey reward: its name, a progress bar and the count.
-func draw_next_reward(rect: Rect2) -> void:
-	if next_reward.is_empty(): return
-	var have: int = next_reward.have
-	var need: int = next_reward.need
-	var name := I18n.t("next_reward", reward_name(next_reward))
-	UiStyle.text(self, name, rect.position + Vector2(0, 10), 13, LIGHT, false, 0, body_font)
-	var count := I18n.t("reward_stars" if next_reward.track == "stars" else "reward_landmarks", [have, need])
-	UiStyle.text(self, count, rect.position + Vector2(rect.size.x - UiStyle.text_width(count, 13, body_font), 10), 13, GOLD, false, 0, body_font)
-	panel(Rect2(rect.position + Vector2(0, 18), Vector2(rect.size.x, 8)), Color("465d6b"), 4)
-	panel(Rect2(rect.position + Vector2(0, 18), Vector2(maxf(8.0, rect.size.x*clampf(float(have)/maxf(1.0, need), 0, 1)), 8)), GOLD, 4)
-
-static func reward_name(entry: Dictionary) -> String:
-	match str(entry.slot):
-		"skins": return Campaign.skin_name(entry.index)
-		"effects": return Campaign.effect_name(entry.index)
-	return Campaign.trail_name(entry.index)
 
 # Time ran out near the landmark: one rewarded-ad rescue with a short countdown.
 func draw_revive() -> void:

@@ -2,10 +2,13 @@ extends Node3D
 
 # Landmark guardian: a mascot (mascot_specs.gd) that keeps the landmark's shield
 # up until the hole swallows it. It roams the whole city along the streets
-# (mascot_roads.gd), never through blocks: patrols between crossings, hunts a
-# nearby hole, and runs home when the hole closes in on the landmark. In range it winds up and attacks the saucer (mascot_attacks.gd); once
+# (mascot_roads.gd, shortest routes round the blocks), never through them: patrols
+# between crossings, hunts the hole from across the city, and runs home when the
+# hole closes in on the landmark. A long detour round a block makes it hop over
+# the roofs to land beside the hole and strike at once. It keeps circling at its
+# style's range, leads a moving saucer, and winds up and attacks (mascot_attacks.gd); once
 # the hole can eat it, it runs off in short sprints instead. It takes three bites:
-# the first two knock it away, so the fight cannot be skipped by a passing sweep.
+# the first two throw it out of the hole, so the fight cannot be skipped by a passing sweep.
 # Attacks are telegraphed defence strikes, so hits go through game.take_hit().
 # The game sets this node's transform from the guardian item; the look and the
 # animation live in mascot_rig.gd.
@@ -14,15 +17,29 @@ const MascotAttacks = preload("res://scripts/mascot_attacks.gd")
 const Roads = preload("res://scripts/mascot_roads.gd")
 const Traffic = preload("res://scripts/traffic.gd")
 const ATTACK_COLORS := MascotAttacks.COLORS
-const FIRST_COOLDOWN := 4.0
-const COOLDOWN := 3.2
+const FIRST_COOLDOWN := 2.5
+const COOLDOWN := 2.3
 const WINDUP := 0.75
-const RECOVER := 0.9
-const RANGE := 8.0
-const HUNT_RANGE := 15.0
-const LOSE_RANGE := 22.0
+const RECOVER := 0.6
+const RANGE := 10.0
+const HUNT_RANGE := 22.0
+const LOSE_RANGE := 32.0
 const WALK_SPEED := 2.4
-const HUNT_SPEED := 3.4
+const HUNT_SPEED := 4.4
+# Seconds of the saucer's motion an attack leads it by.
+const LEAD := 0.6
+# Distance each style likes to fight from; it circles the hole at about that range.
+const STANDOFF := {"fire":5.5, "water":5.5, "lightning":6.0, "stomp":1.0, "charge":6.5, "leap":6.5}
+const CIRCLE_SPEED := 0.7
+const CIRCLE_SWING := 0.9
+# Over the roofs when the street route is this many times the straight distance.
+const HOP_DETOUR := 1.6
+const HOP_REACH := 18.0
+const HOP_TIME := 0.75
+const HOP_HEIGHT := 3.5
+const HOP_COOLDOWN := 3.0
+# A landing from a hop strikes this soon.
+const HOP_STRIKE := 0.35
 const HOME_SPEED := 5.2
 const FLEE_SPEED := 4.8
 const FLEE_DASH := 0.8
@@ -32,11 +49,18 @@ const ALERT := 8.0
 const GUARD_REACH := 5.0
 const HP := 3
 const STAGGER := 1.2
-const KNOCK_SPEED := 9.0
-const KNOCK_TIME := 0.35
+# A bite throws the guardian up and out over the rim: it lands on a street at
+# least THROW_GAP beyond the hole's edge and stays unbiteable for STAGGER after.
+const THROW_TIME := 0.7
+const THROW_HEIGHT := 3.0
+const THROW_GAP := 2.5
 const BITE_SHRINK := 0.92
 # How far ahead an escape looks for a street to run along.
 const FLEE_REACH := 8.0
+# The last bite leaves it hanging on the far rim (when showtime is on): taps pull
+# it loose, and it lets go by itself after CLING_MAX.
+const CLING_TAPS := 6
+const CLING_MAX := 3.2
 
 var spec: Dictionary = {}
 var item: Dictionary = {}
@@ -55,6 +79,10 @@ var squash := 0.0
 var air := 0.0
 var hp := HP
 var hurt := 0.0
+var hop_cooldown := 0.0
+var circle := 0.0
+var taps := 0
+var flail := 0.0
 var rig: Node3D
 var attacks: Node3D
 var rng := RandomNumberGenerator.new()
@@ -79,6 +107,10 @@ func reset() -> void:
 	air = 0.0
 	hp = HP
 	hurt = 0.0
+	hop_cooldown = 0.0
+	circle = 0.0
+	taps = 0
+	flail = 0.0
 	if item.is_empty(): return
 	item.position.y = home.y
 	if item.has("full_radius"): item.radius = item.full_radius
@@ -89,18 +121,21 @@ func attack_color() -> Color:
 # --- bites ------------------------------------------------------------------------
 
 # The hole closed over the guardian. Returns true when this bite swallows it;
-# otherwise it loses a heart, shrinks a little and is knocked out of reach.
+# otherwise it loses a heart, shrinks a little and is thrown out of the hole.
 func bite(game) -> bool:
-	if hurt > 0.0 or air > 0.3: return false
+	if hurt > 0.0 or air > 0.3 or state == "cling": return false
 	hp -= 1
-	if hp <= 0: return true
-	hurt = STAGGER
+	if hp <= 0:
+		if not game.showtime.enabled: return true
+		start_cling(game)
+		return false
+	hurt = STAGGER + THROW_TIME
 	item.full_radius = item.get("full_radius", item.radius)
 	item.radius *= BITE_SHRINK
-	var away := flat(item.position - game.hole_position)
-	heading = Roads.along(game.layout, item.position, inward(game, away.normalized() if away.length() > 0.05 else Vector3.FORWARD))
-	state = "knocked"
-	timer = KNOCK_TIME
+	leap_start = item.position
+	aim = throw_landing(game)
+	state = "thrown"
+	timer = 0.0
 	squash = 1.0
 	game.fx.ripple(item.position, item.radius*1.6, attack_color())
 	game.fx.shake = maxf(game.fx.shake, 0.4)
@@ -108,8 +143,92 @@ func bite(game) -> bool:
 	game.sfx.play("boss")
 	return false
 
+# A street (or plaza) spot clear of the hole's rim: straight away from the hole
+# first, then turning further round, bent toward the middle near the map edge.
+func throw_landing(game) -> Vector3:
+	var away := flat(item.position - game.hole_position)
+	var direction := inward(game, away.normalized() if away.length() > 0.05 else Vector3.FORWARD)
+	var clear: float = game.radius + item.radius + THROW_GAP
+	var best: Vector3 = item.position
+	var best_gap := -1.0
+	for reach in [clear, clear + 3.0, clear + 6.0]:
+		for turn in [0.0, 0.5, -0.5, 1.0, -1.0, 1.6, -1.6, PI]:
+			var spot: Vector3 = game.hole_position + direction.rotated(Vector3.UP, turn)*reach
+			spot.x = clampf(spot.x, -game.layout.move_x, game.layout.move_x)
+			spot.z = clampf(spot.z, -game.layout.move_z, game.layout.move_z)
+			spot = Roads.project(game.layout, Vector3(spot.x, home.y, spot.z))
+			var gap := flat(spot - game.hole_position).length()
+			if gap >= clear: return spot
+			if gap > best_gap:
+				best = spot
+				best_gap = gap
+	return best
+
+# The throw arc; the landing squashes it and it runs (or hunts) from there.
+func thrown(game, dt: float) -> void:
+	timer += dt
+	var t := clampf(timer/THROW_TIME, 0.0, 1.0)
+	item.position = leap_start.lerp(aim, t*t*(3.0 - 2.0*t))
+	air = sin(t*PI)
+	item.position.y = home.y + air*maxf(THROW_HEIGHT, item.radius*2.0)
+	if t < 1.0: return
+	item.position.y = home.y
+	air = 0.0
+	squash = 1.0
+	game.fx.ripple(item.position, item.radius*1.4, attack_color())
+	var edible: bool = item.radius <= game.radius*game.EAT_RATIO
+	state = "flee_rest" if edible else "hunt"
+	timer = 0.3
+
 func can_be_bitten() -> bool:
-	return hurt <= 0.0 and air <= 0.3
+	return hurt <= 0.0 and air <= 0.3 and state != "cling"
+
+# --- hanging on the rim ----------------------------------------------------------------
+
+# It grabs the rim on the side away from the camera, so it hangs facing the player.
+func start_cling(game) -> void:
+	state = "cling"
+	timer = 0.0
+	taps = 0
+	var back := flat(game.hole_position - game.camera.global_position)
+	heading = back.normalized() if back.length() > 0.01 else Vector3.FORWARD
+	squash = 1.0
+	game.fx.shake = maxf(game.fx.shake, 0.5)
+	game.add_floater(item.position, game.I18n.t("guardian_cling"), true)
+	game.sfx.play("boss")
+
+func tug(game) -> void:
+	if state != "cling": return
+	taps += 1
+	squash = 1.0
+	flail = 1.0
+	game.pulse = 1.0
+	game.fx.puff(item.position, item.radius*0.5, game.radius)
+	game.sfx.play("click", 0.9 + taps*0.08)
+
+# Hangs at the far rim, sinking a little more with every tap, kicking its legs.
+func cling(game, dt: float) -> void:
+	timer += dt
+	flail = maxf(0.4, flail - dt*2.0)
+	# The hole holds still and nothing shoots while the player taps.
+	game.mechanics.stun = maxf(game.mechanics.stun, 0.1)
+	game.defense.grace = maxf(game.defense.grace, 0.5)
+	if taps >= CLING_TAPS or timer >= CLING_MAX:
+		state = "dropped"
+		flail = 0.0
+		game.add_floater(item.position, game.I18n.t("guardian_drop"), true)
+		game.swallow(item)
+		return
+	var grip: float = float(taps)/CLING_TAPS
+	var rim: Vector3 = game.hole_position + heading*maxf(0.2, game.radius - item.radius*0.35)
+	var shiver := Vector3(sin(timer*31.0), 0, cos(timer*27.0))*0.04*(1.0 + grip)
+	item.position = rim + shiver
+	item.position.y = home.y - item.radius*(0.9 + grip*0.7) + absf(sin(timer*9.0))*0.06
+	# Facing the camera with its back to the far rim, leaning out over the hole.
+	var facing := atan2(-heading.x, -heading.z)
+	var lean := Basis(Vector3.UP.cross(-heading).normalized(), 0.28 + sin(timer*8.0)*0.06)
+	var basis := (lean*Basis(Vector3.UP, facing + sin(timer*6.0)*0.15)).scaled(Vector3.ONE*game.model_scale(item))
+	game.set_item_basis(item, basis)
 
 # --- behaviour (during play) ---------------------------------------------------------
 
@@ -120,7 +239,7 @@ func think(game, dt: float) -> void:
 	var distance := to_hole.length()
 	moving = 0.0
 	var edible: bool = item.radius <= game.radius*game.EAT_RATIO
-	var busy := state in ["charge", "leap", "knocked"]
+	var busy := state in ["charge", "leap", "thrown", "cling", "dropped", "hop"]
 	if edible and not busy and not state.begins_with("flee"):
 		state = "flee_rest"
 		timer = 0.4
@@ -140,12 +259,12 @@ func think(game, dt: float) -> void:
 			if timer <= 0:
 				state = "hunt"
 				cooldown = COOLDOWN*game.defense.cooldown_scale
-		"knocked":
-			timer -= dt
-			item.position += heading*KNOCK_SPEED*dt
-			if timer <= 0:
-				state = "flee_rest" if edible else "hunt"
-				timer = 0.3
+		"thrown": thrown(game, dt)
+		"hop": hop(game, dt)
+		"cling":
+			cling(game, dt)
+			return
+		"dropped": return
 		"flee_rest":
 			if not edible:
 				state = "hunt"
@@ -174,19 +293,64 @@ func roam(game, dt: float, to_hole: Vector3, distance: float) -> void:
 	if threat < GUARD_REACH and away_from_home > RANGE*0.5: state = "home"
 	elif distance < HUNT_RANGE: state = "hunt"
 	elif distance > LOSE_RANGE: state = "patrol"
+	hop_cooldown -= dt
 	match state:
 		"home": road_walk(game, home, HOME_SPEED, dt)
-		"hunt":
-			if distance > RANGE*0.6: road_walk(game, game.hole_position, HUNT_SPEED, dt)
+		"hunt": hunt(game, dt, to_hole, distance)
 		_:
 			if flat(waypoint - item.position).length() < 0.6: waypoint = next_waypoint(game)
 			road_walk(game, waypoint, WALK_SPEED, dt)
+	if state == "hop": return
 	if distance < HUNT_RANGE: face(to_hole)
-	if cooldown <= 0 and distance < RANGE + item.radius and game.defense.grace <= 0:
-		state = "windup"
-		timer = WINDUP
-		aim = game.hole_position + game.hole_velocity*0.35
-		aim.y = 0
+	if cooldown <= 0 and distance < RANGE + item.radius and game.defense.grace <= 0: wind_up(game)
+
+func wind_up(game) -> void:
+	state = "windup"
+	timer = WINDUP
+	aim = game.hole_position + game.hole_velocity*LEAD
+	aim.y = 0
+
+# Circle the hole at the style's range along the shortest street route, or hop
+# over the roofs when the streets go the long way round.
+func hunt(game, dt: float, to_hole: Vector3, distance: float) -> void:
+	circle += dt*CIRCLE_SPEED
+	var standoff: float = maxf(float(STANDOFF.get(spec.get("attack", "stomp"), 5.0)), game.radius + item.radius*0.5)
+	var back := -to_hole/distance if distance > 0.01 else Vector3.BACK
+	var spot: Vector3 = game.hole_position + back.rotated(Vector3.UP, sin(circle)*CIRCLE_SWING)*standoff
+	spot.y = home.y
+	if hop_cooldown <= 0.0 and distance < HOP_REACH and distance > standoff + 2.0 \
+			and Roads.plan(game.layout, item.position, game.hole_position).length > distance*HOP_DETOUR:
+		start_hop(game, spot)
+		return
+	var route: Dictionary = Roads.plan(game.layout, item.position, spot)
+	var goal: Vector3 = Roads.project(game.layout, spot)
+	if flat(goal - item.position).length() > 0.3: step_to(route.next, HUNT_SPEED, dt)
+
+func start_hop(game, spot: Vector3) -> void:
+	state = "hop"
+	timer = 0.0
+	leap_start = item.position
+	aim = Roads.project(game.layout, spot)
+	squash = 1.0
+	game.fx.puff(item.position, item.radius*0.6, 1.0)
+
+# Over a block in one arc, landing on the street beside the hole, then a quick strike.
+func hop(game, dt: float) -> void:
+	timer += dt
+	var t := clampf(timer/HOP_TIME, 0.0, 1.0)
+	item.position = leap_start.lerp(aim, t)
+	air = sin(t*PI)
+	item.position.y = home.y + air*maxf(HOP_HEIGHT, item.radius*2.0)
+	face(aim - leap_start)
+	if t < 1.0: return
+	item.position.y = home.y
+	air = 0.0
+	squash = 1.0
+	state = "hunt"
+	hop_cooldown = HOP_COOLDOWN
+	cooldown = minf(cooldown, HOP_STRIKE)
+	game.fx.ripple(item.position, item.radius*1.4, attack_color())
+	game.fx.shake = maxf(game.fx.shake, 0.25)
 
 func next_waypoint(game) -> Vector3:
 	var layout = game.layout
@@ -243,7 +407,7 @@ func stay_on_map(game) -> void:
 	position.z = clampf(position.z, -game.layout.move_z, game.layout.move_z)
 	item.position = position
 
-# Near the map edge a knock or an escape bends toward the middle, so the
+# Near the map edge a throw or an escape bends toward the middle, so the
 # guardian is never pinned in a corner where the hole sits on top of it.
 const EDGE_MARGIN := 4.0
 
@@ -259,7 +423,9 @@ static func flat(v: Vector3) -> Vector3:
 
 # Walk toward target along the streets (see mascot_roads.gd).
 func road_walk(game, target: Vector3, speed: float, dt: float) -> void:
-	var corner: Vector3 = Roads.next_point(game.layout, item.position, target)
+	step_to(Roads.next_point(game.layout, item.position, target), speed, dt)
+
+func step_to(corner: Vector3, speed: float, dt: float) -> void:
 	var offset := flat(corner - item.position)
 	if offset.length() < 0.05: return
 	item.position += offset.limit_length(speed*dt)
@@ -279,4 +445,4 @@ func animate(dt: float) -> void:
 	lunge = maxf(0.0, lunge - dt*3.0)
 	squash = maxf(0.0, squash - dt*4.0)
 	rig.animate(dt, {"state":state, "moving":moving, "crouch":crouch, "lunge":lunge,
-		"squash":squash, "air":air, "hurt":hurt})
+		"squash":squash, "air":air, "hurt":hurt, "flail":flail if state == "cling" else 0.0})

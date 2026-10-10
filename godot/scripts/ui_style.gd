@@ -54,7 +54,9 @@ static func vector_icon(kind: String) -> Texture2D:
 		"upgrade":'<path d="M5 13L12 5L19 13 M12 5V21 M5 3H19"/>',
 		"play":'<path d="M7 4L19 12L7 20Z"/>', "pause":'<path d="M8 4V20 M16 4V20"/>',
 		"close":'<path d="M5 5L19 19 M19 5L5 19"/>', "left":'<path d="M15 4L7 12L15 20"/>',
-		"right":'<path d="M9 4L17 12L9 20"/>', "star":'<path d="M12 3L15 9L21 10L16 14L18 21L12 17L6 21L8 14L3 10L9 9Z"/>',
+		"right":'<path d="M9 4L17 12L9 20"/>', "sound":'<path d="M4 9H8L13 5V19L8 15H4Z M16.5 9.5C17.8 11 17.8 13 16.5 14.5 M19 7C21.6 9.8 21.6 14.2 19 17"/>',
+		"settings":'<circle cx="12" cy="12" r="3"/><path d="M12 2V5 M12 19V22 M2 12H5 M19 12H22 M4.9 4.9L7 7 M17 17L19.1 19.1 M4.9 19.1L7 17 M17 7L19.1 4.9"/><circle cx="12" cy="12" r="6.5"/>',
+		"mute":'<path d="M4 9H8L13 5V19L8 15H4Z M16 9L21 15 M21 9L16 15"/>', "star":'<path d="M12 3L15 9L21 10L16 14L18 21L12 17L6 21L8 14L3 10L9 9Z"/>',
 	}
 	var img := Image.new()
 	img.load_svg_from_string('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24"><g fill="none" stroke="#fff4dc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'+paths.get(kind, '<circle cx="12" cy="12" r="8"/>')+'</g></svg>')
