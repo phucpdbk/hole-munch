@@ -91,11 +91,10 @@ its landmark to conquer it, while dodging independent military defenders.
   streets, a green ×1.5 and a red −30%; the half the hole's centre drives
   through fires and the pair folds away. ×1.5 stops at 90% of the size the
   landmark needs. Off in smoke runs; `check_street_events` covers them.
-- **Progress ring** (`hud.gd`): growth toward the landmark (catches in a daily
-  game) is a ring around the hole's rim instead of a bar along the bottom. It
-  pulses on each gain, turns gold from 80%, shakes and glows green at 100% and
-  dims after 2.5 s without a bite; the rival's share is a thin red arc outside.
-  A small chip under the score keeps the percentage and the guardian's hearts.
+- **Progress chip** (`hud.gd`): growth toward the landmark (catches in a daily
+  game) is a small chip under the score instead of a bar along the bottom: the
+  percentage (gold from 80%, green at 100%), the guardian's hearts and the
+  rival's share beside it.
 - **Bonus run** (`runner.gd`): the first win on every fifth city (5, 10, …)
   turns PLAY into BONUS RUN. The hole rolls up a 3×9 map's middle avenue on its
   own; the player only steers sideways. Each half of the road has its own food,

@@ -94,13 +94,8 @@ var strike_shapes: Array = []
 var defense_status := ""
 # Missile lock on the saucer: {center, radius, progress 0..1} in screen pixels, or {}.
 var lock_reticle: Dictionary = {}
-# The progress ring drawn around the hole: {center, radius} in screen pixels, or {}.
-var hole_ring: Dictionary = {}
-# The share the ring last showed and when it last grew, for the pulse and fade.
-var ring_share := 0.0
-var ring_bump := -10.0
-const RING_NEAR := 0.8
-const RING_IDLE := 2.5
+# The chip's percentage turns gold from here on.
+const NEAR_GOAL := 0.8
 var mode := "menu"
 var last_layout_mode := ""
 var score := 0
@@ -242,9 +237,6 @@ func retry_wanted() -> bool:
 	return mode == "result" and run_kind == "campaign" and won and stars < 3 and has_next
 
 func sync() -> void:
-	var share := round_share()
-	if share > ring_share + 0.001: ring_bump = Time.get_ticks_msec()/1000.0
-	ring_share = share
 	privacy_button.visible = mode in ["menu", "paused"]
 	privacy_button.text = I18n.t("privacy")
 	var layout_key := mode + str(retry_wanted()) + str(can_double) + str(board_ready)
@@ -395,10 +387,10 @@ func round_share() -> float:
 	if run_kind == "daily": return clampf(float(daily_count)/maxf(1.0, daily_target), 0, 1)
 	return growth
 
-func ring_color(share: float) -> Color:
+func goal_color(share: float) -> Color:
 	if run_kind == "daily": return GOLD
 	if share >= 1.0: return Color("7dffb0")
-	return GOLD if share >= RING_NEAR else Color("b7a2f1")
+	return GOLD if share >= NEAR_GOAL else Color("b7a2f1")
 
 # A small chip under the score: the goal icon and its percentage (catches in a
 # daily round), the guardian's hearts, and the rival's share beside it.
@@ -410,36 +402,12 @@ func draw_progress_chip() -> void:
 	var width := 76.0 + UiStyle.text_width(value, 20, title_font) + hearts*24.0
 	panel(Rect2(24, 112, width, 44), Color("1b3048ed"), 20)
 	UiStyle.draw_icon(self, daily_icon if daily_round else "flag", Vector2(48, 134), 26)
-	UiStyle.text(self, value, Vector2(68, 142), 20, ring_color(share), false, 0, title_font)
+	UiStyle.text(self, value, Vector2(68, 142), 20, goal_color(share), false, 0, title_font)
 	for i in hearts:
 		var at := Vector2(width + 12 - (hearts - i)*24.0, 134)
 		if i < guardian_hp: UiStyle.draw_icon(self, "heart", at, 20, Color("ff6b7d"))
 		else: draw_circle(at, 6.0, Color("465d6b"))
 	if rival_growth >= 0: text_at(I18n.t("rival_pct", int(rival_growth*100)), Vector2(width + 36, 140), 13, Color("ffb3a6"), false, 4)
-
-# Progress drawn around the hole's rim, where the eyes already are: it pulses as
-# it grows, turns gold near the goal, shakes and glows when the boss can be
-# eaten, and dims after a while without a bite. The rival's share rides outside.
-func draw_hole_ring() -> void:
-	var share := round_share()
-	var now := Time.get_ticks_msec()/1000.0
-	var since := now - ring_bump
-	var pulse := clampf(1.0 - since/0.35, 0, 1)
-	var full := share >= 1.0
-	var alpha := 1.0 if full else lerpf(1.0, 0.35, clampf((since - RING_IDLE)/0.8, 0, 1))
-	var center: Vector2 = hole_ring.center
-	if full: center += Vector2(sin(now*41.0), cos(now*37.0))*1.6
-	var radius := maxf(30.0, float(hole_ring.radius) + 12.0)*(1.0 + 0.08*pulse)
-	var color := ring_color(share)
-	var width := 6.0 + 3.0*pulse
-	draw_arc(center, radius, 0, TAU, 64, Color(0.05, 0.1, 0.18, 0.45*alpha), width + 3.0, true)
-	if full:
-		var glow := 0.35 + 0.25*sin(now*8.0)
-		draw_arc(center, radius, 0, TAU, 64, Color(color, glow*0.5), width + 12.0, true)
-	if share > 0.0:
-		draw_arc(center, radius, -PI/2, -PI/2 + TAU*share, maxi(8, int(64*share)), Color(color, alpha), width, true)
-	if rival_growth > 0.0:
-		draw_arc(center, radius + width + 2.0, -PI/2, -PI/2 + TAU*rival_growth, maxi(6, int(64*rival_growth)), Color(1.0, 0.36, 0.3, 0.8*alpha), 3.0, true)
 
 # Missile lock: four red brackets close in on the saucer as the lock fills,
 # spinning and blinking faster near the end, with the fill drawn as an arc.
@@ -486,7 +454,6 @@ func draw_playing() -> void:
 	if combo >= 2: draw_combo()
 	draw_floaters()
 	draw_progress_chip()
-	if not hole_ring.is_empty(): draw_hole_ring()
 	var run_label := run_title()
 	if run_label != "": text_at(run_label, Vector2(w/2-44, 126), 15, UiStyle.MINT, true, 4)
 	if waiting:

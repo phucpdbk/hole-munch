@@ -1742,10 +1742,6 @@ func update_hud() -> void:
 		var center := camera.unproject_position(saucer.position)
 		var edge := camera.unproject_position(saucer.position + camera.global_basis.x*saucer.scale.x*1.6)
 		hud.lock_reticle = {"center":center, "radius":center.distance_to(edge), "progress":army.lock.progress}
-	hud.hole_ring = {}
-	if mode == "playing" and not camera.is_position_behind(hole_position):
-		var rim := camera.unproject_position(hole_position)
-		hud.hole_ring = {"center":rim, "radius":rim.distance_to(camera.unproject_position(hole_position + camera.global_basis.x*radius))}
 	hud.defense_status = "" if run_kind in ["daily", "runner"] else I18n.t("def_lock") if locked else I18n.t("def_hit") if defense.slow > 0 else I18n.t("def_dodge") if not defense.strikes.is_empty() else I18n.t("def_count", defense.active_count() + army.active_count())
 	hud.strike_shapes.clear()
 	if mode == "playing":
