@@ -8,7 +8,8 @@ extends Node3D
 # (game.gd model_scale), so the model inside is sized against it.
 const MODELS := {"vn": {"police":"vn_police", "soldier":"vn_soldier", "rocket":"vn_soldier"}}
 const SOURCE_HEIGHT := 1.2
-const HEIGHT := 1.75
+# Standing height in world units, 70% of the first 1.75 (matches army_models S).
+const HEIGHT := 1.225
 const GUN := Color("2b2f33")
 
 var player: AnimationPlayer

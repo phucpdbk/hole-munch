@@ -3,7 +3,8 @@ extends "res://scripts/region_models.gd"
 # Army units in a country's colours (army_forces.gd LOOKS). Foot units face +z
 # like the soldier minion; vehicles face +x like the traffic car, and the gun
 # vehicles turn to the saucer at runtime.
-const S := 1.9
+# Foot-unit scale (70% of the first 1.9, which towered over the street).
+const S := 1.33
 const SKIN := Color("efd1b0")
 const TYRE := Color("2b3138")
 

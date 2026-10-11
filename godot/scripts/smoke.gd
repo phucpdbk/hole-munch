@@ -588,20 +588,7 @@ func check_mechanics() -> void:
 	for i in 40: g.step(0.02,Vector2.ZERO)
 	check(guardian.eaten and not guardian.node.visible and not boss.shielded and (boss.fall >= 0 or boss.eaten), "swallowing the guardian drops the shield")
 	check_guardian()
-	var bombs: Array = g.items.filter(func(item): return item.get("bomb", false))
-	check(bombs.size() == mech.BOMBS and bombs.all(func(item): return item.optional), "every map hides optional bombs")
-	g.reset_round()
-	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
-	g.defense.grace = INF
-	var before: float = g.remaining
-	g.swallow(bombs[0])
-	check(mech.stun > 0 and g.remaining == before-mech.BOMB_SECONDS and mech.speed_multiplier() == 0.0, "a small hole is stunned by a bomb")
-	g.reset_round()
-	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
-	g.target_radius = 2.6; g.radius = 2.6
-	var eaten_before: int = g.eaten
-	g.swallow(bombs[1])
-	check(mech.stun == 0.0 and g.eaten > eaten_before+1, "a big hole turns a bomb blast into food")
+	check(not g.items.any(func(item): return item.get("bomb", false)), "campaign maps have no bombs")
 	g.reset_round()
 	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
 	g.target_radius = 2.0; g.radius = 2.0
@@ -616,7 +603,7 @@ func check_mechanics() -> void:
 	check(not mech.hungry, "a bite ends hunger")
 	mech.spawn_pickup(g)
 	var kind: String = mech.pickup.kind
-	before = g.remaining
+	var before: float = g.remaining
 	g.hole_position = mech.pickup.position
 	mech.update_pickup(g, 0.02)
 	check(not mech.pickup.is_empty() and mech.markers[mech.PICKUP_MARKER].visible, "a falling pickup casts a shadow and cannot be caught mid-air")
@@ -624,13 +611,6 @@ func check_mechanics() -> void:
 	mech.update_pickup(g, 0.02)
 	check(mech.pickup.is_empty() and (kind != "time" or g.remaining == before+mech.TIME_PICKUP), "touching a landed pickup collects it (%s)" % kind)
 	g.reset_round()
-	var sky_bomb: Dictionary = mech.bombs[0]
-	check(mech.bombs.all(func(b): return b.hidden), "bombs start in the sky")
-	mech.round_time = sky_bomb.drop_at
-	mech.update_bombs(g, 0.1)
-	check(not sky_bomb.hidden and sky_bomb.falling > 0 and sky_bomb.position.y > sky_bomb.origin.y, "a bomb drops at its scheduled moment")
-	mech.update_bombs(g, mech.DROP_TIME)
-	check(sky_bomb.falling == 0.0 and sky_bomb.position == sky_bomb.origin, "a dropped bomb lands on the road")
 	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
 	var kinds := {}
 	for i in 40:

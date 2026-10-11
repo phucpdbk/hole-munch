@@ -11,7 +11,9 @@ const KNOCK_FADE := 6.0
 const MascotSpecs = preload("res://scripts/mascot_specs.gd")
 # The guardian is about half the landmark's size, so it falls mid-way up the ladder.
 const GUARDIAN_SHARE := 0.55
-const BOMBS := 3
+# Campaign maps no longer drop bombs: a big hole's blast cleared whole blocks
+# at once and took the fun out of eating. Daily coin rain still uses BOMB_*.
+const BOMBS := 0
 const BOMB_SIZE := 0.42
 # Below this hole radius a bomb stuns you; from it up, the blast feeds you.
 const BOMB_SAFE := 1.7
@@ -29,7 +31,7 @@ const DROP_HEIGHT := 16.0
 const DROP_TIME := 1.2
 # Each bomb lands at a random moment in this window (seconds into the round).
 const BOMB_DROPS := Vector2(8.0, 40.0)
-const PICKUP_MARKER := 3
+const PICKUP_MARKER := BOMBS
 const POWER_TIME := 5.0
 const TIME_PICKUP := 5.0
 const FREEZE_TIME := 4.0

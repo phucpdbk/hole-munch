@@ -5,7 +5,7 @@ extends RefCounted
 #   gold districts - every bite there scores double and feeds 1.5× growth;
 #   roadblocks     - barriers on some crossings that a small hole cannot pass;
 #   shortcuts      - an alley cut through a block, lined with small snacks;
-#   danger zone    - a block held by a guard squad with bombs, but twice the food.
+#   danger zone    - a block held by a guard squad, but twice the food.
 # plan() runs before the ground is built (it tints districts); build() adds the
 # items while the city is filled, before the landmark is sized.
 const Traffic = preload("res://scripts/traffic.gd")
@@ -121,7 +121,7 @@ func cut_shortcut(g, key: Vector2, rng: RandomNumberGenerator) -> void:
 		i += 1
 	shortcuts.append([Vector2(key.x, area.position.y), Vector2(key.x, area.end.y)])
 
-# Twice the food, held by a squad that stays put and two bombs on the ground.
+# Twice the food, held by a squad that stays put.
 func fill_danger(g, key: Vector2, rng: RandomNumberGenerator) -> void:
 	var area := block_rect(g.layout, key)
 	var inner := area.grow(-3.2)
@@ -141,10 +141,6 @@ func fill_danger(g, key: Vector2, rng: RandomNumberGenerator) -> void:
 		var guard: Dictionary = g.add_item("patrol_tank" if tank else "soldier", Vector3(at.x, 0.16, at.y), 1.5 if tank else 0.36)
 		guard.defender = true
 		guard.stay = true
-	for side in [-1.0, 1.0]:
-		var bomb: Dictionary = g.add_item("bomb", Vector3(key.x + side*inner.size.x*0.3, 0.16, key.y - side*1.2), g.Mechanics.BOMB_SIZE)
-		bomb.bomb = true
-		bomb.optional = true
 
 # --- per frame ----------------------------------------------------------------------
 

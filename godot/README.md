@@ -31,8 +31,8 @@ its landmark to conquer it, while dodging independent military defenders.
   clears a small window around the saucer (it widens as the hole grows) and
   hides the minimap. `-- --capture --weather-capture` shoots rain, fog, snow
   and storm mid-round.
-- **Timer** = par × 2.3 early, falling to ×1.55 late, never below 45 s early /
-  30 s late. Par is how long a real-time greedy route (`smoke.gd`, the same
+- **Timer** = par × 3.5 early, falling to ×3 late, never below 52.5 s early /
+  45 s late. Par is how long a real-time greedy route (`smoke.gd`, the same
   food-per-distance choice the rival makes, no clock bonus) needs at player
   speed, 14–206 s. Par times live in `campaign.gd` (`PAR_SECONDS`); regenerate them
   from `--campaign-smoke` output (`PAR` lines) after changing map contents.
@@ -47,7 +47,7 @@ its landmark to conquer it, while dodging independent military defenders.
   west L, split street); defender squads also change corner per city.
 - **Random drop point** (`spawn_points.gd`): each campaign/endless round (retries
   too) the saucer drops onto a random inner street segment, clear of the
-  landmark, its guardian, the rival's corner and the bombs; the opening cones
+  landmark, its guardian, and the rival's corner; the opening cones
   move with it as a row on that street. Daily games, smoke and captures keep the
   designed opening street. `-- --campaign-smoke --spawn-bench` times the par
   route from each city's farthest drop point (all still finish 40 s+ early).
@@ -211,7 +211,7 @@ its landmark to conquer it, while dodging independent military defenders.
   language; the speech-bubble button on the menu switches it (saved).
 - **Intro and tips** (`intro.gd`): a four-card story and how-to-play on first
   launch (again from the ? button), and a "new!" card before the first city with
-  each new thing: rain, fog, wind, snow, storm, power orbs, gas bombs, hunger,
+  each new thing: rain, fog, wind, snow, storm, power orbs, hunger,
   the landmark counter-attack, the rival hole, continent finales and each new
   continent (at most one card per start, the landmark card only when nothing new
   needs explaining; seen cards are saved).

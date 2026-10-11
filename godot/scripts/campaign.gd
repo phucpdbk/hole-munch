@@ -199,9 +199,11 @@ const PAR_SECONDS: Array[int] = [22, 36, 27, 19, 26, 33, 23, 32, 26, 27, 30, 29,
 # the slack covers steering, dodging, the guardian fight and learning the map,
 # and every second left when the landmark falls pays coins. Nothing
 # adds time in campaign or daily rounds, so this is the whole budget.
-const TIME_SLACK_START := 5.0
+# The first cities get 70% of the old 5.0 slack / 75 s floor: they felt too easy.
+# The cut fades out towards the last city, whose numbers are unchanged.
+const TIME_SLACK_START := 3.5
 const TIME_SLACK_END := 3.0
-const TIME_FLOOR_START := 75.0
+const TIME_FLOOR_START := 52.5
 const TIME_FLOOR_END := 45.0
 
 static func level_seconds(index: int, blocks: int, progress: float) -> float:

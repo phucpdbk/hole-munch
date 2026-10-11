@@ -1,7 +1,7 @@
 extends Control
 
 # Story intro (first launch, or the ? button) and "new!" cards that introduce a
-# mechanic the first time a city uses it: weather, orbs, bombs, hunger, the
+# mechanic the first time a city uses it: weather, orbs, hunger, the
 # landmark counter-attack, the rival hole, continent finales and new continents.
 # game.gd decides when to open it; seen ids are saved in campaign.seen.
 const UiStyle = preload("res://scripts/ui_style.gd")
@@ -10,8 +10,8 @@ const I18n = preload("res://scripts/i18n.gd")
 const Campaign = preload("res://scripts/campaign.gd")
 const STORY := [["globe", "story1"], ["food", "story2"], ["shield", "story3"], ["target", "story4"]]
 # First city index where each always-on mechanic gets its card.
-const FEATURE_FROM := {"pickup":1, "bomb":2, "hunger":3, "counter":4, "gold":2, "roadblock":3, "shortcut":5, "danger":6, "guardian":0}
-const FEATURE_ICON := {"pickup":"magnet", "bomb":"bomb", "hunger":"food", "counter":"megaphone",
+const FEATURE_FROM := {"pickup":1, "hunger":3, "counter":4, "gold":2, "roadblock":3, "shortcut":5, "danger":6, "guardian":0}
+const FEATURE_ICON := {"pickup":"magnet", "hunger":"food", "counter":"megaphone",
 	"rival":"skull", "finale":"crown", "region":"globe",
 	"guardian":"shield", "gold":"gem", "roadblock":"lock", "shortcut":"map", "danger":"shield",
 	"daily_stampede":"target", "daily_coinrain":"coin", "daily_goldrush":"chest"}
