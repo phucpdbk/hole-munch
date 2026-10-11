@@ -46,6 +46,29 @@ func run(game, campaign_mode: bool) -> void:
 			await snapshot("skin-%d" % skin)
 		g.get_tree().quit()
 		return
+	# Bonus run: the start, a gate pair coming up, the landmark ahead, the result.
+	if "--run-capture" in OS.get_cmdline_user_args():
+		g.load_level(4)
+		g.start_run()
+		await frames(30)
+		await snapshot("run-start")
+		g.started = true
+		# Steered through bot_input so the camera and HUD run frame by frame;
+		# shots are taken by distance, since capture frames are uncapped.
+		var shots := [[60.0, "run-gates"], [5.0, "run-mid"], [-50.0, "run-end"]]
+		for i in 20000:
+			if g.mode != "playing": break
+			var aim := 0.0
+			for gate in g.runner.gates:
+				if not gate.used and gate.at < g.hole_position.z and gate.gain >= 1.3: aim = gate.side*3.3; break
+			g.bot_input = Vector2(clampf((aim - g.hole_position.x)*0.5, -1, 1), 0)
+			if not shots.is_empty() and g.hole_position.z < shots[0][0]: await snapshot(shots.pop_front()[1])
+			else: await frames(1)
+		g.bot_input = Vector2.ZERO
+		await frames(40)
+		await snapshot("run-result")
+		g.get_tree().quit()
+		return
 	# Each guardian attack style mid-shot at the saucer, then a hit wobble.
 	if "--guardian-capture" in OS.get_cmdline_user_args():
 		await guardian_preview()

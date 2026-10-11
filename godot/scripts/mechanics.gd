@@ -149,13 +149,13 @@ func show_marker(index: int, at: Vector3, size: float, k: float) -> void:
 
 # --- level setup (called by game.gd after the boss is sized) ---------------------
 
-func setup(game, landmark: bool, seed_value: int) -> void:
+func setup(game, landmark: bool, seed_value: int, with_bombs := true) -> void:
 	guardian = {}
 	mascot = null
 	bombs.clear()
 	boss = game.items[game.boss_index]
 	if landmark: place_guardian(game)
-	place_bombs(game, seed_value)
+	if with_bombs: place_bombs(game, seed_value)
 
 # The landmark's mascot stands guard at its front corner, toward the spawn side.
 # It is drawn by its own node (mascot.gd), not by a MultiMesh batch.

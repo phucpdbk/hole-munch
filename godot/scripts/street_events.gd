@@ -47,7 +47,7 @@ var rng := RandomNumberGenerator.new()
 # Hidden jam vehicles, made with the city so they share its batches.
 func build(game) -> void:
 	jam.clear()
-	if game.run_kind == "daily": return
+	if game.run_kind in ["daily", "runner"]: return
 	var mix: Array = JAM_MIX[int(game.level.region) % JAM_MIX.size()]
 	for i in JAM_CARS:
 		var variant: int = mix[i % mix.size()]
@@ -58,7 +58,7 @@ func build(game) -> void:
 		jam.append(car)
 
 func reset(game) -> void:
-	active = enabled and game.run_kind != "daily"
+	active = enabled and game.run_kind not in ["daily", "runner"]
 	jam_state = "wait"
 	jam_clock = 0.0
 	round_time = 0.0

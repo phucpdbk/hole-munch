@@ -91,6 +91,21 @@ its landmark to conquer it, while dodging independent military defenders.
   streets, a green ×1.5 and a red −30%; the half the hole's centre drives
   through fires and the pair folds away. ×1.5 stops at 90% of the size the
   landmark needs. Off in smoke runs; `check_street_events` covers them.
+- **Progress ring** (`hud.gd`): growth toward the landmark (catches in a daily
+  game) is a ring around the hole's rim instead of a bar along the bottom. It
+  pulses on each gain, turns gold from 80%, shakes and glows green at 100% and
+  dims after 2.5 s without a bite; the rival's share is a thin red arc outside.
+  A small chip under the score keeps the percentage and the guardian's hearts.
+- **Bonus run** (`runner.gd`): the first win on every fifth city (5, 10, …)
+  turns PLAY into BONUS RUN. The hole rolls up a 3×9 map's middle avenue on its
+  own; the player only steers sideways. Each half of the road has its own food,
+  growing from cones to towers, and every other cross street has a gate pair
+  (×1.5/−30%, ×1.3/×1.1, …). The city's landmark waits at the far end, sized
+  from a simulated run that eats 55% of what fits and takes the better gates;
+  too small at the end loses. It pays coins only (no stars or goals), and PLAY
+  afterwards goes on to the next city. `check_runner` in `campaign_smoke.gd`
+  drives a better-gate bot (wins) and a worse-gate bot (falls short);
+  `-- --capture --run-capture` writes `test-output/run-*.png`.
 - **Ad clips** (`ad_capture.gd`, `tools/make-ads.ps1`): portrait 720×1280 AVIs
   plus key-frame PNGs in `test-output/ads/`, English by default (`-Lang es` etc.),
   HUD hidden (score popups drawn by showtime instead). Presets `conquer` (drive

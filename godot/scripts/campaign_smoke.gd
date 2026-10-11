@@ -26,6 +26,7 @@ func run(g) -> void:
 	check_services(g)
 	check_rival(g)
 	check_special_runs(g)
+	check_runner(g)
 	check_panels(g)
 	check_language_and_intro(g)
 	print("CAMPAIGN CHECKS: ", failures, " failures")
@@ -392,6 +393,52 @@ func check_special_runs(g) -> void:
 	check(g.mode == "result" and g.campaign.endless.stage >= 1,"endless ends on timeout and records the run")
 	g.go_menu()
 	check(g.run_kind == "campaign" and g.campaign.selected == 5, "leaving endless returns to the campaign city")
+
+# Bonus run (runner.gd): offered on a first win of every fifth city, a gate-
+# picking bot swallows the landmark, a bot taking the worse gates falls short,
+# and PLAY afterwards goes on to the next city.
+func check_runner(g) -> void:
+	var Runner = g.Runner
+	check(Runner.due(4) and Runner.due(9) and not Runner.due(5), "every fifth city opens a bonus run")
+	var unlock: bool = g.campaign.unlock_all_for_testing
+	g.campaign.unlock_all_for_testing = true
+	g.load_level(4)
+	g.go_menu()
+	var goals_before: int = g.campaign.goals[4]
+	g.campaign.goals[4] = 0
+	g.playing = true
+	g.mode = "playing"
+	g.finish(true)
+	g.update_hud()
+	check(g.bonus_pending and g.hud.bonus_ready, "a first win on city 5 offers the bonus run")
+	g.on_play()
+	check(g.run_kind == "runner" and g.mode == "playing" and g.campaign_level == 4, "PLAY on that result starts the run")
+	check(g.runner.gates.size() >= 6 and g.layout.cols == Runner.COLS and g.items[g.boss_index].position.z < g.hole_position.z - 100.0, "the course has gate pairs and the landmark at the far end")
+	var good := drive_run(g, true)
+	check(good.won, "taking the bigger gates swallows the landmark (r %.2f, boss %.2f, %.1fs)" % [good.radius, g.boss_radius, good.time])
+	check(good.time < 40.0 and g.reward > 0, "the run ends at the landmark and pays coins")
+	g.start_run()
+	var bad := drive_run(g, false)
+	check(not bad.won and bad.radius < good.radius, "always the worse gate falls short (r %.2f, %s at z %.1f after %.1fs)" % [bad.radius, bad.mode, bad.z, bad.time])
+	g.on_play()
+	check(g.run_kind == "campaign" and g.campaign.selected == 5 and g.mode == "playing", "after the run PLAY goes on to the next city")
+	check(g.runner.gates.is_empty(), "the course's gates are cleared in a normal city")
+	g.go_menu()
+	g.campaign.goals[4] = goals_before
+	g.campaign.unlock_all_for_testing = unlock
+
+func drive_run(g, better: bool) -> Dictionary:
+	g.started = true
+	var time := 0.0
+	while g.mode == "playing" and time < 60.0:
+		var next: Dictionary = {}
+		for gate in g.runner.gates:
+			if gate.used or gate.at > g.hole_position.z: continue
+			if next.is_empty() or gate.at > next.at or (gate.at == next.at and (gate.gain > next.gain) == better): next = gate
+		var aim: float = next.side*g.Runner.LANE*0.5 if not next.is_empty() else 0.0
+		g.step(0.02, Vector2(clampf((aim - g.hole_position.x)*0.5, -1.0, 1.0), 0.0))
+		time += 0.02
+	return {"won":g.mode == "result" and g.hud.won, "radius":g.radius, "time":time, "mode":g.mode, "z":g.hole_position.z}
 
 # Daily mini-games (daily_games.gd): setup, scoring, three tries a day and the
 # carry-in power a first win pays.

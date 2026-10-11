@@ -35,6 +35,7 @@ const StreetEvents = preload("res://scripts/street_events.gd")
 const Army = preload("res://scripts/army.gd")
 const ArmyForces = preload("res://scripts/army_forces.gd")
 const ArmySoldiers = preload("res://scripts/army_soldiers.gd")
+const Runner = preload("res://scripts/runner.gd")
 # Seconds a carry-in power from the daily mini-game lasts (time adds seconds).
 const CARRY_SECONDS := 12.0
 const CARRY_TIME := 10.0
@@ -84,6 +85,9 @@ const CAR_SPACING := 15.0
 # Orthographic view: a closer camera frames the same area but lets the shadow
 # map cover a shorter range at higher resolution.
 const CAMERA_OFFSET := Vector3(10.8, 16.2, 13.8)
+# The bonus run looks straight down the avenue, a little ahead of the hole.
+const RUN_CAMERA := Vector3(0, 17.5, 12.0)
+const RUN_LOOK := 5.0
 const LAMP_OFFSET := Transform3D(Basis(), Vector3(0, 1.68, 0))
 
 var campaign = Campaign.new()
@@ -132,6 +136,9 @@ var endless_advance := false
 var daily: Node3D
 var daily_kind := "stampede"
 var daily_override := ""
+var runner: Node3D
+# A first win on every Runner.BONUS_EVERY-th city opens the bonus run.
+var bonus_pending := false
 var goal_list: Array = []
 var goal_mask := 0
 var defenders_eaten := 0
@@ -249,6 +256,8 @@ func _ready() -> void:
 	add_child(army_visual)
 	daily = DailyGames.new()
 	add_child(daily)
+	runner = Runner.new()
+	add_child(runner)
 	fx = Fx.new()
 	add_child(fx)
 	sfx = Sfx.new()
@@ -371,9 +380,13 @@ func load_level(index: int) -> void:
 	if run_kind == "daily":
 		level.rival = daily_kind == "goldrush"
 		level.seconds = DailyGames.SECONDS[daily_kind]
-	goal_list = Challenges.goals(level)
-	layout = MapLayout.make(level.cols, level.rows)
-	layout.vary_districts(campaign.selected)
+	var run := run_kind == "runner"
+	if run:
+		level.rival = false
+		level.weather = "clear"
+	goal_list = [] if run else Challenges.goals(level)
+	layout = MapLayout.make(Runner.COLS, Runner.ROWS) if run else MapLayout.make(level.cols, level.rows)
+	if not run: layout.vary_districts(campaign.selected)
 	models.snow_material.set_shader_parameter("snow_amount",0.95 if level.weather == "snow" else 0.0)
 	stats = campaign.stats()
 	palette = level.palette
@@ -391,11 +404,16 @@ func load_level(index: int) -> void:
 	models.region_style = level.style
 	models.army_look = ArmyForces.look(level)
 	models.city_profile = CityProfiles.profile(level.boss)
-	city_blocks.plan(layout, models.city_profile, has_farms(), 4819 + campaign.selected*137 + 1)
-	features.plan(layout, city_blocks.districts, campaign.selected, 4819 + campaign.selected*137 + 11, SPAWN)
+	if run: features = MapFeatures.new()
+	else:
+		city_blocks.plan(layout, models.city_profile, has_farms(), 4819 + campaign.selected*137 + 1)
+		features.plan(layout, city_blocks.districts, campaign.selected, 4819 + campaign.selected*137 + 11, SPAWN)
 	total_points = 0
 	make_ground()
-	make_city()
+	if run: runner.build(self, 5303 + campaign.selected*71)
+	else:
+		runner.clear()
+		make_city()
 	if run_kind == "daily": daily.build(self, daily_kind, 7177 + campaign.selected*53)
 	make_batches()
 	weather.configure(level.weather, sky_environment, sunlight, Color(palette[5]))
@@ -511,6 +529,7 @@ func make_ground() -> void:
 
 # Grass courtyards, a paved downtown and a lighter landmark plaza.
 func inner_ground(x: float, z: float) -> Color:
+	if run_kind == "runner": return Color(palette[3])
 	var snow: bool = level.weather == "snow"
 	match features.zone(x, z):
 		"gold": return MapFeatures.GOLD_TINT.lerp(Color.WHITE, 0.35 if snow else 0.0)
@@ -845,12 +864,16 @@ func reset_round() -> void:
 			item.home = item.origin
 	duck.reset(items[boss_index])
 	if run_kind == "daily": daily.reset(self)
+	if run_kind == "runner": runner.reset(self)
 	animate_world(0.0)
 	for item in items: set_item_transform(item)
 
 # A random inner street per campaign/endless round; the daily mini-games, smoke
 # tests and captures keep the designed opening street so they stay repeatable.
 func pick_spawn() -> void:
+	if run_kind == "runner":
+		spawn = runner.start
+		return
 	var spot := {"at":SPAWN, "axis":Vector3.RIGHT, "length":18.0}
 	if run_kind != "daily" and not test_mode and not capture_mode:
 		spot = SpawnPoints.pick(self, spawn_rng)
@@ -932,6 +955,16 @@ func on_play() -> void:
 	if mode == "result" and run_kind == "endless":
 		start_endless()
 		return
+	if mode == "result" and run_kind == "campaign" and bonus_pending:
+		start_run()
+		return
+	# After the bonus run, PLAY goes on to the city after the one that opened it.
+	if mode == "result" and run_kind == "runner":
+		run_kind = "campaign"
+		load_level(campaign_level + 1 if campaign.can_select(campaign_level + 1) else campaign_level)
+		persist()
+		mode = "menu"
+		stats = campaign.stats()
 	if mode == "result" and hud.won and has_next_city():
 		load_level(campaign.selected+1)
 		persist()
@@ -962,9 +995,14 @@ func use_carry_in() -> void:
 	persist()
 
 func go_menu() -> void:
+	bonus_pending = false
 	if run_kind != "campaign":
+		var after_run := run_kind == "runner"
 		run_kind = "campaign"
 		load_level(campaign_level)
+		if after_run and has_next_city():
+			load_level(campaign.selected+1)
+			persist()
 	elif mode == "result" and hud.won and has_next_city():
 		# Home after a win lands on the next city, as NEXT CITY would.
 		load_level(campaign.selected+1)
@@ -1091,6 +1129,9 @@ func step(dt: float, input: Vector2) -> void:
 	if showtime.busy():
 		conquest_step(dt)
 		return
+	if run_kind == "runner":
+		run_step(dt, input)
+		return
 	if defense.update(dt,hole_position,campaign.selected,hole_velocity): take_hit()
 	# Army guns shoot at the saucer itself; they share the opening grace and
 	# hold fire while the player taps a clinging guardian loose.
@@ -1138,14 +1179,7 @@ func step(dt: float, input: Vector2) -> void:
 		unit.node.animate("panic" if near else "aim" if gunner.engaged else "alert")
 	advance_falls(dt)
 	if magnet_level() > 0: pull_small_items(dt)
-	for item in items:
-		if item.eaten or item.get("hidden", false) or item.fall >= 0 or item.get("falling", 0.0) > 0: continue
-		if item.radius > radius*EAT_RATIO or item.get("shielded", false) or not mechanics.guardian_biteable(item): continue
-		# Like 2D: the centre must pass inside the rim, less a bit for bigger objects.
-		var reach: float = radius - item.radius*0.4
-		if Vector2(item.position.x-hole_position.x,item.position.z-hole_position.z).length() < reach:
-			# The guardian takes several bites; the earlier ones knock it away.
-			if mechanics.guardian_yields(self, item): swallow(item)
+	eat_reachable()
 	update_counter()
 	update_rival(dt)
 	if not playing: return
@@ -1157,6 +1191,33 @@ func step(dt: float, input: Vector2) -> void:
 	elif remaining <= 0 and (boss_down or items[boss_index].fall < 0):
 		if not boss_down and can_offer_revive(): offer_revive()
 		else: finish(boss_down)
+
+func eat_reachable() -> void:
+	for item in items:
+		if item.eaten or item.get("hidden", false) or item.fall >= 0 or item.get("falling", 0.0) > 0: continue
+		if item.radius > radius*EAT_RATIO or item.get("shielded", false) or not mechanics.guardian_biteable(item): continue
+		# Like 2D: the centre must pass inside the rim, less a bit for bigger objects.
+		var reach: float = radius - item.radius*0.4
+		if Vector2(item.position.x-hole_position.x,item.position.z-hole_position.z).length() < reach:
+			# The guardian takes several bites; the earlier ones knock it away.
+			if mechanics.guardian_yields(self, item): swallow(item)
+
+# The bonus run (runner.gd): no clock, defence or hunger; the course drives the
+# hole and ends at the landmark, swallowed or too big to fit.
+func run_step(dt: float, input: Vector2) -> void:
+	var over: bool = runner.drive(self, dt, input)
+	radius = lerpf(radius, target_radius, 1.0-exp(-dt*8.0))
+	bite_time = maxf(0, bite_time-dt*2.5)
+	pulse = maxf(0, pulse-dt*2.0)
+	combo_time = maxf(0, combo_time-dt)
+	if combo_time <= 0: combo = 0
+	update_floaters(dt)
+	advance_falls(dt)
+	if magnet_level() > 0: pull_small_items(dt)
+	eat_reachable()
+	if not playing: return
+	if boss_down: finish(true)
+	elif over: finish(false)
 
 # The landmark's conquest (showtime.gd) holds the round: no clock, shots or
 # steering until the landmark is down and its banner has played.
@@ -1427,12 +1488,18 @@ func finish(won: bool) -> void:
 			if not gift.is_empty():
 				var line := I18n.t("streak_gift", [int(gift.day), int(gift.coins)])
 				record_note = line + " · " + record_note
+		"runner":
+			reward = runner.reward(eaten_points, won, float(stats.coin_mul))
+			hud.stars = 3 if won else 1 if growth() >= 0.5 else 0
+			record_note = I18n.t("run_won", reward) if won else I18n.t("run_lost")
 		"endless":
 			reward = campaign.endless_reward(score, endless_stage)
 			record_note = (I18n.t("new_record") if campaign.record_endless(score, endless_stage) else I18n.t("record", int(campaign.endless.best))) + I18n.t("cities_taken", endless_stage)
 		_:
 			reward = campaign.reward(won, hud.stars, eaten_points, best_combo)
+			var first_win: bool = won and campaign.goals[campaign.selected] == 0
 			campaign.complete_goals(goal_mask, score)
+			bonus_pending = first_win and Runner.due(campaign.selected) and has_next_city()
 	# Taking the landmark early pays for every second left on the clock.
 	time_coins = int(remaining)*CLEAR_COINS if won and run_kind == "campaign" else 0
 	if time_coins > 0:
@@ -1557,6 +1624,10 @@ func begin_special(kind: String, index: int) -> void:
 	playing = true
 	mode = "playing"
 
+func start_run() -> void:
+	bonus_pending = false
+	begin_special("runner", campaign.selected)
+
 # Three tries a day; a mini-game's first try opens its tip card.
 func start_daily() -> void:
 	if mode not in ["menu", "result"] or intro.visible: return
@@ -1603,13 +1674,15 @@ func advance_endless() -> void:
 
 func update_view(dt: float) -> void:
 	# The menu frames the boss slightly low so the title does not cover it.
+	var run_view := run_kind == "runner" and mode != "menu"
 	var target := Vector3(0, boss_radius*0.7, 0.5) if mode == "menu" else hole_position
+	if run_view: target += Vector3(0, 0, -RUN_LOOK - radius*0.6)
 	# The conquest swings the camera round and in on the landmark (showtime.gd).
 	var shot: float = showtime.blend if mode in ["playing", "result"] else 0.0
 	if shot > 0.0: target = target.lerp(showtime.focus, shot)
 	camera_target = camera_target.lerp(target,1.0-exp(-dt*6.0))
 	var look := camera_target + fx.shake_offset(elapsed)
-	camera.position = look + CAMERA_OFFSET.rotated(Vector3.UP, showtime.angle*shot)
+	camera.position = look + (RUN_CAMERA if run_view else CAMERA_OFFSET).rotated(Vector3.UP, showtime.angle*shot)
 	camera.look_at(look)
 	var menu_zoom := 21.0 + boss_radius*1.7
 	var zoom: float = 12.0 if mode == "customize" else menu_zoom if mode == "menu" else (21.0+radius*1.8)*mechanics.view_scale()
@@ -1669,7 +1742,11 @@ func update_hud() -> void:
 		var center := camera.unproject_position(saucer.position)
 		var edge := camera.unproject_position(saucer.position + camera.global_basis.x*saucer.scale.x*1.6)
 		hud.lock_reticle = {"center":center, "radius":center.distance_to(edge), "progress":army.lock.progress}
-	hud.defense_status = "" if run_kind == "daily" else I18n.t("def_lock") if locked else I18n.t("def_hit") if defense.slow > 0 else I18n.t("def_dodge") if not defense.strikes.is_empty() else I18n.t("def_count", defense.active_count() + army.active_count())
+	hud.hole_ring = {}
+	if mode == "playing" and not camera.is_position_behind(hole_position):
+		var rim := camera.unproject_position(hole_position)
+		hud.hole_ring = {"center":rim, "radius":rim.distance_to(camera.unproject_position(hole_position + camera.global_basis.x*radius))}
+	hud.defense_status = "" if run_kind in ["daily", "runner"] else I18n.t("def_lock") if locked else I18n.t("def_hit") if defense.slow > 0 else I18n.t("def_dodge") if not defense.strikes.is_empty() else I18n.t("def_count", defense.active_count() + army.active_count())
 	hud.strike_shapes.clear()
 	if mode == "playing":
 		for strike in defense.strikes:
@@ -1688,7 +1765,7 @@ func update_hud() -> void:
 	hud.guardian_max = mechanics.mascot.HP if guarding else 0
 	hud.guardian_hp = mechanics.mascot.hp if guarding else 0
 	# Fog hides the map: only the patch around the saucer shows where to go.
-	hud.minimap = {} if level.weather == "fog" else minimap_data()
+	hud.minimap = {} if level.weather == "fog" or run_kind == "runner" else minimap_data()
 	hud.revive_left = revive_left
 	hud.revive_seconds = int(Ads.REVIVE_SECONDS)
 	hud.can_double = can_double()
@@ -1698,7 +1775,8 @@ func update_hud() -> void:
 	hud.stick_delta = drag_delta
 	var target_name: String = Campaign.boss_name(level.boss)
 	mechanics.sync_shield(self)
-	if not started and mechanics.weather_note() != "": hud.note = mechanics.weather_note()
+	if run_kind == "runner": hud.note = I18n.t("run_hint", target_name) if not started else I18n.t("big_enough", target_name) if radius*EAT_RATIO >= boss_radius and not boss_down else ""
+	elif not started and mechanics.weather_note() != "": hud.note = mechanics.weather_note()
 	elif mechanics.hungry: hud.note = I18n.t("hungry")
 	elif run_kind == "daily": hud.note = ""
 	elif boss_down: hud.note = I18n.t("boss_down", target_name)
@@ -1720,6 +1798,7 @@ func update_hud() -> void:
 	hud.has_next = has_next_city()
 	hud.last_city = campaign.selected >= Campaign.level_count()-1
 	hud.run_kind = run_kind
+	hud.bonus_ready = bonus_pending and mode == "result"
 	hud.stage = endless_stage
 	hud.lose_reason = lose_reason
 	hud.record_note = record_note

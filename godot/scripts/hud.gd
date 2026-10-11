@@ -71,6 +71,8 @@ var daily_target := 1
 var items := {}
 const ITEM_ICONS := {"magnet":"magnet", "speed":"bolt", "time":"clock"}
 var endless_best := 0
+# A first win here opens the bonus run: PLAY starts it instead of the next city.
+var bonus_ready := false
 var gate_note := ""
 var level_title := ""
 var city := ""
@@ -92,6 +94,13 @@ var strike_shapes: Array = []
 var defense_status := ""
 # Missile lock on the saucer: {center, radius, progress 0..1} in screen pixels, or {}.
 var lock_reticle: Dictionary = {}
+# The progress ring drawn around the hole: {center, radius} in screen pixels, or {}.
+var hole_ring: Dictionary = {}
+# The share the ring last showed and when it last grew, for the pulse and fade.
+var ring_share := 0.0
+var ring_bump := -10.0
+const RING_NEAR := 0.8
+const RING_IDLE := 2.5
 var mode := "menu"
 var last_layout_mode := ""
 var score := 0
@@ -233,6 +242,9 @@ func retry_wanted() -> bool:
 	return mode == "result" and run_kind == "campaign" and won and stars < 3 and has_next
 
 func sync() -> void:
+	var share := round_share()
+	if share > ring_share + 0.001: ring_bump = Time.get_ticks_msec()/1000.0
+	ring_share = share
 	privacy_button.visible = mode in ["menu", "paused"]
 	privacy_button.text = I18n.t("privacy")
 	var layout_key := mode + str(retry_wanted()) + str(can_double) + str(board_ready)
@@ -260,6 +272,9 @@ func sync() -> void:
 	play_button.text = I18n.t("resume") if mode == "paused" else I18n.t("next_city") if next_level else I18n.t("replay") if mode == "result" else I18n.t("play")
 	if mode == "result" and run_kind == "daily": play_button.text = I18n.t("replay_left", daily_left)
 	play_button.icon = UiStyle.icon("next" if next_level else "replay" if mode == "result" else "play")
+	if mode == "result" and (bonus_ready or run_kind == "runner"):
+		play_button.text = I18n.t("bonus_run") if bonus_ready else I18n.t("next_city")
+		play_button.icon = UiStyle.icon("next")
 	menu_button.text = I18n.t("home")
 	levels_button.text = I18n.t("map")
 	shop_button.text = I18n.t("upgrades")
@@ -375,6 +390,57 @@ func draw_portrait_menu() -> void:
 	UiStyle.text(self, level_line(), Vector2(w/2, h-214), 15, MUTED, true, 0, body_font)
 	UiStyle.text(self, I18n.t("eat_then_take", boss_title), Vector2(w/2, h-188), 15, LIGHT, true, 0, body_font)
 
+# Growth toward the landmark, or catches toward the daily mini-game's target.
+func round_share() -> float:
+	if run_kind == "daily": return clampf(float(daily_count)/maxf(1.0, daily_target), 0, 1)
+	return growth
+
+func ring_color(share: float) -> Color:
+	if run_kind == "daily": return GOLD
+	if share >= 1.0: return Color("7dffb0")
+	return GOLD if share >= RING_NEAR else Color("b7a2f1")
+
+# A small chip under the score: the goal icon and its percentage (catches in a
+# daily round), the guardian's hearts, and the rival's share beside it.
+func draw_progress_chip() -> void:
+	var daily_round := run_kind == "daily"
+	var share := round_share()
+	var value := "%d/%d" % [daily_count, daily_target] if daily_round else "%d%%" % int(share*100)
+	var hearts := guardian_max if not daily_round else 0
+	var width := 76.0 + UiStyle.text_width(value, 20, title_font) + hearts*24.0
+	panel(Rect2(24, 112, width, 44), Color("1b3048ed"), 20)
+	UiStyle.draw_icon(self, daily_icon if daily_round else "flag", Vector2(48, 134), 26)
+	UiStyle.text(self, value, Vector2(68, 142), 20, ring_color(share), false, 0, title_font)
+	for i in hearts:
+		var at := Vector2(width + 12 - (hearts - i)*24.0, 134)
+		if i < guardian_hp: UiStyle.draw_icon(self, "heart", at, 20, Color("ff6b7d"))
+		else: draw_circle(at, 6.0, Color("465d6b"))
+	if rival_growth >= 0: text_at(I18n.t("rival_pct", int(rival_growth*100)), Vector2(width + 36, 140), 13, Color("ffb3a6"), false, 4)
+
+# Progress drawn around the hole's rim, where the eyes already are: it pulses as
+# it grows, turns gold near the goal, shakes and glows when the boss can be
+# eaten, and dims after a while without a bite. The rival's share rides outside.
+func draw_hole_ring() -> void:
+	var share := round_share()
+	var now := Time.get_ticks_msec()/1000.0
+	var since := now - ring_bump
+	var pulse := clampf(1.0 - since/0.35, 0, 1)
+	var full := share >= 1.0
+	var alpha := 1.0 if full else lerpf(1.0, 0.35, clampf((since - RING_IDLE)/0.8, 0, 1))
+	var center: Vector2 = hole_ring.center
+	if full: center += Vector2(sin(now*41.0), cos(now*37.0))*1.6
+	var radius := maxf(30.0, float(hole_ring.radius) + 12.0)*(1.0 + 0.08*pulse)
+	var color := ring_color(share)
+	var width := 6.0 + 3.0*pulse
+	draw_arc(center, radius, 0, TAU, 64, Color(0.05, 0.1, 0.18, 0.45*alpha), width + 3.0, true)
+	if full:
+		var glow := 0.35 + 0.25*sin(now*8.0)
+		draw_arc(center, radius, 0, TAU, 64, Color(color, glow*0.5), width + 12.0, true)
+	if share > 0.0:
+		draw_arc(center, radius, -PI/2, -PI/2 + TAU*share, maxi(8, int(64*share)), Color(color, alpha), width, true)
+	if rival_growth > 0.0:
+		draw_arc(center, radius + width + 2.0, -PI/2, -PI/2 + TAU*rival_growth, maxi(6, int(64*rival_growth)), Color(1.0, 0.36, 0.3, 0.8*alpha), 3.0, true)
+
 # Missile lock: four red brackets close in on the saucer as the lock fills,
 # spinning and blinking faster near the end, with the fill drawn as an arc.
 func draw_lock(lock: Dictionary) -> void:
@@ -412,36 +478,21 @@ func draw_playing() -> void:
 	panel(Rect2(w/2-104, 36, 116, 68), Color("1b3048ed"), 20)
 	UiStyle.draw_icon(self, "clock", Vector2(w/2-80, 70), 30)
 	UiStyle.text(self, "%d:%02d" % [int(ceil(seconds))/60, int(ceil(seconds))%60], Vector2(w/2-26, 82), 28, Color("ffad94") if seconds < 15 else LIGHT, true, 0, title_font)
-	panel(Rect2(w-176, 36, 84, 68), Color("1b3048ed"), 20)
-	text_at(I18n.t("cleared"), Vector2(w-134, 58), 13, MUTED, true)
-	UiStyle.text(self, "%d%%" % int(completion*100), Vector2(w-134, 90), 23, LIGHT, true, 0, title_font)
+	if run_kind != "runner":
+		panel(Rect2(w-176, 36, 84, 68), Color("1b3048ed"), 20)
+		text_at(I18n.t("cleared"), Vector2(w-134, 58), 13, MUTED, true)
+		UiStyle.text(self, "%d%%" % int(completion*100), Vector2(w-134, 90), 23, LIGHT, true, 0, title_font)
 	Minimap.draw(self, Vector2(w-32, 118), minimap)
 	if combo >= 2: draw_combo()
 	draw_floaters()
-	panel(Rect2(24, h-115, w-48, 88), Color("1b3048ed"), 20)
-	# The daily mini-game tracks catches instead of growth toward the landmark.
-	var daily_round := run_kind == "daily"
-	var share := clampf(float(daily_count)/maxf(1.0, daily_target), 0, 1) if daily_round else growth
-	UiStyle.draw_icon(self, daily_icon if daily_round else "flag", Vector2(58, h-88), 30)
-	text_at(daily_goal if daily_round else I18n.t("take_target", boss_title.to_upper()), Vector2(80, h-80), 17, LIGHT)
-	var value := "%d/%d" % [daily_count, daily_target] if daily_round else "%d%%" % int(growth*100)
-	UiStyle.text(self, value, Vector2(w-(110 if daily_round else 92), h-80), 19, GOLD, false, 0, title_font)
-	# The guardian's hearts sit left of the percentage: it takes that many bites.
-	if not daily_round and guardian_max > 0:
-		for i in guardian_max:
-			var at := Vector2(w-118-(guardian_max-1-i)*26, h-88)
-			if i < guardian_hp: UiStyle.draw_icon(self, "heart", at, 22, Color("ff6b7d"))
-			else: draw_circle(at, 7.0, Color("465d6b"))
-	panel(Rect2(44, h-63, w-88, 10), Color("465d6b"), 5)
-	panel(Rect2(44, h-63, maxf(10, (w-88)*share), 10), GOLD if daily_round else Color("b7a2f1"), 5)
-	if rival_growth >= 0:
-		panel(Rect2(44, h-47, maxf(8, (w-88)*rival_growth), 6), Color("ff5a4e"), 3)
-		text_at(I18n.t("rival_pct", int(rival_growth*100)), Vector2(w-110, h-34), 12, Color("ffb3a6"))
+	draw_progress_chip()
+	if not hole_ring.is_empty(): draw_hole_ring()
 	var run_label := run_title()
 	if run_label != "": text_at(run_label, Vector2(w/2-44, 126), 15, UiStyle.MINT, true, 4)
 	if waiting:
 		panel(Rect2(w/2-176, h/2+88, 352, 48), Color("1b3048df"), 20)
 		text_at(I18n.t("drag_to_start"), Vector2(w/2, h/2+119), 19, LIGHT, true)
+		if run_kind == "runner": text_at(note, Vector2(w/2, 186), 20, LIGHT, true, 6)
 	elif note != "":
 		text_at(note, Vector2(w/2, 186), 20, LIGHT, true, 6)
 	if stick_active:
@@ -533,6 +584,7 @@ func draw_revive() -> void:
 func run_title() -> String:
 	if run_kind == "daily": return daily_title
 	if run_kind == "endless": return I18n.t("endless_city", stage+1)
+	if run_kind == "runner": return I18n.t("run_title")
 	return ""
 
 func result_title() -> String:
@@ -541,11 +593,13 @@ func result_title() -> String:
 	if lose_reason == "rival": return I18n.t("rival_took", city.to_upper())
 	if run_kind == "endless": return I18n.t("time_up_cities", stage)
 	if run_kind == "daily": return I18n.t("dg_won" if won else "dg_lost", [daily_count, daily_target])
+	if run_kind == "runner": return I18n.t("run_won_title" if won else "run_lost_title", boss_title.to_upper())
 	return I18n.t("conquered", city.to_upper()) if won else I18n.t("pushed_back")
 
 func result_sub() -> String:
 	if mode == "paused": return I18n.t("sub_paused")
 	if record_note != "": return record_note
+	if bonus_ready: return I18n.t("bonus_ready_sub")
 	if won and last_city: return I18n.t("sub_earth")
 	if won and playtest: return I18n.t("sub_test")
 	if won and has_next: return I18n.t("sub_next_open")
@@ -581,11 +635,11 @@ func goals_width(parts: Array, font_size: int, gap := -1.0) -> float:
 	return total
 
 func draw_combo() -> void:
-	panel(Rect2(24, 112, 160, 38), GOLD, 18)
-	UiStyle.draw_icon(self, "fire", Vector2(46, 131), 28)
+	panel(Rect2(24, 164, 160, 38), GOLD, 18)
+	UiStyle.draw_icon(self, "fire", Vector2(46, 183), 28)
 	var label := I18n.t("combo", combo)
 	if multiplier > 1.0: label += "  ×%s" % ("%.1f" % multiplier).trim_suffix(".0")
-	UiStyle.text(self, label, Vector2(114, 139), 18, INK, true, 0, title_font)
+	UiStyle.text(self, label, Vector2(114, 191), 18, INK, true, 0, title_font)
 
 # Score popups rise and fade above the swallowed object.
 func draw_floaters() -> void:
