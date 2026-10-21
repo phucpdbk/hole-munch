@@ -1,16 +1,21 @@
 extends Node
 
-# One local reminder a day on Android, through the NotificationScheduler addon
+# Local reminders on Android, through the NotificationScheduler addon
 # (godot-mobile-plugins/godot-notification-scheduler, see README). Whenever the
-# game goes to the background or closes, the old reminder is cancelled and one
-# new reminder is set for REMIND_HOUR the next day: "streak about to end" when
-# there is a streak to lose, otherwise "a new daily challenge is open". Nothing
-# is sent when the player switched reminders off. The addon is found and loaded
+# game goes to the background or closes, the pending reminders are cancelled
+# and one is set for REMIND_HOUR on each of the next DAYS_AHEAD days, naming
+# that day's challenge ("Today: Find the cow in Paris!"); the first one warns
+# about the streak instead when there is one to lose. Nothing is sent when the
+# player switched reminders off. The addon is found and loaded
 # by path, so desktop, web and headless runs never parse it.
 const I18n = preload("res://scripts/i18n.gd")
 const CHANNEL := "daily"
 const REMINDER_ID := 1
 const REMIND_HOUR := 19
+# A player who skips a day or two still hears about the next challenges.
+const DAYS_AHEAD := 3
+const Campaign = preload("res://scripts/campaign.gd")
+const DailyGames = preload("res://scripts/daily_games.gd")
 const ADDONS := "res://addons/"
 const SCRIPT_NAME := "NotificationScheduler.gd"
 
@@ -57,18 +62,28 @@ static func delay_until_tomorrow(now: Dictionary) -> int:
 	var seconds_today: int = int(now.hour)*3600 + int(now.minute)*60 + int(now.second)
 	return 86400 - seconds_today + REMIND_HOUR*3600
 
-static func message(streak: int) -> Array:
-	if streak >= 2: return [I18n.t("remind_streak_t", streak), I18n.t("remind_streak_b")]
-	return [I18n.t("remind_daily_t"), I18n.t("remind_daily_b")]
+# [title, body] for the reminder that fires on `date` ("YYYY-MM-DD"): that day's
+# mini-game and city, or the streak warning on the first day of a live streak.
+static func message(streak: int, date: String, first: bool) -> Array:
+	if first and streak >= 2: return [I18n.t("remind_streak_t", streak), I18n.t("remind_streak_b")]
+	var type := Campaign.daily_type(date)
+	var city: String = Campaign.level_info(Campaign.daily_level(date)).city
+	return [I18n.t("remind_today_t", [DailyGames.title(type), city]), DailyGames.goal_line(type)]
 
-# Replaces the pending reminder; switched off or not ready, it only cancels.
+# The local date `days` after today.
+static func date_after(days: int) -> String:
+	return Time.get_date_string_from_unix_time(int(Time.get_unix_time_from_datetime_string(Campaign.today() + "T12:00:00")) + days*86400)
+
+# Replaces the pending reminders; switched off or not ready, it only cancels.
 func reschedule(enabled: bool, streak: int) -> void:
 	if not available(): return
-	scheduler.cancel(REMINDER_ID)
+	for day in DAYS_AHEAD: scheduler.cancel(REMINDER_ID + day)
 	if not enabled or not ready_to_send or not scheduler.has_post_notifications_permission(): return
 	var folder: String = scheduler.get_script().resource_path.get_base_dir() + "/model/"
-	var lines := message(streak)
-	var data = load(folder + "NotificationData.gd").new()
-	data.set_id(REMINDER_ID).set_channel_id(CHANNEL).set_title(lines[0]).set_content(lines[1]) \
-		.set_small_icon_name("ic_default_notification").set_delay(delay_until_tomorrow(Time.get_datetime_dict_from_system()))
-	scheduler.schedule(data)
+	var first_delay := delay_until_tomorrow(Time.get_datetime_dict_from_system())
+	for day in DAYS_AHEAD:
+		var lines := message(streak, date_after(day + 1), day == 0)
+		var data = load(folder + "NotificationData.gd").new()
+		data.set_id(REMINDER_ID + day).set_channel_id(CHANNEL).set_title(lines[0]).set_content(lines[1])
+		data.set_small_icon_name("ic_default_notification").set_delay(first_delay + day*86400)
+		scheduler.schedule(data)

@@ -211,6 +211,11 @@ its landmark to conquer it, while dodging independent military defenders.
   about 70–90% of the timer).
 - **Daily challenge** (THỬ THÁCH NGÀY): one city per date for everyone, with a
   rival and one continent tougher defence; the first win of the day pays ×1.5.
+  Mini-games by date: duck stampede, coin rain, gold rush and **find the cow**
+  (`cow_hunt.gd`): 80 named cows, one of them today's; clues open one by one
+  (bell colour, then coat, then part of town, every 15 s and after each wrong
+  bite), a wrong cow costs 3 s and a 1.2 s chew, five wrong ones end the round,
+  a cow's name shows when the hole is close, and the minimap gives no help.
 - **Daily streak**: a finished daily round keeps it; days 1–7 pay 20–120 coins
   and every seventh day adds a 300-coin bonus. Shown beside today's mini-game.
 - **Daily leaderboard** (`play_games.gd`): Android only, with the GodotPlayGameServices
@@ -221,8 +226,9 @@ its landmark to conquer it, while dodging independent military defenders.
   the addon or the id every leaderboard button stays hidden.
 - **Reminders** (`notify.gd`): Android only, with the NotificationScheduler addon
   v6.0 (godot-mobile-plugins/godot-notification-scheduler, Android zip into
-  `addons/`). One notification at 19:00 the next day, re-set whenever the app
-  goes to the background; permission is asked after the first win and the
+  `addons/`). One notification at 19:00 on each of the next three days, re-set
+  whenever the app goes to the background, naming that day's mini-game and
+  city ("Today: FIND THE COW in Paris!"; the first warns about a live streak); permission is asked after the first win and the
   megaphone button in the menu switches it off.
 - **Endless** (VÔ TẬN): 60 s clock, every bite adds a little time (plus combo
   time and +5 s pickups), each landmark adds 30 s and leads to a random harder

@@ -135,6 +135,9 @@ func toy(kind: String, variant: int = 0) -> ArrayMesh:
 	if kind.begins_with("farm_"):
 		cache[key] = farm_mesh(kind.trim_prefix("farm_"))
 		return cache[key]
+	if kind == "huntcow":
+		cache[key] = bake(preload("res://scripts/cow_hunt.gd").parts(self, variant))
+		return cache[key]
 	if kind == "boat":
 		cache[key] = bake(Boats.parts(self, variant))
 		return cache[key]

@@ -348,7 +348,10 @@ func check_services(g) -> void:
 	check(not g.play_games.available() and not g.hud.board_button.visible, "without Play Games no leaderboard button shows")
 	var Notify = g.Notify
 	check(Notify.delay_until_tomorrow({"hour":20, "minute":0, "second":0}) == 23*3600 and Notify.delay_until_tomorrow({"hour":0, "minute":0, "second":0}) == 43*3600, "the reminder lands at 19:00 the next day")
-	check(Notify.message(4)[0].contains("4") and Notify.message(1)[0] != Notify.message(4)[0], "a streak gets its own reminder text")
+	check(Notify.message(4, "2026-10-22", true)[0].contains("4") and Notify.message(1, "2026-10-22", true)[0] != Notify.message(4, "2026-10-22", true)[0], "a streak gets its own reminder text")
+	var day := "2026-10-23"
+	check(Notify.message(4, day, false)[0].contains(g.DailyGames.title(Campaign.daily_type(day))) and Notify.message(0, day, true)[0].contains(Campaign.level_info(Campaign.daily_level(day)).city), "a reminder names that day's challenge and city")
+	check(Notify.date_after(1) != Campaign.today() and Notify.date_after(1).length() == 10, "reminders are dated from tomorrow")
 	check(not g.notify.available() and not g.hud.reminder_button.visible, "without the notification addon there is no reminder switch")
 # Days in a row with a finished daily: coins grow over a week, day 7 adds a
 # coin bonus (never a free look), a skipped day starts over, and the same day never pays twice.
@@ -584,6 +587,7 @@ func check_daily_games(g) -> void:
 	for frame in 40: g.step(0.02, Vector2.ZERO)
 	check(g.items.filter(func(item): return item.kind == "coin" and not item.hidden and item.eaten).is_empty(), "caught coins go back to the sky pool")
 	g.go_menu()
+	check_cow_hunt(g)
 	g.daily_override = ""
 	var saved = Campaign.new()
 	saved.daily = {"date":date, "type":"coinrain", "attempts":9, "best":-4, "won":true}
@@ -594,6 +598,33 @@ func check_daily_games(g) -> void:
 	g.campaign.items = {"magnet":1, "speed":1, "time":0}
 	g.on_play()
 	check(g.mechanics.powers.magnet > 0 and g.mechanics.powers.speed > 0 and g.campaign.items.magnet == 0, "carry-in powers start the next campaign round")
+	g.go_menu()
+
+# Find the cow (cow_hunt.gd): a herd where only today's cow matches every clue;
+# a wrong bite costs time, a chew and opens a clue; the right one wins.
+func check_cow_hunt(g) -> void:
+	g.campaign.daily = {}
+	g.daily_override = "findcow"
+	g.start_daily()
+	var hunt = g.daily.hunt
+	var herd: Array = g.items.filter(func(item): return item.kind == "huntcow")
+	var twins: Array = herd.filter(func(cow): return cow != hunt.star and cow.bell == hunt.star.bell and cow.coat == hunt.star.coat and hunt.quarter(cow.origin) == hunt.quarter(hunt.star.origin))
+	var reachable := herd.all(func(cow): return absf(cow.origin.x) <= g.layout.move_x - 1.0 and absf(cow.origin.z) <= g.layout.move_z - 1.0)
+	check(reachable and herd.size() == hunt.COWS and twins.is_empty() and hunt.note().contains(hunt.star_name) and g.daily.dots().is_empty(), "the herd has one cow that fits all clues, and no minimap help")
+	g.started = true
+	g.defense.grace = INF
+	var decoy: Dictionary = herd.filter(func(cow): return cow != hunt.star)[0]
+	var before: float = g.remaining
+	# Hold the hole on the cow (drift and wind would carry it off).
+	for frame in 30:
+		if decoy.fall < 0 and not decoy.eaten: g.hole_position = Vector3(decoy.position.x, 0, decoy.position.z)
+		g.step(0.02, Vector2.ZERO)
+	check(hunt.wrong == 1 and hunt.clues == 2 and g.remaining < before - 2.0 and g.daily.speed_scale() < 1.0, "a wrong cow costs time, a chew, and opens the next clue")
+	for frame in 60:
+		if g.mode != "playing": break
+		if hunt.star.fall < 0: g.hole_position = Vector3(hunt.star.position.x, 0, hunt.star.position.z)
+		g.step(0.02, Vector2.ZERO)
+	check(g.mode == "result" and g.hud.won and g.hud.stars == 3 and g.reward > 0, "swallowing today's cow wins the hunt")
 	g.go_menu()
 
 # Tuning aid (`-- --campaign-smoke --rival-bench`): seconds an unopposed rival

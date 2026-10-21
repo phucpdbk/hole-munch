@@ -4,16 +4,18 @@ extends Node3D
 #   stampede - fast ducks scatter from the hole; catch as many as you can.
 #   coinrain - coins rain down near the hole, with a few bombs mixed in.
 #   goldrush - only golden treasure scores, raced by the rival hole.
+#   findcow  - find today's named cow in a herd from opening clues (cow_hunt.gd).
 # The landmark, its guardian and the defence squads sit the round out. game.gd
 # owns the items; this node adds the game's own items when the city is built,
 # moves them, counts catches and draws the shadows of falling coins.
 const Traffic = preload("res://scripts/traffic.gd")
 const I18n = preload("res://scripts/i18n.gd")
-const SECONDS := {"stampede":45.0, "coinrain":45.0, "goldrush":60.0}
-const TARGET := {"stampede":15, "coinrain":24, "goldrush":30}
+const CowHunt = preload("res://scripts/cow_hunt.gd")
+const SECONDS := {"stampede":45.0, "coinrain":45.0, "goldrush":60.0, "findcow":75.0}
+const TARGET := {"stampede":15, "coinrain":24, "goldrush":30, "findcow":1}
 # Coins paid per catch (gold pays per value point).
-const COIN_RATE := {"stampede":6, "coinrain":4, "goldrush":4}
-const ICON := {"stampede":"target", "coinrain":"coin", "goldrush":"chest"}
+const COIN_RATE := {"stampede":6, "coinrain":4, "goldrush":4, "findcow":1}
+const ICON := {"stampede":"target", "coinrain":"coin", "goldrush":"chest", "findcow":"target"}
 const STAR_SHARES := [0.5, 1.0, 1.5]
 # Ducks rest, then sprint away from a nearby hole; a sprint is faster than the
 # hole but short, so cornering a duck pays off.
@@ -46,6 +48,7 @@ var sky: Array = []
 var next_coin := 0.0
 var next_bomb := 0.0
 var markers: Array[MeshInstance3D] = []
+var hunt := CowHunt.new()
 
 func _ready() -> void:
 	var shadow := StandardMaterial3D.new()
@@ -70,6 +73,7 @@ static func title(type: String) -> String:
 	return I18n.t("dg_" + type)
 
 static func goal_line(type: String) -> String:
+	if type == "findcow": return I18n.t("dgoal_findcow")
 	return I18n.t("dgoal_" + type, TARGET[type])
 
 func target() -> int:
@@ -104,6 +108,7 @@ func build(game, type: String, value: int) -> void:
 					treasure.value = entry[2]
 					treasure.gold = true
 					prey.append(treasure)
+		"findcow": hunt.build(game, rng, func(): return road_spot(game, 6.0))
 	for item in prey + sky: item.optional = true
 
 # A spot on a road, away from the spawn point.
@@ -139,6 +144,7 @@ func reset(game) -> void:
 		duck.heading = Vector3.ZERO
 	for drop in sky: park(game, drop)
 	for marker in markers: marker.visible = false
+	if kind == "findcow": hunt.reset()
 
 func park(game, drop: Dictionary) -> void:
 	drop.hidden = true
@@ -154,6 +160,8 @@ func update(game, dt: float) -> void:
 		for duck in prey: move_duck(game, duck, dt)
 	elif kind == "coinrain":
 		update_rain(game, dt)
+	elif kind == "findcow":
+		hunt.update(game, dt)
 
 func move_duck(game, duck: Dictionary, dt: float) -> void:
 	if not Traffic.is_active(duck): return
@@ -246,6 +254,10 @@ func snap_to_road(game, at: Vector3) -> Vector3:
 
 # Called by game.swallow for every bite during a daily round.
 func caught(game, item: Dictionary) -> void:
+	if kind == "findcow":
+		hunt.caught(game, item)
+		count = 1 if hunt.found else 0
+		return
 	if not item.get("prey", false): return
 	var value := int(item.get("value", 1))
 	count += value
@@ -253,27 +265,41 @@ func caught(game, item: Dictionary) -> void:
 	game.sfx.play("grow")
 
 func done() -> bool:
+	if kind == "findcow": return hunt.done()
 	return kind == "stampede" and prey.all(func(duck): return not Traffic.is_active(duck))
 
 func reached() -> bool:
 	return count >= target()
 
 func stars() -> int:
+	if kind == "findcow": return hunt.stars()
 	var total := 0
 	for share in STAR_SHARES:
 		if count >= ceili(target()*share): total += 1
 	return total
 
 func goal_labels() -> Array:
+	if kind == "findcow": return hunt.goal_labels()
 	return STAR_SHARES.map(func(share): return I18n.t("dg_count_" + kind, ceili(target()*share)))
 
 func reward(coin_mul: float) -> int:
+	if kind == "findcow": return hunt.reward(coin_mul)
 	return roundi(count*COIN_RATE.get(kind, 1)*coin_mul)
 
 # Minimap dots for what still scores.
 func dots() -> Array:
 	var list: Array = []
+	# No minimap help in the cow hunt: the clues are the whole game.
+	if kind == "findcow": return list
 	for item in prey + sky:
 		if item.get("prey", false) and Traffic.is_active(item) and item.get("falling", 0.0) <= 0:
 			list.append(Vector2(item.position.x, item.position.z))
 	return list
+
+# The HUD's note line: the cow hunt's open clues, nothing for the others.
+func note() -> String:
+	return hunt.note() if kind == "findcow" else ""
+
+# Movement scale: a wrong cow is chewed slowly.
+func speed_scale() -> float:
+	return hunt.speed_scale() if kind == "findcow" else 1.0

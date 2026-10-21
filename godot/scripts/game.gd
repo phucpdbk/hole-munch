@@ -1246,7 +1246,7 @@ func step(dt: float, input: Vector2) -> void:
 	right.y = 0
 	down.y = 0
 	var movement := (right.normalized()*input.x + down.normalized()*input.y).limit_length()
-	var wanted: Vector3 = movement*(5.8+minf(radius,4.0)*0.45)*float(stats.speed)*defense.speed_multiplier()*mechanics.speed_multiplier()
+	var wanted: Vector3 = movement*(5.8+minf(radius,4.0)*0.45)*float(stats.speed)*defense.speed_multiplier()*mechanics.speed_multiplier()*(daily.speed_scale() if run_kind == "daily" else 1.0)
 	hole_velocity = mechanics.steer(wanted, dt, elapsed)
 	hole_position += hole_velocity*dt
 	hole_position = layout.clamp_point(hole_position)
@@ -1881,7 +1881,7 @@ func update_hud() -> void:
 	if run_kind == "runner": hud.note = I18n.t("run_hint", target_name) if not started else I18n.t("big_enough", target_name) if radius*EAT_RATIO >= boss_radius and not boss_down else ""
 	elif not started and mechanics.weather_note() != "": hud.note = mechanics.weather_note()
 	elif mechanics.hungry: hud.note = I18n.t("hungry")
-	elif run_kind == "daily": hud.note = ""
+	elif run_kind == "daily": hud.note = daily.note()
 	elif boss_down: hud.note = I18n.t("boss_down", target_name)
 	elif mechanics.shield_up() and radius*EAT_RATIO >= boss_radius: hud.note = I18n.t("eat_guardian")
 	else: hud.note = I18n.t("big_enough", target_name) if radius*EAT_RATIO >= boss_radius else ""

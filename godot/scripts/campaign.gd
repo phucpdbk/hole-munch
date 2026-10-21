@@ -547,7 +547,7 @@ func complete_goals(mask: int, score: int) -> void:
 # Reaching the mini-game's target the first time that day pays a bonus and a
 # carry-in power for the campaign (daily_games.gd has the games themselves).
 const DAILY_COIN_BONUS := 1.5
-const DAILY_TYPES := ["stampede", "coinrain", "goldrush"]
+const DAILY_TYPES := ["stampede", "coinrain", "goldrush", "findcow"]
 const DAILY_ATTEMPTS := 3
 const MAX_ITEMS := 9
 const POWER_KINDS := ["magnet", "speed", "time"]
