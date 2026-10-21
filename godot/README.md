@@ -21,7 +21,7 @@ its landmark to conquer it, while dodging independent military defenders.
 - **Map size follows difficulty**: 3×3 blocks at the start, 5×3, then 5×5;
   continent finales use the next size up (5×7 from the fourth continent).
   The boss size comes from the map's own food: the hole must eat 27% of it
-  at the start, rising to 40% (`campaign.gd` `share_at`), landmarks 3.0–6.6,
+  at the start, rising to 46% (`campaign.gd` `share_at`), landmarks 3.0–6.6,
   finales up to 7.2 (still under the hole's 8.5 cap).
   Blocks around the plaza are 24/31/38 units street to street
   (`map_layout.gd`) and sparsely built: about a quarter of shop lots stay
@@ -63,14 +63,14 @@ its landmark to conquer it, while dodging independent military defenders.
   clears a small window around the saucer (it widens as the hole grows) and
   hides the minimap. `-- --capture --weather-capture` shoots rain, fog, snow
   and storm mid-round.
-- **Timer** = par × 3.5 early, falling to ×3 late, never below 52.5 s early /
-  45 s late. Par is how long a real-time greedy route (`smoke.gd`, the same
+- **Timer** = par × 3 early, falling to ×2.4 late, never below 48 s early /
+  40 s late. Par is how long a real-time greedy route (`smoke.gd`, the same
   food-per-distance choice the rival makes, no clock bonus) needs at player
   speed, 14–206 s. Par times live in `campaign.gd` (`PAR_SECONDS`); regenerate them
   from `--campaign-smoke` output (`PAR` lines) after changing map contents.
 - **The clock never refills in campaign or daily rounds**: no combo time, no
   +5 s pickup (both stay in endless only). The only extras are the small time
-  upgrade (+1 s per level, 5 levels) and the one rewarded-ad revive below.
+  upgrade (+2 s per level, 5 levels) and the one rewarded-ad revive below.
   Best combo raises the coin reward by 1% per bite (up to +60%).
 - **Swallowing the landmark wins at once**; every second left pays 2 coins. The
   clean 75%/90% goals therefore mean clearing the city before the landmark.
@@ -129,15 +129,26 @@ its landmark to conquer it, while dodging independent military defenders.
   game) is a small chip under the score instead of a bar along the bottom: the
   percentage (gold from 80%, green at 100%), the guardian's hearts and the
   rival's share beside it.
-- **Bonus run** (`runner.gd`): the first win on every fifth city (5, 10, …)
-  turns PLAY into BONUS RUN. The hole rolls up a 3×9 map's middle avenue on its
-  own; the player only steers sideways. Each half of the road has its own food,
-  growing from cones to towers, and every other cross street has a gate pair
-  (×1.5/−30%, ×1.3/×1.1, …). The city's landmark waits at the far end, sized
-  from a simulated run that eats 55% of what fits and takes the better gates;
-  too small at the end loses. It pays coins only (no stars or goals), and PLAY
-  afterwards goes on to the next city. `check_runner` in `campaign_smoke.gd`
-  drives a better-gate bot (wins) and a worse-gate bot (falls short);
+- **Bonus run** (`runner.gd`, `runner_props.gd`): the first win on every fifth
+  city (5, 10, …) turns PLAY into BONUS RUN. The hole rolls up a 3×31 map's
+  middle avenue on its own (about 42 s, speeding up from 10 to 15 units/s); the
+  player only steers sideways (14 units/s). Each half of the road has its own
+  sparse food, growing from cones to towers. The cross streets repeat a beat of
+  four: a gate pair (×1.2/−20%, ×1.1/×1.05, …; from 40% of the course on a pair
+  swaps sides every 0.8 s until the hole is 16 units away) with a roadblock on
+  one half past it and a coin line leading into that; a free coin line; a
+  roadblock sliding from side to side (from 20% on; coins before that); a boost
+  pad on one half (×1.35 speed and double coins for 2.5 s) with coins over it.
+  Driving into any roadblock costs 20% of the hole's size. Roadblocks and coins
+  grow along the course so they read next to a big hole. The city's landmark
+  waits at the far end, sized from a simulated run that eats 65% of what fits
+  and takes the better gates, never above 90% of what the size cap can eat;
+  too small at the end loses. It pays coins only (no stars or goals): food,
+  1 per picked coin and 60 for the landmark, up to 120 when the hole arrives
+  twice the size it needed. PLAY afterwards goes on to the next city.
+  `check_runner` in `campaign_smoke.gd` drives a better-gate bot (wins, reads
+  the sliding roadblocks and dodges every one), the same bot hitting one late
+  roadblock (still wins) or four (loses) and a worse-gate bot (falls short);
   `-- --capture --run-capture` writes `test-output/run-*.png`.
 - **Ad clips** (`ad_capture.gd`, `tools/make-ads.ps1`): portrait 720×1280 AVIs
   plus key-frame PNGs in `test-output/ads/`, English by default (`-Lang es` etc.),
@@ -168,7 +179,7 @@ its landmark to conquer it, while dodging independent military defenders.
 - **Three goals per city** (`challenges.gd`), one star each: conquer, plus two
   rotating goals (clean 75%/90%, combo N, finish with time left, no hits, eat N
   defenders, eat the rival). Stars are kept per goal across replays.
-- **Star gates**: each continent after the first needs 14 more stars in total.
+- **Star gates**: each continent after the first needs 16 more stars in total (two per city on average, so some goals get replayed).
 - **Defence scales per continent** (`defense.gd`): warnings shrink from 1.25 s
   to 0.8 s, up to 5 simultaneous shots, opening grace drops from 8 s to 0,
   later gunners lead a moving hole, and each hit also shrinks the hole by 6%.
@@ -234,7 +245,7 @@ its landmark to conquer it, while dodging independent military defenders.
   time and +5 s pickups), each landmark adds 30 s and leads to a random harder
   city; best score and cities are saved.
 - **Upgrades** (NÂNG CẤP): coins buy start size (+0.04 × 6), speed (+4% × 8),
-  time (+1 s × 5), magnet (× 5) and coin bonus (+8% × 8); base prices
+  time (+2 s × 5), magnet (× 5) and coin bonus (+8% × 8); base prices
   160/140/200/300/240, ×1.75 per level. A maxed size upgrade still cannot eat
   a shop at the start (checked in `--campaign-smoke`). Map food pays 1 coin per
   80 points on a win (200 on a loss); stars and the win pay the rest.

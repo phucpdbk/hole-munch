@@ -79,7 +79,7 @@ const S := {
 	"gate_small": ["TEO MẤT 30%!", "SHRUNK −30%!", "¡ENCOGIDO −30%!", "ENCOLHEU −30%!", "RÉTRÉCI −30 % !", "MENYUSUT −30%!"],
 	# --- Bonus run (runner.gd) ------------------------------------------------------
 	"run_title": ["MÀN THƯỞNG · CHẠY", "BONUS RUN", "CARRERA EXTRA", "CORRIDA BÔNUS", "COURSE BONUS", "LARI BONUS"],
-	"run_hint": ["Vuốt trái/phải · chọn cổng · nuốt %s cuối đường!", "Swipe left/right · pick gates · swallow %s at the end!", "Desliza a los lados · elige puertas · ¡trágate %s al final!", "Deslize para os lados · escolha portões · engula %s no fim!", "Glisse à gauche/droite · choisis les portes · avale %s au bout !", "Geser kiri/kanan · pilih gerbang · telan %s di ujung!"],
+	"run_hint": ["Vuốt trái/phải · chọn cổng · né rào, ăn xu · nuốt %s cuối đường!", "Swipe left/right · pick gates · dodge roadblocks, grab coins · swallow %s at the end!", "Desliza a los lados · elige puertas · esquiva barreras, coge monedas · ¡trágate %s al final!", "Deslize para os lados · escolha portões · desvie das barreiras, pegue moedas · engula %s no fim!", "Glisse à gauche/droite · choisis les portes · évite les barrages, prends les pièces · avale %s au bout !", "Geser kiri/kanan · pilih gerbang · hindari palang, ambil koin · telan %s di ujung!"],
 	"run_too_small": ["CHƯA ĐỦ TO!", "TOO SMALL!", "¡DEMASIADO PEQUEÑO!", "PEQUENO DEMAIS!", "TROP PETIT !", "KURANG BESAR!"],
 	"run_won": ["Nuốt trọn cuối đường · +%d xu", "Swallowed at the finish · +%d coins", "Devorado en la meta · +%d monedas", "Engolido na chegada · +%d moedas", "Avalé à l'arrivée · +%d pièces", "Ditelan di garis akhir · +%d koin"],
 	"run_lost": ["Chọn cổng xanh để kịp to ra!", "Pick the bigger gates to grow in time!", "¡Elige las puertas que más crecen!", "Escolha os portões que mais crescem!", "Choisis les portes qui font grandir !", "Pilih gerbang yang paling membesarkan!"],
@@ -466,7 +466,7 @@ const S := {
 	"up_speed": ["TỐC ĐỘ", "SPEED", "VELOCIDAD", "VELOCIDADE", "VITESSE", "KECEPATAN"],
 	"up_speed_d": ["+4% tốc độ di chuyển", "+4% move speed", "+4% de velocidad", "+4% de velocidade", "+4% de vitesse", "+4% kecepatan"],
 	"up_time": ["THỜI GIAN", "TIME", "TIEMPO", "TEMPO", "TEMPS", "WAKTU"],
-	"up_time_d": ["+1 giây mỗi màn", "+1 s per round", "+1 s por ronda", "+1 s por rodada", "+1 s par manche", "+1 dtk per ronde"],
+	"up_time_d": ["+2 giây mỗi màn", "+2 s per round", "+2 s por ronda", "+2 s por rodada", "+2 s par manche", "+2 dtk per ronde"],
 	"up_magnet": ["LỰC HÚT", "MAGNET", "IMÁN", "ÍMÃ", "AIMANT", "MAGNET"],
 	"up_magnet_d": ["Hút đồ nhỏ về phía hố", "Pulls small things into the hole", "Atrae cosas pequeñas al hoyo", "Puxa coisas pequenas ao buraco", "Attire les petits objets", "Menarik benda kecil ke lubang"],
 	"up_greed": ["THU XU", "COIN BONUS", "BONO DE MONEDAS", "BÔNUS DE MOEDAS", "BONUS DE PIÈCES", "BONUS KOIN"],

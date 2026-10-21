@@ -6,19 +6,25 @@ extends Node3D
 # player only steers left and right: food on both halves of the road, a gate
 # pair on every other cross street (a choice of size changes), and the city's
 # landmark, oversized, waiting at the far end. Big enough by then swallows it.
+# The road speeds up as it goes, gates in the second half swap sides until the
+# hole is close, and roadblocks with coin lines (runner_props.gd) ask for swerves.
 # game.gd owns the items, the hole and the result; this node builds the course,
 # drives the hole and fires the gates.
 const I18n = preload("res://scripts/i18n.gd")
 const UiStyle = preload("res://scripts/ui_style.gd")
+const RunnerProps = preload("res://scripts/runner_props.gd")
 const BONUS_EVERY := 5
 const COLS := 3
-const ROWS := 9
-const SPEED := 7.0
-const STEER := 9.0
+const ROWS := 31
+# Forward speed ramps from the start to the finish.
+const SPEED := 10.0
+const SPEED_END := 15.0
+# Sideways speed at full stick, quick enough to cross the road at full speed.
+const STEER := 14.0
 # How far either side of the centre line the hole may roll.
 const LANE := 6.6
 # The last stretch eases the hole onto the landmark's line.
-const FUNNEL := 14.0
+const FUNNEL := 22.0
 const GATE_HEIGHT := 2.6
 const GATE_FOLD := 0.3
 const GOOD := Color("3ddc84")
@@ -26,7 +32,16 @@ const BAD := Color("ff5a5f")
 const FAIR := Color("ffd166")
 # Gate pairs as [left, right] size multipliers before the side is shuffled; one
 # pair in two offers two gains, so the better gain also rewards a sharp eye.
-const PAIRS := [[1.5, 0.7], [1.3, 1.1], [1.4, 0.75], [1.2, 1.5], [1.25, 0.8], [1.6, 0.6]]
+const PAIRS := [[1.2, 0.8], [1.1, 1.05], [1.15, 0.85], [1.05, 1.2], [1.15, 0.8], [1.25, 0.75], [1.05, 1.15], [1.25, 0.7]]
+# From this share of the course on, a gate pair trades sides every SWAP_TIME
+# seconds and settles once the hole is LOCK_DIST away.
+const SWAP_FROM := 0.4
+const SWAP_TIME := 0.8
+const LOCK_DIST := 16.0
+# The cross streets repeat a beat of BEAT: a gate pair (a roadblock after it),
+# a coin line, a sliding roadblock (coins before SLIDE_FROM), a boost pad.
+const BEAT := 4
+const SLIDE_FROM := 0.2
 # Food ladder by progress along the course: [kind, radius, variants].
 const FOOD := [
 	[["cone", 0.2, 1], ["person", 0.22, 4]],
@@ -36,11 +51,20 @@ const FOOD := [
 	[["car", 0.82, 4], ["house", 1.5, 2]],
 	[["house", 1.5, 2], ["tower", 2.0, 1]],
 	[["house", 1.5, 2], ["tower", 2.4, 1]],
+	[["tower", 2.4, 1], ["tower", 2.8, 1]],
 ]
 # A player who eats this share of what fits and takes the better gate makes the
 # landmark with some room; always the worse gate falls short.
-const EAT_SHARE := 0.55
-const BOSS_MARGIN := 0.92
+const EAT_SHARE := 0.65
+# Share of row spots left empty: the long course would otherwise grow any hole
+# to the size cap before the landmark.
+const SKIP := 0.62
+const BOSS_MARGIN := 0.95
+# The landmark never asks for more than this share of the size cap, so a hole
+# at the cap can take one late roadblock and still make it.
+const BOSS_CAP := 0.9
+# Coins for the landmark, plus up to as much again for arriving oversized.
+const WIN_COINS := 60.0
 
 var rng := RandomNumberGenerator.new()
 var gates: Array = []
@@ -49,6 +73,8 @@ var finish_z := 0.0
 # Seconds the hole has sat at the landmark too small to eat it.
 var stuck := 0.0
 var last_z := 0.0
+var swap_clock := 0.0
+var props := RunnerProps.new()
 
 static func due(index: int) -> bool:
 	return (index + 1) % BONUS_EVERY == 0
@@ -56,6 +82,7 @@ static func due(index: int) -> bool:
 func clear() -> void:
 	for gate in gates: gate.node.queue_free()
 	gates.clear()
+	props.clear()
 
 # Course: food rows in each block, gates on the cross streets, the boss beyond
 # the last one. Called instead of make_city().
@@ -81,11 +108,13 @@ func build(game, seed_value: int) -> void:
 			for z in layout.blocks_z: fill_scenery(game, x, z)
 	var streets: Array = layout.crossings_z.duplicate()
 	streets.reverse()
-	for i in range(1, streets.size(), 2):
-		var pair: Array = PAIRS[(i/2 + rng.randi_range(0, PAIRS.size() - 1)) % PAIRS.size()].duplicate()
+	for i in range(1, streets.size(), BEAT):
+		var pair: Array = PAIRS[(i/BEAT + rng.randi_range(0, PAIRS.size() - 1)) % PAIRS.size()].duplicate()
 		if rng.randf() < 0.5: pair.reverse()
+		var swaps := float(i)/float(streets.size() - 1) >= SWAP_FROM
 		for side in [-1.0, 1.0]:
-			gates.append(make_gate(float(streets[i]), side, pair[0 if side < 0 else 1], i))
+			gates.append(make_gate(float(streets[i]), side, pair[0 if side < 0 else 1], i, swaps))
+	place_props(game, streets)
 	game.make_boss()
 	var boss: Dictionary = game.items[game.boss_index]
 	game.boss_radius = landmark_radius(game)
@@ -93,6 +122,28 @@ func build(game, seed_value: int) -> void:
 	boss.origin = Vector3(0, game.BOSS_HOME.y, finish_z - game.boss_radius*0.4)
 	boss.position = boss.origin
 	game.mechanics.setup(game, false, seed_value, false)
+
+# One beat of BEAT cross streets: past each gate but the first a roadblock on one
+# half with coins leading into it; then a coin line; then a sliding roadblock;
+# then a boost pad with coins over it.
+func place_props(game, streets: Array) -> void:
+	var barrier: Mesh = game.models.toy("barrier")
+	for i in range(1, streets.size() - 1):
+		var z: float = streets[i]
+		var side := -1.0 if rng.randf() < 0.5 else 1.0
+		var grow := clampf((start.z - z)/(start.z - finish_z), 0.0, 1.0)
+		match i % BEAT:
+			1:
+				if i == 1: continue
+				props.add_block(self, barrier, z - 13.0, side, grow)
+				props.add_coin_line(self, side*LANE*0.5, z - 3.0, 4, grow)
+			3 when grow >= SLIDE_FROM:
+				props.add_block(self, barrier, z - 9.0, side, grow, true)
+			0:
+				props.add_pad(self, z + 2.0, side)
+				props.add_coin_line(self, side*LANE*0.5, z - 1.0, 5, grow)
+			_:
+				props.add_coin_line(self, side*rng.randf_range(1.5, LANE - 1.0), z + 4.0, 6, grow)
 
 # Two lanes of loose rows: each half of the road gets its own mix, so steering
 # is a choice.
@@ -107,7 +158,7 @@ func fill_block(game, z: float, tier: Array, first: bool) -> void:
 		var rows := maxi(1, int(depth/gap))
 		for r in rows:
 			for c in cols:
-				if rng.randf() < 0.22: continue
+				if rng.randf() < SKIP: continue
 				# Now and then a smaller snack from the tier sits in the row.
 				var kind_pick: Array = tier[0] if rng.randf() < 0.25 else pick
 				var x: float = side*(0.6 + gap*0.5 + c*gap) + rng.randf_range(-0.25, 0.25)*gap
@@ -139,7 +190,7 @@ func landmark_radius(game) -> float:
 			r = minf(game.MAX_RADIUS, r*best_gain(ordered[next].pair))
 			next += 1
 		if item.radius <= r*game.EAT_RATIO: r = sqrt(r*r + EAT_SHARE*item.radius*item.radius*game.GROWTH)
-	return clampf(r*game.EAT_RATIO*BOSS_MARGIN, game.MIN_BOSS, game.MAX_RADIUS*game.EAT_RATIO)
+	return clampf(r*game.EAT_RATIO*BOSS_MARGIN, game.MIN_BOSS, game.MAX_RADIUS*game.EAT_RATIO*BOSS_CAP)
 
 func best_gain(pair: int) -> float:
 	var best := 0.0
@@ -147,35 +198,60 @@ func best_gain(pair: int) -> float:
 		if gate.pair == pair: best = maxf(best, gate.gain)
 	return best
 
-func make_gate(z: float, side: float, gain: float, pair: int) -> Dictionary:
+func make_gate(z: float, side: float, gain: float, pair: int, swaps := false) -> Dictionary:
 	var node := Node3D.new()
 	var width := LANE + 0.4
 	node.position = Vector3(side*width/2.0, 0, z)
 	add_child(node)
-	var color := BAD if gain < 1.0 else GOOD if gain >= 1.4 else FAIR
 	var frame := StandardMaterial3D.new()
-	frame.albedo_color = color.darkened(0.25)
 	var glow := StandardMaterial3D.new()
 	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	glow.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	glow.cull_mode = BaseMaterial3D.CULL_DISABLED
-	glow.albedo_color = Color(color, 0.32)
 	for x in [-width/2.0, width/2.0]: node.add_child(block(Vector3(x, GATE_HEIGHT/2.0, 0), Vector3(0.18, GATE_HEIGHT, 0.18), frame))
 	node.add_child(block(Vector3(0, GATE_HEIGHT, 0), Vector3(width + 0.18, 0.2, 0.2), frame))
 	node.add_child(block(Vector3(0, GATE_HEIGHT/2.0, 0), Vector3(width, GATE_HEIGHT, 0.04), glow))
 	var label := Label3D.new()
-	label.text = gain_text(gain)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.font = UiStyle.font(800)
 	label.font_size = 150
 	label.outline_size = 34
 	label.pixel_size = 0.012
-	label.modulate = color.lightened(0.35)
 	label.outline_modulate = Color("1d1530")
 	label.position = Vector3(0, GATE_HEIGHT + 1.1, 0)
 	label.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	node.add_child(label)
-	return {"node":node, "at":z, "side":side, "gain":gain, "pair":pair, "used":false, "fold":0.0, "color":color}
+	var gate := {"node":node, "at":z, "side":side, "gain":gain, "start_gain":gain, "pair":pair, "used":false, "fold":0.0,
+		"swaps":swaps, "frame":frame, "glow":glow, "label":label}
+	style_gate(gate)
+	return gate
+
+static func gate_color(gain: float) -> Color:
+	return BAD if gain < 1.0 else GOOD if gain >= 1.2 else FAIR
+
+func style_gate(gate: Dictionary) -> void:
+	var color := gate_color(gate.gain)
+	gate.color = color
+	gate.frame.albedo_color = color.darkened(0.25)
+	gate.glow.albedo_color = Color(color, 0.32)
+	gate.label.text = gain_text(gate.gain)
+	gate.label.modulate = color.lightened(0.35)
+
+# Swapping pairs trade gains (and looks) until the hole comes within LOCK_DIST.
+func swap_gates(game, dt: float) -> void:
+	swap_clock += dt
+	if swap_clock < SWAP_TIME: return
+	swap_clock -= SWAP_TIME
+	for gate in gates:
+		if gate.side > 0 or not gate.swaps or gate.used: continue
+		if game.hole_position.z - gate.at < LOCK_DIST: continue
+		for other in gates:
+			if other.pair != gate.pair or other.side == gate.side: continue
+			var gain: float = gate.gain
+			gate.gain = other.gain
+			other.gain = gain
+			style_gate(gate)
+			style_gate(other)
 
 static func gain_text(gain: float) -> String:
 	if gain >= 1.0: return "×%s" % str(snappedf(gain, 0.01))
@@ -194,15 +270,22 @@ func block(at: Vector3, size: Vector3, material: Material) -> MeshInstance3D:
 func reset(game) -> void:
 	stuck = 0.0
 	last_z = start.z
+	swap_clock = 0.0
+	props.reset()
 	for gate in gates:
 		gate.used = false
 		gate.fold = 0.0
+		gate.gain = gate.start_gain
+		style_gate(gate)
 		gate.node.scale = Vector3.ONE
 		gate.node.visible = true
 	game.remaining = time_left(game.hole_position)
 
 func time_left(at: Vector3) -> float:
-	return maxf(0.0, (at.z - finish_z)/SPEED)
+	return maxf(0.0, (at.z - finish_z)/lerpf(speed_at(at.z), SPEED_END, 0.5))
+
+func speed_at(z: float) -> float:
+	return lerpf(SPEED, SPEED_END, clampf((start.z - z)/(start.z - finish_z), 0.0, 1.0))
 
 # Forward on its own, sideways from the stick; the last stretch lines the hole
 # up with the landmark. Returns true once the round is over.
@@ -210,7 +293,7 @@ func drive(game, dt: float, input: Vector2) -> bool:
 	var boss: Dictionary = game.items[game.boss_index]
 	var stop: float = boss.position.z + (boss.radius*0.4 if boss.radius <= game.radius*game.EAT_RATIO else boss.radius + game.radius*0.6)
 	# A small slack so a hole still settling in size does not creep forward forever.
-	var forward := SPEED*float(game.stats.speed) if game.hole_position.z > stop + 0.1 else 0.0
+	var forward := speed_at(game.hole_position.z)*props.speed_scale()*float(game.stats.speed) if game.hole_position.z > stop + 0.1 else 0.0
 	var lane := LANE
 	if game.hole_position.z - finish_z < FUNNEL:
 		lane = lerpf(0.0, LANE, clampf((game.hole_position.z - finish_z)/FUNNEL, 0, 1))
@@ -222,7 +305,9 @@ func drive(game, dt: float, input: Vector2) -> bool:
 	game.hole_position.x = clampf(game.hole_position.x, -lane, lane)
 	game.remaining = time_left(game.hole_position)
 	check_gates(game)
+	swap_gates(game, dt)
 	fold_gates(dt)
+	props.update(game, dt, last_z)
 	if forward > 0.0 or game.boss_down or boss.fall >= 0: return false
 	# Too small at the landmark: a beat to see it, then the round ends.
 	if stuck == 0.0:
@@ -262,6 +347,8 @@ func fold_gates(dt: float) -> void:
 		gate.node.scale = Vector3(1.0, maxf(0.001, 1.0 - gate.fold), 1.0)
 		gate.node.visible = gate.fold < 1.0
 
-# Coins: a share of the food eaten, more for the landmark.
-func reward(eaten_points: int, won: bool, coin_mul: float) -> int:
-	return roundi((eaten_points/20.0 + (60.0 if won else 0.0))*coin_mul)
+# Coins: a share of the food eaten, the coins picked up, and for the landmark a
+# bonus that doubles when the hole arrives twice the size it needed.
+func reward(eaten_points: int, won: bool, coin_mul: float, oversize := 1.0) -> int:
+	var finish := WIN_COINS*(1.0 + clampf(oversize - 1.0, 0.0, 1.0)) if won else 0.0
+	return roundi((eaten_points/30.0 + props.picked + finish)*coin_mul)

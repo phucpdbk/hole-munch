@@ -1583,7 +1583,7 @@ func finish(won: bool) -> void:
 				var line := I18n.t("streak_gift", [int(gift.day), int(gift.coins)])
 				record_note = line + " · " + record_note
 		"runner":
-			reward = runner.reward(eaten_points, won, float(stats.coin_mul))
+			reward = runner.reward(eaten_points, won, float(stats.coin_mul), radius*EAT_RATIO/boss_radius)
 			hud.stars = 3 if won else 1 if growth() >= 0.5 else 0
 			record_note = I18n.t("run_won", reward) if won else I18n.t("run_lost")
 		"endless":

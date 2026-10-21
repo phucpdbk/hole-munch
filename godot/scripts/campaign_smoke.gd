@@ -314,8 +314,8 @@ func check_goals_and_modes() -> void:
 	progress.unlock_all_for_testing = false
 	progress.unlocked = 8
 	check(progress.can_select(7) and not progress.can_select(8), "second continent needs stars")
-	for i in 5: progress.medals[i] = 3
-	check(progress.total_stars() == 15 and progress.can_select(8), "enough stars open the next continent")
+	for i in 6: progress.medals[i] = 3
+	check(progress.total_stars() == 18 and progress.can_select(8), "enough stars open the next continent")
 	progress = Campaign.new()
 	progress.restore({"version":4, "medals":[2, 0, 3]})
 	check(progress.goals[0] == 3 and progress.goals[2] == 7 and progress.medals[0] == 2, "old star counts become goal masks")
@@ -495,10 +495,18 @@ func check_runner(g) -> void:
 	check(g.runner.gates.size() >= 6 and g.layout.cols == Runner.COLS and g.items[g.boss_index].position.z < g.hole_position.z - 100.0, "the course has gate pairs and the landmark at the far end")
 	var good := drive_run(g, true)
 	check(good.won, "taking the bigger gates swallows the landmark (r %.2f, boss %.2f, %.1fs)" % [good.radius, g.boss_radius, good.time])
-	check(good.time < 40.0 and g.reward > 0, "the run ends at the landmark and pays coins")
+	check(good.time > 35.0 and good.time < 55.0 and g.reward > 0, "the run lasts 35-55 s and pays coins (%.1fs, %d coins, %d picked, %d roadblocks hit, %d boosts)" % [good.time, g.reward, g.runner.props.picked, g.runner.props.hits, g.runner.props.boosts])
+	check(g.runner.props.blocks.size() >= 10 and g.runner.props.blocks.any(func(block): return block.slide) and g.runner.props.pads.size() >= 5 and g.runner.props.coins.size() >= 60 and g.runner.props.hits == 0, "fixed and sliding roadblocks, boost pads and coin lines line the course; the bot dodges every roadblock")
+	check(g.runner.gates.any(func(gate): return gate.swaps) and g.runner.gates.any(func(gate): return not gate.swaps), "gates in the second half swap sides")
 	g.start_run()
 	var bad := drive_run(g, false)
 	check(not bad.won and bad.radius < good.radius, "always the worse gate falls short (r %.2f, %s at z %.1f after %.1fs)" % [bad.radius, bad.mode, bad.z, bad.time])
+	g.start_run()
+	var slip := drive_run(g, true, 1)
+	check(slip.won, "one roadblock hit near the end is still forgiven (r %.2f)" % slip.radius)
+	g.start_run()
+	var crash := drive_run(g, true, 4)
+	check(not crash.won and g.runner.props.hits == 4, "four roadblock hits cost the landmark (r %.2f)" % crash.radius)
 	g.on_play()
 	check(g.run_kind == "campaign" and g.campaign.selected == 5 and g.mode == "playing", "after the run PLAY goes on to the next city")
 	check(g.runner.gates.is_empty(), "the course's gates are cleared in a normal city")
@@ -506,15 +514,31 @@ func check_runner(g) -> void:
 	g.campaign.goals[4] = goals_before
 	g.campaign.unlock_all_for_testing = unlock
 
-func drive_run(g, better: bool) -> Dictionary:
+# `hits` roadblocks from the end are driven into on purpose (a slip).
+func drive_run(g, better: bool, hits := 0) -> Dictionary:
 	g.started = true
 	var time := 0.0
-	while g.mode == "playing" and time < 60.0:
+	var props = g.runner.props
+	var blocks: Array = props.blocks
+	while g.mode == "playing" and time < 90.0:
 		var next: Dictionary = {}
 		for gate in g.runner.gates:
 			if gate.used or gate.at > g.hole_position.z: continue
 			if next.is_empty() or gate.at > next.at or (gate.at == next.at and (gate.gain > next.gain) == better): next = gate
 		var aim: float = next.side*g.Runner.LANE*0.5 if not next.is_empty() else 0.0
+		# Both bots read the nearest roadblock before that gate (where a sliding
+		# one will be on arrival) and pass on the open half.
+		var near := -1
+		for k in blocks.size():
+			var block: Dictionary = blocks[k]
+			if block.used or block.at > g.hole_position.z or (not next.is_empty() and block.at < next.at): continue
+			if near < 0 or block.at > blocks[near].at: near = k
+		if near >= 0:
+			var block: Dictionary = blocks[near]
+			var eta: float = (g.hole_position.z - block.at)/maxf(1.0, -g.hole_velocity.z)
+			var x: float = props.block_x(block, props.clock + eta)
+			if near >= blocks.size() - hits: aim = x
+			elif absf(aim - x) < props.BLOCK_HALF + g.radius*props.BLOCK_REACH + 0.6: aim = -signf(x if x != 0.0 else 1.0)*g.Runner.LANE
 		g.step(0.02, Vector2(clampf((aim - g.hole_position.x)*0.5, -1.0, 1.0), 0.0))
 		time += 0.02
 	return {"won":g.mode == "result" and g.hud.won, "radius":g.radius, "time":time, "mode":g.mode, "z":g.hole_position.z}

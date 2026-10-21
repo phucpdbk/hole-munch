@@ -114,12 +114,12 @@ const TRAILS = ["Không", "Bong bóng", "Lấp lánh", "Tuyết", "Lửa", "Cầ
 const UPGRADES = [
 	["size", "KÍCH THƯỚC", "+0,05 bán kính khởi đầu", 160, 6],
 	["speed", "TỐC ĐỘ", "+4% tốc độ di chuyển", 140, 8],
-	["time", "THỜI GIAN", "+1 giây mỗi màn", 200, 5],
+	["time", "THỜI GIAN", "+2 giây mỗi màn", 200, 5],
 	["magnet", "LỰC HÚT", "Hút đồ nhỏ về phía hố", 300, 5],
 	["greed", "THU XU", "+8% xu nhận được", 240, 8],
 ]
 const COST_GROWTH := 1.75
-const TIME_PER_UPGRADE := 1.0
+const TIME_PER_UPGRADE := 2.0
 # Best combo raises the coin reward by 1% per bite, up to +60%.
 const COMBO_COIN_CAP := 60
 const START_RADIUS := 0.95
@@ -237,9 +237,10 @@ static func level_info(index: int) -> Dictionary:
 
 # Share of the map's food the hole must eat before the boss fits. Dense street
 # fronts hold about four times the food of the old detached houses. Raised from
-# 0.2-0.3 (the game felt easy): the landmark now waits for a bigger hole.
+# 0.2-0.3 (the game felt easy), then the late end from 0.4 to 0.46: the second
+# half of the journey expects a few upgrades.
 const SHARE_START := 0.27
-const SHARE_END := 0.4
+const SHARE_END := 0.46
 # Festival cities ask for a little more on top.
 const HOLIDAY_SHARE := 0.03
 
@@ -265,19 +266,20 @@ static func holiday_info(index: int) -> Dictionary:
 # (the 48 cities, then the festival cities in HOLIDAYS order).
 # timer gives generous slack early and less later; regenerate with --campaign-smoke
 # (it prints each route) after changing map contents.
-const PAR_SECONDS: Array[int] = [20, 38, 30, 26, 24, 19, 23, 34, 24, 22, 22, 36, 41, 30, 39, 47, 39, 39, 36, 41, 38, 33, 54, 44, 20, 34, 33, 29, 39, 45, 56, 32, 43, 30, 54, 40, 35, 34, 51, 42, 44, 34, 53, 40, 42, 50, 56, 41, 38, 44, 41, 47, 44, 40]
+const PAR_SECONDS: Array[int] = [20, 38, 28, 26, 26, 19, 22, 34, 24, 22, 21, 40, 45, 31, 40, 47, 39, 39, 36, 45, 48, 33, 47, 44, 20, 34, 33, 29, 39, 45, 56, 32, 43, 30, 54, 40, 35, 34, 51, 42, 44, 34, 53, 40, 42, 50, 56, 41, 38, 45, 41, 47, 44, 40]
 
 # Timer = par × slack, never below a floor. The par route plays like a sharp
 # player who knows the whole map and takes the landmark the moment it fits, so
 # the slack covers steering, dodging, the guardian fight and learning the map,
 # and every second left when the landmark falls pays coins. Nothing
 # adds time in campaign or daily rounds, so this is the whole budget.
-# The first cities get 70% of the old 5.0 slack / 75 s floor: they felt too easy.
-# The cut fades out towards the last city, whose numbers are unchanged.
-const TIME_SLACK_START := 3.5
-const TIME_SLACK_END := 3.0
-const TIME_FLOOR_START := 52.5
-const TIME_FLOOR_END := 45.0
+# Cut twice because the game felt too easy: the first cities now get 60% of the
+# old 5.0 slack, the last ones 2.4x par, and the time upgrade (+2 s a level)
+# matters more the further the journey goes.
+const TIME_SLACK_START := 3.0
+const TIME_SLACK_END := 2.4
+const TIME_FLOOR_START := 48.0
+const TIME_FLOOR_END := 40.0
 
 static func level_seconds(index: int, blocks: int, progress: float) -> float:
 	if index >= PAR_SECONDS.size(): return 35.0 + blocks*20.0
@@ -293,7 +295,7 @@ static func has_rival(index: int) -> bool:
 	return index >= RIVAL_EVERYWHERE or (index >= RIVAL_FROM and index%CITIES_PER_REGION%3 == 1)
 
 # Stars needed (in total) to enter each continent after the first.
-const REGION_STAR_GATE := 14
+const REGION_STAR_GATE := 16
 
 static func stars_needed(region_index: int) -> int:
 	return region_index*REGION_STAR_GATE

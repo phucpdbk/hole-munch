@@ -55,12 +55,19 @@ func run(game, campaign_mode: bool) -> void:
 		g.started = true
 		# Steered through bot_input so the camera and HUD run frame by frame;
 		# shots are taken by distance, since capture frames are uncapped.
-		var shots := [[60.0, "run-gates"], [5.0, "run-mid"], [-50.0, "run-end"]]
+		var shots := [[215.0, "run-gates"], [100.0, "run-boost"], [20.0, "run-mid"], [-110.0, "run-swap"], [-245.0, "run-end"]]
 		for i in 20000:
 			if g.mode != "playing": break
-			var aim := 0.0
+			# The better gate of the next pair, round any roadblock before it.
+			var next: Dictionary = {}
 			for gate in g.runner.gates:
-				if not gate.used and gate.at < g.hole_position.z and gate.gain >= 1.3: aim = gate.side*3.3; break
+				if gate.used or gate.at > g.hole_position.z: continue
+				if next.is_empty() or gate.at > next.at or (gate.at == next.at and gate.gain > next.gain): next = gate
+			var aim: float = next.side*3.3 if not next.is_empty() else 0.0
+			for block in g.runner.props.blocks:
+				if block.used or block.at > g.hole_position.z or (not next.is_empty() and block.at < next.at): continue
+				var x: float = g.runner.props.block_x(block, g.runner.props.clock + (g.hole_position.z - block.at)/12.0)
+				if absf(aim - x) < 4.5: aim = -signf(x if x != 0.0 else 1.0)*6.6
 			g.bot_input = Vector2(clampf((aim - g.hole_position.x)*0.5, -1, 1), 0)
 			if not shots.is_empty() and g.hole_position.z < shots[0][0]: await snapshot(shots.pop_front()[1])
 			else: await frames(1)
