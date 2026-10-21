@@ -4,6 +4,7 @@
 //   mascots   -> assets/mascots_src/<id>.glb plus <id>@<clip>.glb animations after
 //                "rig" (Meshy auto-rigging + animation library; bake: tools/bake_mascots.gd)
 //   crafts    -> assets/crafts_src/<index>.glb  (bake: tools/bake_crafts.gd)
+//   pickups   -> assets/pickups_src/<kind>.glb  (power-ups that drop on the map; bake: tools/bake_pickups.gd)
 //   soldiers  -> assets/soldiers_src/<id>.glb plus <id>@<clip>.glb after "rig" (army foot units;
 //                bake: tools/bake_mascots.gd soldiers)
 // Prompts live in tools/meshy/<kind>.json. Resumable: finished steps are kept in
@@ -66,6 +67,13 @@ const KINDS = {
 			"chunky simplified shapes, big head, bright soft colors, full body visible and centered, front view facing the camera, " +
 			"plain white background, no text overlay, game asset",
 	},
+	// Power-ups dropping on the map (mechanics.gd PICKUPS): small, read at a glance.
+	pickups: {
+		out: "pickups_src", polycount: 3000,
+		style: "stylized toy game power-up icon, chunky simplified shapes, bright saturated colors, glossy, " +
+			"whole object fully visible and centered, three-quarter view from slightly above, floating with no base or stand, " +
+			"plain white background, no text, no letters, no numbers, game asset",
+	},
 	crafts: {
 		out: "crafts_src", polycount: 5000,
 		style: "stylized toy spaceship, chunky simplified shapes, bright soft colors, whole object fully visible and centered, " +
@@ -90,7 +98,7 @@ const flag = (name) => args.includes(name);
 const option = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
 const commands = ["images", "models", "all", "status", "balance", ...(kind?.rig ? ["rig", "library"] : [])];
 if (!kind || !commands.includes(command)) {
-	console.error("Usage: meshy.mjs landmarks|mascots|crafts|soldiers images|models|all|status|balance [--only id,id] [--redo]");
+	console.error("Usage: meshy.mjs landmarks|mascots|crafts|soldiers|pickups images|models|all|status|balance [--only id,id] [--redo]");
 	console.error("       meshy.mjs mascots rig|library [--only id,id] [--redo] [--actions idle=N,attack=N,hit=N,leap=N]");
 	process.exit(1);
 }

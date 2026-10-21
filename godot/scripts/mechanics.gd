@@ -80,6 +80,11 @@ var shield_material: StandardMaterial3D
 var orb: Node3D
 var orb_material: StandardMaterial3D
 var orb_label: Label3D
+# The plain orb, and the Meshy model of each pickup kind shown in its place
+# (assets/pickups/<kind>.res, tools/bake_pickups.gd) once baked.
+var orb_ball: MeshInstance3D
+var orb_icon: MeshInstance3D
+var icon_meshes := {}
 
 func _ready() -> void:
 	shield = MeshInstance3D.new()
@@ -109,6 +114,16 @@ func _ready() -> void:
 	ball.material_override = orb_material
 	ball.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	orb.add_child(ball)
+	orb_ball = ball
+	orb_icon = MeshInstance3D.new()
+	orb_icon.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	orb_icon.visible = false
+	# Baked 0.55 wide; shown about as big as the halo so it reads from afar.
+	orb_icon.scale = Vector3.ONE*1.8
+	# Leaned back toward the camera above, so a flat one (the stopwatch) never
+	# shows only its edge while it spins.
+	orb_icon.rotation.x = -0.75
+	orb.add_child(orb_icon)
 	var halo := MeshInstance3D.new()
 	var ring := TorusMesh.new()
 	ring.inner_radius = 0.62
@@ -305,7 +320,8 @@ func update_pickup(game, dt: float) -> void:
 		clear_pickup()
 
 # Anywhere along an inner road, not only at crossings, and not on top of the hole.
-func spawn_pickup(game) -> void:
+# `forced` picks the kind (captures); otherwise it is random.
+func spawn_pickup(game, forced := "") -> void:
 	var xs: Array = game.layout.crossings_x
 	var zs: Array = game.layout.crossings_z
 	var at := Vector3.ZERO
@@ -317,13 +333,32 @@ func spawn_pickup(game) -> void:
 		if Vector2(at.x-game.hole_position.x, at.z-game.hole_position.z).length() > 4.0: break
 	at = game.layout.clamp_point(at)
 	var kinds: Array = PICKUPS.keys().filter(func(k): return k != "time" or game.clock_can_grow())
-	var kind: String = kinds[rng.randi()%kinds.size()]
+	var kind: String = forced if PICKUPS.has(forced) else kinds[rng.randi()%kinds.size()]
 	pickup = {"kind":kind, "position":at, "life":PICKUP_LIFE, "drop":DROP_TIME}
 	var color: Color = PICKUPS[kind][1]
 	orb_material.albedo_color = color
 	orb_label.text = I18n.t(PICKUPS[kind][0])
 	orb_label.modulate = color.lightened(0.3)
+	var icon := pickup_icon(game.models, kind)
+	orb_icon.mesh = icon
+	orb_icon.visible = icon != null
+	orb_ball.visible = icon == null
 	orb.visible = true
+
+# The pickup's own model (a stopwatch, a magnet, a winged sneaker, a frozen
+# helmet), or null to keep the plain orb.
+func pickup_icon(models, kind: String) -> Mesh:
+	if icon_meshes.has(kind): return icon_meshes[kind]
+	var path := "res://assets/pickups/%s.res" % kind
+	var texture_path := "res://assets/pickups/%s_albedo.res" % kind
+	var mesh: ArrayMesh = null
+	if ResourceLoader.exists(path) and ResourceLoader.exists(texture_path):
+		mesh = load(path).duplicate()
+		var material: ShaderMaterial = models.landmark_material.duplicate()
+		material.set_shader_parameter("albedo_tex", load(texture_path))
+		mesh.surface_set_material(0, material)
+	icon_meshes[kind] = mesh
+	return mesh
 
 func collect(game) -> void:
 	var kind: String = pickup.kind

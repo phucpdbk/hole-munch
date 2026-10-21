@@ -124,6 +124,30 @@ func run(game, campaign_mode: bool) -> void:
 		await challenge_preview()
 		g.get_tree().quit()
 		return
+	# Each power-up dropping in and floating (`--pickup-capture`): test-output/pickup-<kind>.png.
+	if "--pickup-capture" in OS.get_cmdline_user_args():
+		g.load_level(4)
+		g.on_play()
+		g.started = true
+		g.defense.grace = INF
+		for kind in g.Mechanics.PICKUPS:
+			g.hole_position = g.SPAWN
+			g.mechanics.spawn_pickup(g, kind)
+			# Park it beside the hole so it floats in the middle of the shot.
+			g.mechanics.pickup.position = g.SPAWN + Vector3(2.5, 0, -1.5)
+			g.mechanics.pickup.drop = 0.0
+			await frames(70)
+			await snapshot("pickup-" + kind)
+			# A 3x close-up around the floating model as well.
+			var image: Image = g.get_viewport().get_texture().get_image()
+			var centre: Vector2 = g.camera.unproject_position(g.mechanics.orb.global_position)
+			var box := Rect2i(Vector2i(centre) - Vector2i(80, 80), Vector2i(160, 160)).intersection(Rect2i(Vector2i.ZERO, image.get_size()))
+			var close := image.get_region(box)
+			close.resize(box.size.x*3, box.size.y*3, Image.INTERPOLATE_LANCZOS)
+			close.save_png("res://test-output/pickup-%s-close.png" % kind)
+			g.mechanics.clear_pickup()
+		g.get_tree().quit()
+		return
 	# Whole shaped cities from above (bays, lakes, rivers, festival dress):
 	# test-output/shape-XX.png, `--levels=4,48` picks cities (0-based).
 	if "--shape-capture" in OS.get_cmdline_user_args():

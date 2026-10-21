@@ -416,6 +416,7 @@ Then bake (headless Godot, `--script res://tools/<tool>.gd [-- ids]`):
 | Landmarks | `assets/landmarks_src/<id>.glb` | `bake_landmarks.gd` | `assets/landmarks/<id>.res` + `_albedo.res` | primitive landmark (`landmarks.gd`) |
 | Guardians | `assets/mascots_src/<id>.glb` + `<id>@<clip>.glb` | `bake_mascots.gd` | `assets/mascots/<id>.scn` | primitive rig (`mascot_specs.gd`) |
 | Saucers | `assets/crafts_src/<index>.glb` (0–12, `fleet.gd` NAMES) | `bake_crafts.gd` | `assets/crafts/<index>.res` + `_albedo.res` | primitive craft (`fleet.gd`) |
+| Power-ups | `assets/pickups_src/<kind>.glb` (time, magnet, speed, freeze) | `bake_pickups.gd` | `assets/pickups/<kind>.res` + `_albedo.res` | the plain coloured orb (`mechanics.gd`) |
 
 - **Facing**: models face +z (toward the camera). Fix a bad bake with that tool's
   `YAW` table; for a hand-made guardian GLB, use `CLIP_OVERRIDES` in `mascot_rig.gd`.

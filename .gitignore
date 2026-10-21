@@ -33,6 +33,7 @@ godot/android/build/src/main/assets/
 godot/assets/mascots_src/
 godot/assets/crafts_src/
 godot/assets/soldiers_src/
+godot/assets/pickups_src/
 godot/tools/meshy/keys.local.json
 
 # Temporary portrait window written by godot/tools/make-ads.ps1.
