@@ -55,6 +55,15 @@ const MASCOTS := {
 	"fijitemple":["dragon", "ff6b6b", "ffd166", "ff8fb1", "flower", "fire"],
 	"moai":["blob", "8d8d8d", "b5b5b5", "c1440e", "none", "stomp"],
 	"parliament":["beast", "9e9e9e", "f0f0f0", "2a9d8f", "cap", "leap"],
+	# Festival cities (campaign.gd HOLIDAYS).
+	# Banh chung, lion dance, cupid, snowman, pumpkin scarecrow, Easter bunny
+	# (tools/meshy/mascots.json); these toy rigs stand in until the bakes exist.
+	"tetmai":["blob", "3f8f4a", "e8d9a8", "e63946", "none", "fire"],
+	"starlantern":["beast", "e63946", "ffd23f", "ffd23f", "crown", "lightning"],
+	"juliet":["bird", "ffc2d1", "fff0f5", "ffd23f", "bow", "water"],
+	"xmastree":["blob", "f6f6ff", "e8423f", "e8423f", "cap", "stomp"],
+	"jackolantern":["blob", "ff7a1a", "2b1d14", "5b3a7a", "tophat", "fire"],
+	"easteregg":["beast", "f4f4f4", "ffd1dc", "8fd3ff", "bow", "leap"],
 }
 const FALLBACK := ["blob", "7fb8a4", "f2efe4", "e63946", "none", "stomp"]
 const INK := Color("1d2430")

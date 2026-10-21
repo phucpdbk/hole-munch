@@ -15,7 +15,8 @@ const COUNTRY := {
 	"capitol":"us", "cntower":"ca", "chichen":"mx", "christ":"br", "masp":"br", "sugarloaf":"br",
 	"machu":"pe", "limacathedral":"pe", "obelisco":"ar", "monserrate":"co", "costanera":"cl", "moai":"cl",
 	"sydney":"au", "flinders":"au", "uluru":"au", "belltower":"au", "parliament":"au", "skytower":"nz",
-	"fijitemple":"fj"}
+	"fijitemple":"fj", "tetmai":"vn", "starlantern":"vn", "juliet":"it", "xmastree":"de", "jackolantern":"us",
+	"easteregg":"au"}
 
 # police uniform, cap, cap band | car body, lower body ("" = same), side stripe
 # ("" = none), checker pair ([] = none), light bar | soldier camo, helmet,
@@ -96,13 +97,9 @@ static func place(g, force_spec: Dictionary) -> void:
 	# Crossings next to a roadblock stay clear: a squad there would hide the
 	# block and wall the street off.
 	var posts: Array[Vector2] = []
-	for x in g.layout.crossings_x:
-		for z in g.layout.crossings_z:
-			var post := Vector2(x, z)
-			if g.features.barriers.all(func(b): return post.distance_to(Vector2(b.position.x, b.position.z)) > 6.0): posts.append(post)
-	if posts.is_empty():
-		for x in g.layout.crossings_x:
-			for z in g.layout.crossings_z: posts.append(Vector2(x, z))
+	for post in g.layout.junctions():
+		if g.features.barriers.all(func(b): return post.distance_to(Vector2(b.position.x, b.position.z)) > 6.0): posts.append(post)
+	if posts.is_empty(): posts = g.layout.junctions()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 6113 + int(g.campaign.selected)*29
 	for i in range(posts.size()-1, 0, -1):

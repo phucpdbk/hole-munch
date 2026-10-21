@@ -28,6 +28,8 @@ const OCEAN := Color("3483b3")
 const SHALLOW := Color("6cc2d6")
 const CARD_WIDTH := 290.0
 const HEADER := 88.0
+# Festival stops (campaign.gd HOLIDAYS) and the side trip that leads to them.
+const FESTIVAL := Color("ff6fae")
 const WEATHER_ICONS := {"clear":"sun", "sun":"sun", "rain":"rain", "snow":"snow", "wind":"wind", "fog":"fog", "storm":"storm"}
 
 var game
@@ -44,6 +46,8 @@ var saucer: MeshInstance3D
 var saucer_craft := -1
 var saucer_target := Vector3.ZERO
 var stops: Array = []
+# The page's level indices in route order (Campaign.route): stop i shows levels[i].
+var levels: Array[int] = []
 # Size of stops relative to the continent: tall continents are framed from further
 # away, so their landmarks and plinths grow to stay readable.
 var unit := 1.0
@@ -156,7 +160,7 @@ func landmark_material(texture: Texture2D, locked: bool) -> ShaderMaterial:
 # --- opening and paging ----------------------------------------------------------------
 
 func open(level_index: int) -> void:
-	page = level_index/Campaign.CITIES_PER_REGION
+	page = Campaign.region_of(level_index)
 	selected = level_index
 	show()
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
@@ -172,12 +176,12 @@ func turn(delta: int) -> void:
 	if target == page: return
 	page = target
 	var current: int = game.campaign.selected if game else 0
-	selected = current if current/Campaign.CITIES_PER_REGION == page else page*Campaign.CITIES_PER_REGION
+	selected = current if Campaign.region_of(current) == page else page*Campaign.CITIES_PER_REGION
 	build_page()
 
 func select(level_index: int) -> void:
 	selected = level_index
-	saucer_target = stop_top(level_index%Campaign.CITIES_PER_REGION)
+	saucer_target = stop_top(levels.find(level_index))
 	if game: game.sfx.play("grow")
 	refresh()
 
@@ -222,7 +226,7 @@ func refresh() -> void:
 	overlay.queue_redraw()
 
 func locked_label(index: int) -> String:
-	var region: int = index/Campaign.CITIES_PER_REGION
+	var region: int = Campaign.region_of(index)
 	if game.campaign.region_open(region): return I18n.t("locked")
 	return I18n.t("need_stars", Campaign.stars_needed(region))
 
@@ -238,13 +242,14 @@ func build_page() -> void:
 	var half := map_half(data)
 	unit = clampf(maxf(half.x, half.y*1.45)/15.0, 1.0, 1.8)
 	var land := projected_land(data)
+	levels = Campaign.route(page)
 	build_shallows(land)
 	build_land(land, Color(palette[3]), Color(palette[2]))
 	build_trees(land, Color(palette[4]), page)
 	place_stops(data, land)
 	build_route()
 	for slot in stops.size(): build_stop(slot)
-	saucer_target = stop_top(selected%Campaign.CITIES_PER_REGION)
+	saucer_target = stop_top(levels.find(selected))
 	saucer.position = saucer_target
 	update_saucer_mesh()
 	frame_camera()
@@ -353,7 +358,8 @@ func place_stops(data: Dictionary, land: Array) -> void:
 	stops.clear()
 	var half := map_half(data) - Vector2(1.4, 1.2)
 	var points: Array = []
-	for p in data.stops:
+	for index in levels:
+		var p: Array = Campaign.holiday(index).map if Campaign.is_holiday(index) else data.stops[index%Campaign.CITIES_PER_REGION]
 		var at := to_map(Vector2(p[0], p[1]), data)
 		points.append(Vector2(clampf(at.x, -half.x, half.x), clampf(at.y, -half.y, half.y)))
 	for pass_index in 80:
@@ -380,7 +386,7 @@ func stop_base(slot: int) -> Vector3:
 	return Vector3(stop.at.x, stop.ground + PLINTH_HEIGHT, stop.at.y)
 
 func level_of(slot: int) -> int:
-	return page*Campaign.CITIES_PER_REGION + slot
+	return levels[slot]
 
 func build_stop(slot: int) -> void:
 	var stop: Dictionary = stops[slot]
@@ -395,7 +401,7 @@ func build_stop(slot: int) -> void:
 		parts.append(models.piece("cyl", Vector3(stop.at.x, LAND_HEIGHT/2, stop.at.y), Vector3(1.5*unit, LAND_HEIGHT, 1.5*unit), Color(Campaign.REGIONS[page].palette[2])))
 		ground = LAND_HEIGHT
 		stop.ground = ground
-	var rim := Color("f6cb70") if conquered else Color("dfe8ef") if not locked else Color("7d8a96")
+	var rim := Color("f6cb70") if conquered else Color("7d8a96") if locked else FESTIVAL if Campaign.is_holiday(index) else Color("dfe8ef")
 	parts.append(models.piece("cyl", Vector3(stop.at.x, ground + PLINTH_HEIGHT/2, stop.at.y), Vector3(PLINTH_RADIUS*unit, PLINTH_HEIGHT, PLINTH_RADIUS*unit), Color("3c5368")))
 	parts.append(models.piece("cyl", Vector3(stop.at.x, ground + PLINTH_HEIGHT + 0.01, stop.at.y), Vector3(PLINTH_RADIUS*unit*0.94, 0.04, PLINTH_RADIUS*unit*0.94), rim))
 	var plinth := MeshInstance3D.new()
@@ -429,14 +435,26 @@ func landmark_mesh(id: String) -> Dictionary:
 	mesh_cache[id] = {"mesh":mesh, "texture":texture, "scale":scale}
 	return mesh_cache[id]
 
-# Dotted arcs from each stop to the next: gold where the player already passed.
+# Dotted arcs from each city to the next: gold where the player already passed.
+# A festival stop hangs off the city that opens it on a pink side trip.
 func build_route() -> void:
 	var parts: Array = []
-	for slot in stops.size() - 1:
-		var a := Vector3(stops[slot].at.x, LAND_HEIGHT + 0.08, stops[slot].at.y)
-		var b := Vector3(stops[slot+1].at.x, LAND_HEIGHT + 0.08, stops[slot+1].at.y)
-		var passed: bool = game.campaign.medals[level_of(slot)] > 0 if game else false
-		var color := Color("ffd66b") if passed else Color("f4f8fb")
+	var legs: Array = []
+	var last := -1
+	for slot in stops.size():
+		if Campaign.is_holiday(levels[slot]):
+			legs.append([levels.find(int(Campaign.holiday(levels[slot]).after)), slot])
+			continue
+		if last >= 0: legs.append([last, slot])
+		last = slot
+	for leg in legs:
+		var from: int = leg[0]
+		var to: int = leg[1]
+		var a := Vector3(stops[from].at.x, LAND_HEIGHT + 0.08, stops[from].at.y)
+		var b := Vector3(stops[to].at.x, LAND_HEIGHT + 0.08, stops[to].at.y)
+		var side_trip := Campaign.is_holiday(levels[to])
+		var passed: bool = game.campaign.medals[level_of(to if side_trip else from)] > 0 if game else false
+		var color := Color("ffd66b") if passed else FESTIVAL if side_trip else Color("f4f8fb")
 		var count := maxi(2, int(a.distance_to(b)/ROUTE_STEP))
 		for k in range(1, count):
 			var t := float(k)/count
@@ -490,7 +508,7 @@ func _process(delta: float) -> void:
 	saucer.position = saucer.position.lerp(saucer_target, 1.0 - exp(-delta*5.0)) + Vector3(0, sin(clock*2.4)*0.004, 0)
 	saucer.rotation.y = clock*0.9
 	saucer.scale = Vector3.ONE*SAUCER_SCALE*unit
-	var slot := selected%Campaign.CITIES_PER_REGION
+	var slot := levels.find(selected)
 	for i in stops.size():
 		var landmark: MeshInstance3D = stops[i].get("landmark")
 		if not landmark: continue
@@ -553,8 +571,9 @@ func draw_card() -> void:
 	var info := Campaign.level_info(index)
 	var x := card.position.x + 20
 	var y := card.position.y + 22
-	var badge := "%d / %d" % [info.slot + 1, Campaign.CITIES_PER_REGION]
-	UiStyle.card(self, Rect2(x, y, UiStyle.text_width(badge, 14) + 24, 28), Color("2c4f73"), 14)
+	var festival := info.has("holiday")
+	var badge := "%s · %s" % [I18n.t("festival_tag"), I18n.t("hol_" + str(info.holiday))] if festival else "%d / %d" % [info.slot + 1, Campaign.CITIES_PER_REGION]
+	UiStyle.card(self, Rect2(x, y, UiStyle.text_width(badge, 14) + 24, 28), FESTIVAL.darkened(0.35) if festival else Color("2c4f73"), 14)
 	UiStyle.text(self, badge, Vector2(x + 12, y + 20), 14, UiStyle.LIGHT)
 	y += 64
 	var title := Campaign.boss_name(info.boss)
@@ -592,10 +611,12 @@ func draw_overlay() -> void:
 		var locked: bool = not game.campaign.can_select(index)
 		var chosen := index == selected
 		var center := base + Vector2(0, 22)
-		overlay.draw_circle(center, 15, Color("f6cb70") if chosen else Color("1b3048"))
+		var festival := Campaign.is_holiday(index)
+		overlay.draw_circle(center, 15, Color("f6cb70") if chosen else FESTIVAL.darkened(0.3) if festival else Color("1b3048"))
 		overlay.draw_arc(center, 15, 0, TAU, 24, Color(1, 1, 1, 0.7), 2, true)
 		if locked: UiStyle.draw_icon(overlay, "lock", center, 24)
-		else: UiStyle.text(overlay, str(slot + 1), center + Vector2(0, 7), 17, UiStyle.INK if chosen else UiStyle.LIGHT, true, 0, UiStyle.font(800))
+		elif festival: UiStyle.draw_icon(overlay, "star", center, 22, UiStyle.INK if chosen else Color.WHITE)
+		else: UiStyle.text(overlay, str(index%Campaign.CITIES_PER_REGION + 1), center + Vector2(0, 7), 17, UiStyle.INK if chosen else UiStyle.LIGHT, true, 0, UiStyle.font(800))
 		var medals: int = game.campaign.medals[index]
 		if medals > 0:
 			for k in 3:

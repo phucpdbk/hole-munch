@@ -23,7 +23,8 @@ var active := false
 var radius := 0.86
 var target_radius := 0.86
 var speed_scale := 0.8
-var bounds := Vector2(20, 20)
+# The city's map_layout.gd: its edge and water bound the rival, which steers round bays.
+var layout = null
 var target: Dictionary = {}
 var retarget := 0.0
 var heading := Vector3.ZERO
@@ -66,14 +67,14 @@ func _ready() -> void:
 	add_child(ring)
 	visible = false
 
-func reset(enabled: bool, start: Vector3, start_radius: float, speed: float, area: Vector2, chew := 1.0) -> void:
+func reset(enabled: bool, start: Vector3, start_radius: float, speed: float, map_layout, chew := 1.0) -> void:
 	active = enabled
 	visible = enabled
 	position = Vector3(start.x, 0, start.z)
 	radius = start_radius
 	target_radius = start_radius
 	speed_scale = speed
-	bounds = area
+	layout = map_layout
 	target = {}
 	retarget = 0.0
 	heading = Vector3.ZERO
@@ -103,8 +104,7 @@ func update(dt: float, items: Array, boss: Dictionary, player: Vector3, player_r
 	heading = steer(player, player_radius)
 	digest = maxf(0.0, digest-dt)
 	if digest <= 0.0: position += heading*speed()*dt
-	position.x = clampf(position.x, -bounds.x, bounds.x)
-	position.z = clampf(position.z, -bounds.y, bounds.y)
+	if layout != null: position = layout.clamp_point(position)
 	var bites: Array = []
 	for item in items:
 		if not can_eat(item): continue
@@ -147,10 +147,15 @@ func steer(player: Vector3, player_radius: float) -> Vector3:
 	var distance := to_player.length()
 	if distance > 0.01:
 		# A smaller player is prey; a bigger one is a threat.
-		if player_radius <= radius*EAT_RATIO and distance < HUNT_RANGE: return to_player/distance
+		if player_radius <= radius*EAT_RATIO and distance < HUNT_RANGE: return toward(player)
 		if radius <= player_radius*EAT_RATIO and distance < FLEE_RANGE: return -to_player/distance
 	if target.is_empty(): return Vector3.ZERO
-	var offset := Vector3(target.position.x-position.x, 0, target.position.z-position.z)
+	return toward(target.position)
+
+# The way to a point, round any water between (map_layout.gd steer).
+func toward(point: Vector3) -> Vector3:
+	var next: Vector3 = layout.steer(position, point) if layout != null else point
+	var offset := Vector3(next.x-position.x, 0, next.z-position.z)
 	return offset.normalized() if offset.length() > 0.05 else Vector3.ZERO
 
 func grow(bite_radius: float) -> void:

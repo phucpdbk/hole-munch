@@ -21,6 +21,8 @@ var impacts: Array = []
 var last_hit: Dictionary = {}
 var roads_x: Array[float] = []
 var roads_z: Array[float] = []
+# map_layout.gd: squads never drive across a bay or a river (no bridge on their way).
+var layout = null
 # Difficulty for the current level, set by reset().
 var strike_cap := 3
 var warning_scale := 1.0
@@ -87,7 +89,7 @@ func is_aiming(item: Dictionary) -> bool:
 
 func approach(unit: Dictionary, player: Vector3, dt: float) -> void:
 	var item: Dictionary = unit.item
-	if not item.get("defender",false) or item.get("stay",false) or roads_x.is_empty() or roads_z.is_empty(): return
+	if not item.get("defender",false) or item.get("stay",false) or unit.get("stuck",false) or roads_x.is_empty() or roads_z.is_empty(): return
 	var offset: Vector3 = player-item.position
 	offset.y = 0
 	if offset.length() <= 7.0 or is_aiming(item): return
@@ -99,9 +101,23 @@ func approach(unit: Dictionary, player: Vector3, dt: float) -> void:
 		for road in roads_z:
 			if absf(road-player.z) < absf(z-player.z): z = road
 		unit.route = [Vector3(x,item.position.y,item.position.z),Vector3(x,item.position.y,z)]
+		if not drivable(item.position, unit.route):
+			unit.stuck = true
+			unit.route = []
+			return
 	var goal: Vector3 = unit.route[0]
 	item.position = item.position.move_toward(goal,(2.0 if item.kind == "patrol_tank" else 2.7)*dt)
 	if item.position.distance_to(goal) < 0.05: unit.route.pop_front()
+
+# Both legs of a squad's route stay on streets and off the water.
+func drivable(from: Vector3, route: Array) -> bool:
+	if layout == null: return true
+	var at := Vector2(from.x, from.z)
+	for point in route:
+		var next := Vector2(point.x, point.z)
+		if not layout.segment_open(point) or not layout.clear_line(at, next): return false
+		at = next
+	return true
 
 static func projectile_position(strike: Dictionary) -> Vector3:
 	var t := clampf(1.0-strike.time/strike.flight,0,1)

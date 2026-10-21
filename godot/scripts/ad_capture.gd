@@ -109,7 +109,7 @@ func growth() -> void:
 	var clock := 0.0
 	while g.mode == "playing" and not g.showtime.busy() and clock < TIMEOUT:
 		var target: Dictionary = g.Rival.best_target(g.items, g.items[g.boss_index], g.hole_position, g.radius)
-		steer(target.position if not target.is_empty() else Vector3.ZERO)
+		steer(g.layout.steer(g.hole_position, target.position) if not target.is_empty() else Vector3.ZERO)
 		auto_tap(g.get_process_delta_time())
 		if not halfway and g.growth() >= 0.5:
 			halfway = true

@@ -14,6 +14,16 @@ func run(g) -> void:
 		bench_rival(g)
 		g.get_tree().quit()
 		return
+	# Shapes only (water, bridges, reachability) for every city, without the routes.
+	if "--shapes" in OS.get_cmdline_user_args():
+		for i in Campaign.level_count():
+			g.load_level(i)
+			g.go_menu()
+			g.on_play()
+			check_shape(g, i)
+		print("CAMPAIGN CHECKS: ", failures, " failures")
+		g.get_tree().quit(1 if failures else 0)
+		return
 	if "--spawn-bench" in OS.get_cmdline_user_args():
 		bench_spawns(g)
 		g.get_tree().quit()
@@ -64,7 +74,7 @@ func check_language_and_intro(g) -> void:
 	restored.restore({"version":5, "lang":"klingon", "seen":[3, "x".repeat(99)]})
 	check(restored.lang == "pt" and restored.seen.size() == 2, "bad language and seen entries are ignored")
 	var Intro = g.Intro
-	check(Intro.pending_tips(Campaign.level_info(0), []) == ["guardian"], "the first city introduces the landmark guardian")
+	check(Intro.pending_tips(Campaign.level_info(0), []).is_empty() and "guardian" in Intro.pending_tips(Campaign.level_info(1), ["weather_rain", "pickup"]), "the first city keeps it simple; the guardian is introduced in the second")
 	var lines := 0
 	for id in Campaign.LANDMARKS:
 		if I18n.t("lmfun_" + id) != "lmfun_" + id: lines += 1
@@ -81,7 +91,8 @@ func check_language_and_intro(g) -> void:
 
 func check_progress() -> void:
 	var count := Campaign.level_count()
-	check(count == 48 and Campaign.REGIONS.size() == 6, "six continents with eight cities each")
+	check(Campaign.regular_count() == 48 and count == 48 + Campaign.HOLIDAYS.size() and Campaign.REGIONS.size() == 6, "six continents with eight cities each, plus the festival cities")
+	check_festivals()
 	var progress = Campaign.new()
 	progress.unlock_all_for_testing = true
 	check(progress.can_select(count-1) and not progress.can_select(count), "playtest allows all valid levels")
@@ -120,13 +131,44 @@ func check_progress() -> void:
 	restored.restore(JSON.parse_string(JSON.stringify(progress.data())))
 	check(restored.data() == progress.data(), "save round trip preserves progress, coins and upgrades")
 	restored.restore({"version":4, "selected":999, "unlocked":999, "skin":999, "trail":-3, "effect":"bad", "medals":[null,99], "upgrades":{"size":99, "speed":"x"}})
-	check(restored.selected == count-1 and restored.skin == Campaign.SKINS.size()-1 and restored.trail == 0 and restored.medals[1] == 3 and restored.upgrades.size == restored.upgrade_max("size"), "malformed save fields are bounded")
+	check(restored.selected == Campaign.regular_count()-1 and restored.skin == Campaign.SKINS.size()-1 and restored.trail == 0 and restored.medals[1] == 3 and restored.upgrades.size == restored.upgrade_max("size"), "malformed save fields are bounded")
 	var sizes: Array = []
 	for i in count:
 		var info := Campaign.level_info(i)
 		sizes.append(int(info.cols)*int(info.rows))
-	check(sizes[0] == 9 and sizes[count-1] == 35 and sizes[30] == 25 and sizes[23] > sizes[0], "maps grow from 3×3 to 5×7")
+	check(sizes[0] == 9 and sizes[Campaign.regular_count()-1] == 35 and sizes[30] == 25 and sizes[23] > sizes[0], "maps grow from 3×3 to 5×7")
 	check(sizes[7] > sizes[6], "continent finale uses a bigger map")
+
+# Festival cities (campaign.gd HOLIDAYS): side stops after their city on the
+# route, opened by beating it, never in the way, stars kept like any city.
+func check_festivals() -> void:
+	var tet := Campaign.regular_count()
+	var lantern := tet + 1
+	check(Campaign.route(0) == [0, 1, 2, lantern, 3, tet, 4, 5, 6, 7] and Campaign.region_of(tet) == 0, "festival stops sit after the city that opens them")
+	check(Campaign.HOLIDAYS.all(func(h): return Campaign.region_of(int(h.after)) == int(h.region)), "each festival opens from a city of its own continent")
+	var seen := {}
+	for h in Campaign.HOLIDAYS:
+		seen[h.boss] = Campaign.LANDMARKS.has(h.boss) and preload("res://scripts/map_shapes.gd").SHAPES.has("%dx%d" % [h.cols, h.rows])
+	check(seen.size() == Campaign.HOLIDAYS.size() and seen.values().all(func(ok): return ok), "every festival has its own landmark and a shape for its grid")
+	var fest = Campaign.new()
+	check(not fest.can_select(tet), "a festival city starts locked")
+	fest.unlocked = 4
+	check(fest.can_select(tet) and fest.can_select(lantern) and not fest.can_select(tet + 2), "it opens once the city before it is beaten")
+	check(fest.next_level(3) == tet and fest.next_level(tet) == 4, "next after that city is the festival, then the route goes on")
+	fest.selected = tet
+	fest.complete(3, 500)
+	check(fest.medals[tet] == 3 and fest.unlocked == 4, "a festival win keeps its stars and leaves the main route as it was")
+	check(fest.next_level(3) == 4 and fest.next_level(7) == 8 and fest.next_level(47) == -1, "a beaten festival is skipped; the route crosses continents and ends")
+	var restored = Campaign.new()
+	restored.restore(JSON.parse_string(JSON.stringify(fest.data())))
+	check(restored.medals[tet] == 3 and restored.total_stars() == fest.total_stars(), "festival stars survive a save")
+	var info := Campaign.level_info(tet)
+	check(info.holiday == "tet" and info.index == 4 and info.slot == -1 and info.share > Campaign.share_at(4.0/47.0), "a festival plays at its rank with a bigger meal")
+	var tester = Campaign.new()
+	tester.unlock_all_for_testing = true
+	tester.selected = tet
+	tester.complete(3, 100)
+	check(tester.medals[tet] == 0, "a preview festival win awards nothing")
 
 # Coin shop for the saucer and hole looks (cosmetics.gd), as in the 2D game.
 func check_looks() -> void:
@@ -164,20 +206,28 @@ func check_levels(g) -> void:
 	g.campaign.unlocked = Campaign.level_count()-1
 	var route = preload("res://scripts/smoke.gd").new()
 	route.g = g
-	for i in Campaign.level_count():
+	# `--levels-from=N` starts the sweep at city N (0-based) while iterating.
+	var first := 0
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--levels-from="): first = int(arg.trim_prefix("--levels-from="))
+	for i in range(first, Campaign.level_count()):
 		g.load_level(i)
+		# The last city has no NEXT, so its result screen is still up: leave it
+		# first, or HOME would treat this city as the one just won.
+		g.mode = "menu"
 		g.go_menu()
 		g.on_play()
 		var info: Dictionary = g.level
 		check(is_equal_approx(g.remaining, float(info.seconds)) and g.boss_radius >= g.MIN_BOSS and g.boss_radius <= g.MAX_BOSS + g.FINALE_BOSS, "level %d config applied (boss %.1f, %ds)" % [i+1, g.boss_radius, info.seconds])
-		# City/prop batches plus bombs, barriers, danger-zone kinds and up to seven
-		# national-force unit kinds (the guardian has its own node).
-		check(g.batches.size() <= 41, "level %d render batches bounded (%d)" % [i+1, g.batches.size()])
-		var wanted: Dictionary = g.MapFeatures.counts(i)
+		# City/prop batches plus bombs, barriers, danger-zone kinds, up to seven
+		# national-force unit kinds and two boat kinds (the guardian has its own node).
+		check(g.batches.size() <= 43, "level %d render batches bounded (%d)" % [i+1, g.batches.size()])
+		var wanted: Dictionary = g.MapFeatures.counts(int(info.index))
 		var f = g.features
 		check(f.gold_blocks.size() == wanted.gold and f.danger_blocks.size() == wanted.danger and f.shortcuts.size() == wanted.shortcuts \
 			and f.barriers.size() <= wanted.barriers and (wanted.barriers == 0 or f.barriers.size() > 0), "level %d map features (%d gold, %d blocks, %d alleys, %d danger)" % [i+1, f.gold_blocks.size(), f.barriers.size(), f.shortcuts.size(), f.danger_blocks.size()])
 		check_spawns(g, i)
+		check_shape(g, i)
 		var boss_mesh: Mesh = g.batches[g.items[g.boss_index].batch].mesh
 		check(g.is_landmark() and g.minions.is_empty(),"level %d objective is a landmark, never a military unit" % (i+1))
 		check(boss_mesh.get_surface_count() == 1 and boss_mesh.get_aabb().size.y > 1.5, "level %d boss mesh is built" % (i+1))
@@ -214,9 +264,31 @@ func check_levels(g) -> void:
 		if i == 0:
 			g.go_menu()
 			check(g.campaign.selected == 1 and g.mode == "menu" and g.score == 0, "home after a win shows the next city")
-		elif i < Campaign.level_count()-1:
+		elif g.campaign.next_level(i) >= 0:
+			# The route goes on through a festival city not yet beaten.
+			var next: int = g.campaign.next_level(i)
 			g.on_play()
-			check(g.campaign.selected == i+1 and g.score == 0, "next button loads a fresh level")
+			check(g.campaign.selected == next and g.score == 0, "next button loads a fresh level (%d -> %d, wanted %d, score %d)" % [i, g.campaign.selected, next, g.score])
+
+# Bays, lakes and rivers (map_shapes.gd): every land block can be reached, no food
+# or crossing sits in the water, the hole is pushed back to the shore and the
+# rival's way round the water reaches the landmark.
+func check_shape(g, i: int) -> void:
+	var layout = g.layout
+	if i >= g.MapShapes.PLAIN_UNTIL and g.MapShapes.SHAPES.has("%dx%d" % [layout.cols, layout.rows]):
+		check(layout.shaped(), "level %d has water in its shape" % (i+1))
+	if not layout.shaped(): return
+	check(g.MapShapes.connected(layout) and layout.is_land(0.0, 0.0), "level %d: every block is reachable over land or bridges" % (i+1))
+	# Boats (boats.gd) are the only things meant to float.
+	var wet: Array = g.items.filter(func(item): return item.kind != "boat" and layout.water_rects.any(func(rect: Rect2): return rect.grow(-0.3).has_point(Vector2(item.origin.x, item.origin.z))))
+	check(wet.is_empty(), "level %d: nothing stands in the water (%s)" % [i+1, ", ".join(wet.map(func(item): return "%s@%.1f,%.1f" % [item.kind, item.origin.x, item.origin.z]))])
+	check(layout.junctions().all(func(spot): return layout.inside(Vector3(spot.x, 0, spot.y))), "level %d: every signalled crossing is on land" % (i+1))
+	var pool: Rect2 = layout.water_rects[0]
+	var shore: Vector3 = layout.clamp_point(Vector3(pool.get_center().x, 0, pool.get_center().y))
+	check(layout.inside(shore), "level %d: a hole driven into the water ends up on the shore (%.1f, %.1f)" % [i+1, shore.x, shore.z])
+	var far: Vector3 = g.rival_corner()
+	var length: float = layout.route_length(far, g.BOSS_HOME)
+	check(layout.inside(far) and length < INF and length < 6.0*far.distance_to(g.BOSS_HOME) + 20.0, "level %d: the rival's way round the water reaches the landmark (%.0f)" % [i+1, length])
 
 # Random drop points sit on inner streets, clear of the landmark, and the opening
 # cones follow them onto that street without reaching a crossing.
@@ -341,7 +413,11 @@ func check_rival(g) -> void:
 	g.reset_round()
 	g.playing = true; g.mode = "playing"; g.started = true
 	g.defense.grace = INF
-	g.hole_position = Vector3(-g.layout.move_x, 0, g.layout.move_z)
+	# Park the player on the land block farthest from the rival's corner.
+	var far_cell: Vector2 = Vector2.ZERO
+	for cell in g.layout.cells():
+		if cell.distance_to(Vector2(g.rival_corner().x, g.rival_corner().z)) > far_cell.distance_to(Vector2(g.rival_corner().x, g.rival_corner().z)): far_cell = cell
+	g.hole_position = Vector3(far_cell.x, 0, far_cell.y)
 	g.remaining = 9999.0
 	var race := 0.0
 	while race < 400.0 and g.playing:
@@ -559,7 +635,8 @@ func bench_spawns(g) -> void:
 		while g.playing and not g.boss_down and route < 300.0:
 			var target: Dictionary = g.Rival.best_target(g.items, boss, g.hole_position, g.radius)
 			if not target.is_empty():
-				var offset := Vector3(target.position.x - g.hole_position.x, 0, target.position.z - g.hole_position.z)
+				var aim: Vector3 = g.layout.steer(g.hole_position, target.position)
+				var offset := Vector3(aim.x - g.hole_position.x, 0, aim.z - g.hole_position.z)
 				g.hole_position += offset.limit_length((5.8 + minf(g.radius, 4.0)*0.45)*float(g.stats.speed)*0.05)
 			g.step(0.05, Vector2.ZERO)
 			route += 0.05
@@ -578,7 +655,7 @@ func check_panels(g) -> void:
 	g.wardrobe.turn_page(-99)
 	check(g.wardrobe.page == 0, "journey clamps to the first continent")
 	g.wardrobe.turn_page(99)
-	check(g.wardrobe.page == 5 and g.wardrobe.journey.stops.size() == 8 and g.wardrobe.controls.size() == 1, "last continent map shows eight 3D stops with bounded controls")
+	check(g.wardrobe.page == 5 and g.wardrobe.journey.stops.size() == Campaign.route(5).size() and g.wardrobe.controls.size() == 1, "last continent map shows its 3D stops (festival included) with bounded controls")
 	g.wardrobe.choose_level(6)
 	check(g.campaign.selected == 6 and g.mode == "menu", "level selection loads chosen map")
 	g.open_panel("shop")

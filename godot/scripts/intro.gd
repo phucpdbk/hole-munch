@@ -10,10 +10,10 @@ const I18n = preload("res://scripts/i18n.gd")
 const Campaign = preload("res://scripts/campaign.gd")
 const STORY := [["globe", "story1"], ["food", "story2"], ["shield", "story3"], ["target", "story4"]]
 # First city index where each always-on mechanic gets its card.
-const FEATURE_FROM := {"pickup":1, "hunger":3, "counter":4, "gold":2, "roadblock":3, "shortcut":5, "danger":6, "guardian":0}
+const FEATURE_FROM := {"pickup":1, "hunger":3, "counter":4, "gold":2, "roadblock":3, "shortcut":5, "danger":6, "guardian":1, "water":3}
 const FEATURE_ICON := {"pickup":"magnet", "hunger":"food", "counter":"megaphone",
 	"rival":"skull", "finale":"crown", "region":"globe",
-	"guardian":"shield", "gold":"gem", "roadblock":"lock", "shortcut":"map", "danger":"shield",
+	"guardian":"shield", "gold":"gem", "roadblock":"lock", "shortcut":"map", "danger":"shield", "water":"map", "festival":"star",
 	"daily_stampede":"target", "daily_coinrain":"coin", "daily_goldrush":"chest"}
 const WEATHER_TIPS := ["rain", "snow", "fog", "wind", "storm"]
 const MAX_TIPS := 1
@@ -65,6 +65,8 @@ static func story_pages() -> Array:
 static func pending_tips(level: Dictionary, seen: Array) -> Array:
 	var ids: Array = []
 	var index: int = level.index
+	# The first festival city explains the side trip before anything else.
+	if level.has("holiday"): ids.append("festival")
 	if int(level.slot) == 0 and int(level.region) > 0: ids.append("region_" + str(Campaign.REGIONS[level.region].id))
 	if level.weather in WEATHER_TIPS: ids.append("weather_" + str(level.weather))
 	if level.get("rival", false): ids.append("rival")
@@ -86,6 +88,8 @@ static func tip_page(id: String) -> Dictionary:
 		for region in Campaign.REGIONS:
 			for entry in region.cities:
 				if entry[1] == boss: city = entry[0]
+		for festival in Campaign.HOLIDAYS:
+			if festival.boss == boss: city = festival.city
 		var page := {"tag":Campaign.city_name(boss, city), "icon":"flag", "title":Campaign.boss_name(boss), "body":I18n.t("lmfun_" + boss)}
 		# Meshy concept art (tools/make-landmark-cards.mjs); the flag icon stands in until it exists.
 		var picture := CARD_DIR + boss + ".png"

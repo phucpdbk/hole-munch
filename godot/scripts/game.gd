@@ -15,6 +15,9 @@ const Campaign = preload("res://scripts/campaign.gd")
 const Weather = preload("res://scripts/weather.gd")
 const Wardrobe = preload("res://scripts/wardrobe.gd")
 const MapLayout = preload("res://scripts/map_layout.gd")
+const MapShapes = preload("res://scripts/map_shapes.gd")
+const Festive = preload("res://scripts/festive.gd")
+const Boats = preload("res://scripts/boats.gd")
 const Capture = preload("res://scripts/capture.gd")
 const CityBlocks = preload("res://scripts/city_blocks.gd")
 const CityProfiles = preload("res://scripts/city_profiles.gd")
@@ -42,7 +45,9 @@ const CARRY_TIME := 10.0
 const START_RADIUS := Campaign.START_RADIUS
 const MAX_RADIUS := 8.5
 const MIN_BOSS := 3.0
-const MAX_BOSS := 5.6
+# Raised from 5.6 with the food share (campaign.gd): a finale landmark (+0.6)
+# still fits a hole at its 8.5 cap.
+const MAX_BOSS := 6.6
 const FINALE_BOSS := 0.6
 const MODEL_BOSS := 2.8
 const SPAWN := Vector3(0, 0, 9)
@@ -229,6 +234,8 @@ var play_games: Node
 # The once-a-day reminder (notify.gd).
 var notify: Node
 var camera_target := Vector3.ZERO
+# Captures only (capture.gd --shape-capture): frame the whole city at this camera size.
+var overview_size := 0.0
 
 func _ready() -> void:
 	get_tree().quit_on_go_back = false
@@ -387,6 +394,9 @@ func load_level(index: int) -> void:
 	goal_list = [] if run else Challenges.goals(level)
 	layout = MapLayout.make(Runner.COLS, Runner.ROWS) if run else MapLayout.make(level.cols, level.rows)
 	if not run: layout.vary_districts(campaign.selected)
+	# Bays, lakes and rivers (map_shapes.gd) in campaign and endless cities; the
+	# daily mini-games keep the plain grid their layouts are written for.
+	if run_kind in ["campaign", "endless"]: MapShapes.apply(layout, MapShapes.for_level(level))
 	models.snow_material.set_shader_parameter("snow_amount",0.95 if level.weather == "snow" else 0.0)
 	stats = campaign.stats()
 	palette = level.palette
@@ -401,13 +411,14 @@ func load_level(index: int) -> void:
 	models.roofs = [Color(palette[6]), Color(palette[7]), Color(palette[6]).lightened(0.17), Color(palette[7]).darkened(0.1)]
 	models.foliage = Color(palette[4])
 	models.boss_style = level.boss
+	models.festive_theme = ""
 	models.region_style = level.style
 	models.army_look = ArmyForces.look(level)
 	models.city_profile = CityProfiles.profile(level.boss)
 	if run: features = MapFeatures.new()
 	else:
 		city_blocks.plan(layout, models.city_profile, has_farms(), 4819 + campaign.selected*137 + 1)
-		features.plan(layout, city_blocks.districts, campaign.selected, 4819 + campaign.selected*137 + 11, SPAWN)
+		features.plan(layout, city_blocks.districts, int(level.index), 4819 + campaign.selected*137 + 11, SPAWN)
 	total_points = 0
 	make_ground()
 	if run: runner.build(self, 5303 + campaign.selected*71)
@@ -417,6 +428,12 @@ func load_level(index: int) -> void:
 	if run_kind == "daily": daily.build(self, daily_kind, 7177 + campaign.selected*53)
 	make_batches()
 	weather.configure(level.weather, sky_environment, sunlight, Color(palette[5]))
+	# Evening festivals (Mid-Autumn, Halloween): dim violet light under a dusk sky.
+	sky_environment.ambient_light_color = Color("b0a8ea") if level.get("dusk", false) else Color("c7dceb")
+	if level.get("dusk", false):
+		weather.base_energy *= 0.88
+		sunlight.light_energy = weather.base_energy
+		sunlight.light_color = Color("c9b8ff")
 	reset_round()
 
 func persist() -> void:
@@ -504,28 +521,68 @@ func make_ground() -> void:
 	var depth: float = layout.half_z*2
 	parts.append(models.piece("box", Vector3(0, -0.24, 0), Vector3(width, 0.48, depth), Color(palette[0])))
 	parts.append(models.piece("box", Vector3(0, 0.01, 0), Vector3(width-2, 0.04, depth-2), Color(palette[1])))
-	for x in layout.blocks_x:
-		for z in layout.blocks_z:
-			parts.append(models.piece("box", Vector3(x, 0.075, z), Vector3(layout.block_size(x,z).x, 0.1, layout.block_size(x,z).y), Color(palette[2])))
-			parts.append(models.piece("box", Vector3(x, 0.13, z), Vector3(layout.block_size(x,z).x-2.1, 0.06, layout.block_size(x,z).y-2.1), inner_ground(x, z)))
+	for cell in layout.cells():
+		var block: Vector2 = layout.block_size(cell.x, cell.y)
+		parts.append(models.piece("box", Vector3(cell.x, 0.075, cell.y), Vector3(block.x, 0.1, block.y), Color(palette[2])))
+		parts.append(models.piece("box", Vector3(cell.x, 0.13, cell.y), Vector3(block.x-2.1, 0.06, block.y-2.1), inner_ground(cell.x, cell.y)))
+	# Lane dashes only where the street is there (not under a bay or a lake).
 	for street in layout.streets_x:
 		for i in range(int(-layout.half_z)+2, int(layout.half_z)-1, 3):
-			parts.append(models.piece("box", Vector3(street, 0.04, i), Vector3(0.1, 0.015, 1.3), Color("c6d0c8")))
+			if layout.segment_open(Vector3(street, 0, i)):
+				parts.append(models.piece("box", Vector3(street, 0.04, i), Vector3(0.1, 0.015, 1.3), Color("c6d0c8")))
 	for street in layout.streets_z:
 		for i in range(int(-layout.half_x)+2, int(layout.half_x)-1, 3):
-			parts.append(models.piece("box", Vector3(i, 0.04, street), Vector3(1.3, 0.015, 0.1), Color("c6d0c8")))
+			if layout.segment_open(Vector3(i, 0, street)):
+				parts.append(models.piece("box", Vector3(i, 0.04, street), Vector3(1.3, 0.015, 0.1), Color("c6d0c8")))
+	parts.append_array(water_parts())
 	# Zebra crossings and stop lines at each signalled crossing.
-	for x in layout.crossings_x:
-		for z in layout.crossings_z:
-			for i in range(5):
-				parts.append(models.piece("box", Vector3(x-1.2+i*0.6, 0.055, z+3.1), Vector3(0.3, 0.02, 1.45), Color("e3ddc8")))
-			for lane in [1, -1]:
-				parts.append(models.piece("box", Vector3(x - lane*(Traffic.BOX-0.72), 0.045, z+lane*0.85), Vector3(0.14, 0.015, 1.45), Color("eef0e6")))
-				parts.append(models.piece("box", Vector3(x-lane*0.85, 0.045, z - lane*(Traffic.BOX-0.72)), Vector3(1.45, 0.015, 0.14), Color("eef0e6")))
+	for spot in layout.junctions():
+		for i in range(5):
+			parts.append(models.piece("box", Vector3(spot.x-1.2+i*0.6, 0.055, spot.y+3.1), Vector3(0.3, 0.02, 1.45), Color("e3ddc8")))
+		for lane in [1, -1]:
+			parts.append(models.piece("box", Vector3(spot.x - lane*(Traffic.BOX-0.72), 0.045, spot.y+lane*0.85), Vector3(0.14, 0.015, 1.45), Color("eef0e6")))
+			parts.append(models.piece("box", Vector3(spot.x-lane*0.85, 0.045, spot.y - lane*(Traffic.BOX-0.72)), Vector3(1.45, 0.015, 0.14), Color("eef0e6")))
 	var ground := MeshInstance3D.new()
 	ground.mesh = models.bake(parts, ground_material)
 	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	world.add_child(ground)
+
+# Bays, lakes and rivers (map_shapes.gd): a stone kerb, the water with a few
+# ripple lines, and bridge decks with railings where a street crosses.
+func water_parts() -> Array:
+	var parts: Array = []
+	var water := Color(level.get("water", "4f9fc4"))
+	if level.weather == "snow": water = water.lerp(Color("cfe6ef"), 0.45)
+	var edge := Rect2(-layout.half_x, -layout.half_z, layout.half_x*2, layout.half_z*2)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 991 + campaign.selected
+	for rect in layout.water_rects:
+		var kerb: Rect2 = rect.grow(0.3).intersection(edge)
+		parts.append(models.piece("box", Vector3(kerb.get_center().x, 0.03, kerb.get_center().y), Vector3(kerb.size.x, 0.05, kerb.size.y), Color(palette[2]).darkened(0.12)))
+	for rect in layout.water_rects:
+		parts.append(models.piece("box", Vector3(rect.get_center().x, 0.035, rect.get_center().y), Vector3(rect.size.x, 0.05, rect.size.y), water))
+		for i in int(rect.get_area()/40.0):
+			var at: Vector2 = rect.position + Vector2(rng.randf_range(1.5, rect.size.x - 1.5), rng.randf_range(1.0, rect.size.y - 1.0))
+			parts.append(models.piece("box", Vector3(at.x, 0.062, at.y), Vector3(rng.randf_range(0.8, 1.8), 0.01, 0.08), water.lightened(0.28)))
+	for key in layout.bridges:
+		var bits: PackedStringArray = str(key).split(":")
+		var line := int(bits[1])
+		var cell := int(bits[2])
+		var horizontal := bits[0] == "h"
+		var along_from: float = (layout.streets_x if horizontal else layout.streets_z)[cell] - MapLayout.ROAD_HALF
+		var along_to: float = (layout.streets_x if horizontal else layout.streets_z)[cell+1] + MapLayout.ROAD_HALF
+		var across: float = (layout.streets_z if horizontal else layout.streets_x)[line]
+		var middle := (along_from + along_to)*0.5
+		var length := along_to - along_from
+		var deck := Vector3(middle, 0.05, across) if horizontal else Vector3(across, 0.05, middle)
+		parts.append(models.piece("box", deck, Vector3(length, 0.04, 3.0) if horizontal else Vector3(3.0, 0.04, length), Color(palette[1]).lightened(0.08)))
+		for side in [-1.5, 1.5]:
+			var rail := Vector3(middle, 0.2, across + side) if horizontal else Vector3(across + side, 0.2, middle)
+			parts.append(models.piece("box", rail, Vector3(length, 0.22, 0.14) if horizontal else Vector3(0.14, 0.22, length), Color("e7dfcb")))
+		for i in range(int(along_from) + 2, int(along_to) - 1, 3):
+			var dash := Vector3(i, 0.075, across) if horizontal else Vector3(across, 0.075, i)
+			parts.append(models.piece("box", dash, Vector3(1.3, 0.015, 0.1) if horizontal else Vector3(0.1, 0.015, 1.3), Color("c6d0c8")))
+	return parts
 
 # Grass courtyards, a paved downtown and a lighter landmark plaza.
 func inner_ground(x: float, z: float) -> Color:
@@ -553,26 +610,32 @@ func add_item(kind: String, pos: Vector3, size: float, variant: int = 0, yaw: fl
 func make_city() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 4819 + campaign.selected*137
-	for x in layout.blocks_x:
-		for z in layout.blocks_z:
-			var block: Vector2 = layout.block_size(x,z)
-			match city_blocks.district(x, z):
-				"plaza", "farm":
-					if x != 0 or z != 0: make_farm_block(x, z, rng)
-					for dx in [-block.x/2+1.7, block.x/2-1.7]:
-						for dz in [-block.y/2+1.7, block.y/2-1.7]:
-							add_item("tree", Vector3(x+dx, 0.16, z+dz), 0.68, int(dx > 0) ^ int(dz > 0))
-				_: city_blocks.fill(self, rng, x, z, block)
-			for dx in [-3.2, 3.2]:
-				add_item("bench", Vector3(x+dx, 0.16, z+block.y/2-0.8), 0.55)
-			for i in range(6):
-				var walker := add_item("person", Vector3(x-5+i*2, 0.16, z+block.y/2-0.35), 0.22, i%4)
-				Traffic.make_walker(walker, Vector2(0.75, 0.12), rng.randf_range(0.35, 0.6), rng.randf_range(0, TAU))
+	for cell in layout.cells():
+		var x: float = cell.x
+		var z: float = cell.y
+		var block: Vector2 = layout.block_size(x,z)
+		match city_blocks.district(x, z):
+			"plaza", "farm":
+				if x != 0 or z != 0: make_farm_block(x, z, rng)
+				for dx in [-block.x/2+1.7, block.x/2-1.7]:
+					for dz in [-block.y/2+1.7, block.y/2-1.7]:
+						add_item("tree", Vector3(x+dx, 0.16, z+dz), 0.68, int(dx > 0) ^ int(dz > 0))
+			_: city_blocks.fill(self, rng, x, z, block)
+		for dx in [-3.2, 3.2]:
+			add_item("bench", Vector3(x+dx, 0.16, z+block.y/2-0.8), 0.55)
+		for i in range(6):
+			var walker := add_item("person", Vector3(x-5+i*2, 0.16, z+block.y/2-0.35), 0.22, i%4)
+			Traffic.make_walker(walker, Vector2(0.75, 0.12), rng.randf_range(0.35, 0.6), rng.randf_range(0, TAU))
 	make_traffic(rng)
 	make_signals()
 	features.build(self, rng)
 	make_zone_labels()
 	make_opening(rng)
+	Festive.decorate(self)
+	# Boats on the bays and rivers, on their own seed so the city keeps its layout.
+	var waves := RandomNumberGenerator.new()
+	waves.seed = 7331 + campaign.selected*19
+	Boats.launch(self, waves)
 	# The country's own force (army_forces.gd) holds the crossings; eat its
 	# units to silence them.
 	ArmyForces.place(self, ArmyForces.force(level))
@@ -580,7 +643,7 @@ func make_city() -> void:
 	make_reinforcements()
 	events.build(self)
 	make_boss()
-	mechanics.setup(self, is_landmark(), 4819 + campaign.selected*137 + 7)
+	mechanics.setup(self, is_landmark() and int(level.index) >= Mechanics.GUARDIAN_FROM, 4819 + campaign.selected*137 + 7)
 
 # Accessible snacks connect the opening street to trees and cars, so the first
 # bite lands at once and a bench pays the first growth within seconds. The shape
@@ -618,12 +681,17 @@ func make_opening(rng: RandomNumberGenerator) -> void:
 # Hidden squad that rolls in from the map edge when the landmark counter-attacks.
 # Marked as bonus so it never changes the boss size or completion.
 func make_reinforcements() -> void:
-	if campaign.selected < COUNTER_FROM: return
+	if int(level.index) < COUNTER_FROM: return
 	for i in 3:
 		var road_x: float = layout.crossings_x[i%layout.crossings_x.size()]
 		var edge: float = (layout.move_z-1.0)*(1.0 if i%2 == 0 else -1.0)
+		# On a shaped map the road may end at a shore first.
+		var spans: Array[Vector2] = layout.street_spans("v", road_x)
+		if not spans.is_empty():
+			var span: Vector2 = spans[-1] if i%2 == 0 else spans[0]
+			edge = clampf(edge, span.x + 1.0, span.y - 1.0)
 		var tank := i == 0
-		var unit := add_item("patrol_tank" if tank else "soldier", Vector3(road_x,0.16,edge), 1.5 if tank else 0.36)
+		var unit := add_item("patrol_tank" if tank else "soldier", layout.clamp_point(Vector3(road_x,0.16,edge)), 1.5 if tank else 0.36)
 		unit.defender = true
 		unit.bonus = true
 		unit.reinforcement = true
@@ -664,18 +732,34 @@ func make_boss() -> void:
 
 # Both directions on each inner road. Starting spots avoid the signalled crossings.
 func make_traffic(rng: RandomNumberGenerator) -> void:
-	for road in layout.crossings_z: make_lanes("h", road, layout.half_x, layout.crossings_x, rng)
-	for road in layout.crossings_x: make_lanes("v", road, layout.half_z, layout.crossings_z, rng)
+	for road in layout.crossings_z:
+		for span in layout.street_spans("h", road): make_lanes("h", road, lane_span(span, layout.half_x), rng)
+	for road in layout.crossings_x:
+		for span in layout.street_spans("v", road): make_lanes("v", road, lane_span(span, layout.half_z), rng)
 
-func make_lanes(axis: String, road: float, wrap: float, crossings: Array[float], rng: RandomNumberGenerator) -> void:
+# A stretch that ends at a shore stops short of the crossing there, so its cars
+# fade out before they would cut across the other road.
+func lane_span(span: Vector2, edge: float) -> Vector2:
+	var from := span.x if span.x <= -edge else span.x + Traffic.BOX + 0.4
+	var to := span.y if span.y >= edge else span.y - Traffic.BOX - 0.4
+	return Vector2(from, to)
+
+func make_lanes(axis: String, road: float, span: Vector2, rng: RandomNumberGenerator) -> void:
+	if span.y - span.x < 8.0: return
+	# Signals stand only where all four arms meet (map_layout.gd junctions).
+	var crossings: Array[float] = []
+	for spot in layout.junctions():
+		var on_road: bool = is_equal_approx(spot.y if axis == "h" else spot.x, road)
+		var at: float = spot.x if axis == "h" else spot.y
+		if on_road and at > span.x and at < span.y: crossings.append(at)
 	for lane in [1, -1]:
 		var speed := rng.randf_range(2.2, 3.4)
-		var along := -wrap + (4.0 if lane > 0 else 11.5)
-		while along < wrap - 2.0:
+		var along := span.x + (4.0 if lane > 0 else 11.5)
+		while along < span.y - 2.0:
 			var start := along
 			if crossings.all(func(c): return absf(start - c) > Traffic.BOX + 1.0):
 				var car := add_item("car", Vector3(0, 0.08, 0), 0.82, rng.randi_range(0,3))
-				Traffic.make_car(car, axis, road, lane, along, speed, wrap, crossings)
+				Traffic.make_car(car, axis, road, lane, along, speed, span, crossings)
 			along += CAR_SPACING
 
 # One signal per road direction at each crossing; its lamp follows the pole, even
@@ -688,17 +772,20 @@ func make_signals() -> void:
 	var lamp_mesh := SphereMesh.new()
 	lamp_mesh.radius = 0.13
 	lamp_mesh.height = 0.26
-	for cx in layout.crossings_x:
-		for cz in layout.crossings_z:
-			for axis in ["h", "v"]:
-				var corner := Vector3(cx-1.95, 0.16, cz+1.95) if axis == "h" else Vector3(cx+1.95, 0.16, cz-1.95)
-				var pole := add_item("signal", corner, 0.45)
-				var lamp := MeshInstance3D.new()
-				lamp.mesh = lamp_mesh
-				lamp.material_override = lamp_materials[axis]
-				lamp.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-				world.add_child(lamp)
-				pole.lamp = lamp
+	for spot in layout.junctions():
+		var cx: float = spot.x
+		var cz: float = spot.y
+		for axis in ["h", "v"]:
+			# Water in a corner of the crossing moves the pole to a dry one.
+			var dry: Vector2 = layout.land_corner(Vector2(cx, cz), Vector2(-1.95, 1.95) if axis == "h" else Vector2(1.95, -1.95))
+			var corner := Vector3(dry.x, 0.16, dry.y)
+			var pole := add_item("signal", corner, 0.45)
+			var lamp := MeshInstance3D.new()
+			lamp.mesh = lamp_mesh
+			lamp.material_override = lamp_materials[axis]
+			lamp.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			world.add_child(lamp)
+			pole.lamp = lamp
 
 func base_points(item: Dictionary) -> int:
 	return maxi(5, int(item.radius*item.radius*65))*(MapFeatures.GOLD_POINTS if item.get("gold", false) else 1)
@@ -848,6 +935,7 @@ func reset_round() -> void:
 	reset_stats()
 	defense.roads_x = layout.crossings_x
 	defense.roads_z = layout.crossings_z
+	defense.layout = layout
 	traffic.clock = 0.0
 	for item in items:
 		item.position = item.origin
@@ -926,17 +1014,23 @@ func reset_stats() -> void:
 # Defence gets one continent harder in the daily challenge; the rival starts in
 # the far corner, a little faster on later continents.
 func reset_hazards() -> void:
-	defense.reset(items, not is_landmark(), campaign.selected, 1 if run_kind == "daily" else 0)
+	# level.index is the difficulty rank: a festival city's matches the city after it.
+	defense.reset(items, not is_landmark(), int(level.index), 1 if run_kind == "daily" else 0)
 	army.reset(items, ArmyForces.force(level))
 	if not is_instance_valid(rival): return
 	var region := int(level.region) + (1 if run_kind == "daily" else 0)
 	var speed := RIVAL_SPEED + region*RIVAL_SPEED_STEP
 	var chew := maxf(RIVAL_CHEW_MIN, 1.0 - region*RIVAL_CHEW_STEP)
-	var corner := Vector3(layout.move_x*0.8, 0, -layout.move_z*0.8)
-	rival.reset(bool(level.get("rival", false)), corner, START_RADIUS, speed, Vector2(layout.move_x, layout.move_z), chew)
+	rival.reset(bool(level.get("rival", false)), rival_corner(), START_RADIUS, speed, layout, chew)
 
+# The rival drops in the far north-east corner, or the nearest land to it.
+func rival_corner() -> Vector3:
+	return layout.clamp_point(Vector3(layout.move_x*0.8, 0, -layout.move_z*0.8))
+
+# The next stop on the route (campaign.gd next_level), when it is open.
 func has_next_city() -> bool:
-	return run_kind == "campaign" and campaign.can_select(campaign.selected+1)
+	var next: int = campaign.next_level(campaign.selected)
+	return run_kind == "campaign" and next >= 0 and campaign.can_select(next)
 
 # "Retry for stars" on a won result: the same city again, not the next one.
 func retry_city() -> void:
@@ -961,12 +1055,13 @@ func on_play() -> void:
 	# After the bonus run, PLAY goes on to the city after the one that opened it.
 	if mode == "result" and run_kind == "runner":
 		run_kind = "campaign"
-		load_level(campaign_level + 1 if campaign.can_select(campaign_level + 1) else campaign_level)
+		var after_run: int = campaign.next_level(campaign_level)
+		load_level(after_run if after_run >= 0 and campaign.can_select(after_run) else campaign_level)
 		persist()
 		mode = "menu"
 		stats = campaign.stats()
 	if mode == "result" and hud.won and has_next_city():
-		load_level(campaign.selected+1)
+		load_level(campaign.next_level(campaign.selected))
 		persist()
 		# The next city is fresh, like a menu city, so tips can replay on_play().
 		mode = "menu"
@@ -1001,11 +1096,11 @@ func go_menu() -> void:
 		run_kind = "campaign"
 		load_level(campaign_level)
 		if after_run and has_next_city():
-			load_level(campaign.selected+1)
+			load_level(campaign.next_level(campaign.selected))
 			persist()
 	elif mode == "result" and hud.won and has_next_city():
 		# Home after a win lands on the next city, as NEXT CITY would.
-		load_level(campaign.selected+1)
+		load_level(campaign.next_level(campaign.selected))
 		persist()
 	elif mode in ["paused", "result"]: reset_round()
 	playing = false
@@ -1132,7 +1227,7 @@ func step(dt: float, input: Vector2) -> void:
 	if run_kind == "runner":
 		run_step(dt, input)
 		return
-	if defense.update(dt,hole_position,campaign.selected,hole_velocity): take_hit()
+	if defense.update(dt,hole_position,int(level.index),hole_velocity): take_hit()
 	# Army guns shoot at the saucer itself; they share the opening grace and
 	# hold fire while the player taps a clinging guardian loose.
 	var hold: bool = defense.grace > 0 or mechanics.guardian_clinging()
@@ -1154,8 +1249,7 @@ func step(dt: float, input: Vector2) -> void:
 	var wanted: Vector3 = movement*(5.8+minf(radius,4.0)*0.45)*float(stats.speed)*defense.speed_multiplier()*mechanics.speed_multiplier()
 	hole_velocity = mechanics.steer(wanted, dt, elapsed)
 	hole_position += hole_velocity*dt
-	hole_position.x = clampf(hole_position.x, -layout.move_x, layout.move_x)
-	hole_position.z = clampf(hole_position.z, -layout.move_z, layout.move_z)
+	hole_position = layout.clamp_point(hole_position)
 	hole_position = features.collide(hole_position, radius, EAT_RATIO, hole_velocity)
 	radius = lerpf(radius, target_radius, 1.0-exp(-dt*8.0))
 	bite_time = maxf(0, bite_time-dt*2.5)
@@ -1239,7 +1333,7 @@ func magnet_level() -> int:
 # Near the end of a landmark city the landmark fights back: volleys of blasts
 # around the hole and a reinforcement squad from the map edge.
 func update_counter() -> void:
-	if counter_started or run_kind == "daily" or campaign.selected < COUNTER_FROM or not is_landmark(): return
+	if counter_started or run_kind == "daily" or int(level.index) < COUNTER_FROM or not is_landmark(): return
 	if target_radius*EAT_RATIO < boss_radius*COUNTER_AT: return
 	counter_started = true
 	var boss: Dictionary = items[boss_index]
@@ -1499,7 +1593,7 @@ func finish(won: bool) -> void:
 			reward = campaign.reward(won, hud.stars, eaten_points, best_combo)
 			var first_win: bool = won and campaign.goals[campaign.selected] == 0
 			campaign.complete_goals(goal_mask, score)
-			bonus_pending = first_win and Runner.due(campaign.selected) and has_next_city()
+			bonus_pending = first_win and not Campaign.is_holiday(campaign.selected) and Runner.due(campaign.selected) and has_next_city()
 	# Taking the landmark early pays for every second left on the clock.
 	time_coins = int(remaining)*CLEAR_COINS if won and run_kind == "campaign" else 0
 	if time_coins > 0:
@@ -1585,6 +1679,14 @@ func open_update() -> void:
 	if update_url != "": OS.shell_open(update_url)
 
 # How far the hole has grown toward swallowing the landmark, 0..1.
+# The two ends of a bridged street segment ("h:<line>:<cell>"), for the minimap.
+func bridge_ends(key: String) -> Array:
+	var bits := key.split(":")
+	var line := int(bits[1])
+	var cell := int(bits[2])
+	if bits[0] == "h": return [Vector2(layout.streets_x[cell], layout.streets_z[line]), Vector2(layout.streets_x[cell+1], layout.streets_z[line])]
+	return [Vector2(layout.streets_x[line], layout.streets_z[cell]), Vector2(layout.streets_x[line], layout.streets_z[cell+1])]
+
 # What the HUD minimap shows: roads, hole, landmark, rival and sky drops.
 func minimap_data() -> Dictionary:
 	if layout == null or boss_index < 0 or boss_index >= items.size(): return {}
@@ -1599,6 +1701,8 @@ func minimap_data() -> Dictionary:
 		data.guardian_color = mechanics.mascot.attack_color() if mechanics.mascot != null else Color("9fdcff")
 	if run_kind == "daily": data.dots = daily.dots()
 	data.merge(features.minimap(layout))
+	data.water = layout.water_rects
+	data.bridges = layout.bridges.keys().map(func(key): return bridge_ends(str(key)))
 	for bomb in mechanics.bombs:
 		if not bomb.eaten and not bomb.hidden: data.bombs.append(Vector2(bomb.origin.x, bomb.origin.z))
 	if not mechanics.pickup.is_empty(): data.pickup = Vector2(mechanics.pickup.position.x, mechanics.pickup.position.z)
@@ -1682,11 +1786,14 @@ func update_view(dt: float) -> void:
 	if shot > 0.0: target = target.lerp(showtime.focus, shot)
 	camera_target = camera_target.lerp(target,1.0-exp(-dt*6.0))
 	var look := camera_target + fx.shake_offset(elapsed)
-	camera.position = look + (RUN_CAMERA if run_view else CAMERA_OFFSET).rotated(Vector3.UP, showtime.angle*shot)
+	camera.position = look + (RUN_CAMERA if run_view else CAMERA_OFFSET).rotated(Vector3.UP, showtime.angle*shot)*(6.0 if overview_size > 0.0 else 1.0)
 	camera.look_at(look)
 	var menu_zoom := 21.0 + boss_radius*1.7
 	var zoom: float = 12.0 if mode == "customize" else menu_zoom if mode == "menu" else (21.0+radius*1.8)*mechanics.view_scale()
 	if shot > 0.0: zoom = lerpf(zoom, showtime.size, shot)
+	if overview_size > 0.0:
+		zoom = overview_size
+		camera_target = Vector3.ZERO
 	camera.size = lerpf(camera.size, zoom, 1.0-exp(-dt*3.0))
 	# Leave the right half free for the landscape wardrobe controls.
 	var preview_offset := 5.8 if mode == "customize" and get_viewport().get_visible_rect().size.x > get_viewport().get_visible_rect().size.y else 0.0
@@ -1781,7 +1888,7 @@ func update_hud() -> void:
 	var city_label: String = Campaign.city_name(level.boss, Campaign.REGIONS[level.region].cities[level.slot][0])
 	hud.level_title = "%s · %s" % [city_label, target_name]
 	hud.city = city_label
-	hud.region_title = I18n.t("region_city", [Campaign.region_name(level.region), int(level.slot)+1, Campaign.CITIES_PER_REGION])
+	hud.region_title = I18n.t("region_festival", [Campaign.region_name(level.region), I18n.t("hol_" + str(level.holiday)).to_upper()]) if level.has("holiday") 		else I18n.t("region_city", [Campaign.region_name(level.region), int(level.slot)+1, Campaign.CITIES_PER_REGION])
 	hud.weather_title = Campaign.weather_name(level.weather)
 	hud.weather_kind = level.weather
 	hud.map_title = "%d×%d" % [level.cols, level.rows]
@@ -1792,7 +1899,7 @@ func update_hud() -> void:
 	hud.level_count = Campaign.level_count()
 	hud.playtest = campaign.unlock_all_for_testing
 	hud.has_next = has_next_city()
-	hud.last_city = campaign.selected >= Campaign.level_count()-1
+	hud.last_city = campaign.next_level(campaign.selected) < 0
 	hud.run_kind = run_kind
 	hud.bonus_ready = bonus_pending and mode == "result"
 	hud.stage = endless_stage
@@ -1815,7 +1922,8 @@ func update_hud() -> void:
 	hud.reminder_ready = notify.available()
 	hud.reminders_on = campaign.reminders
 	hud.endless_best = int(campaign.endless.best)
-	var next_region: int = (campaign.selected+1)/Campaign.CITIES_PER_REGION
+	var next_city: int = campaign.next_level(campaign.selected)
+	var next_region: int = Campaign.REGIONS.size() if next_city < 0 else Campaign.region_of(next_city)
 	hud.gate_note = "" if next_region >= Campaign.REGIONS.size() or campaign.region_open(next_region) else I18n.t("gate", [Campaign.stars_needed(next_region), Campaign.region_name(next_region), campaign.total_stars()])
 	hud.combo = combo
 	hud.multiplier = combo_multiplier(combo)

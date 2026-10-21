@@ -148,7 +148,7 @@ func pick_street(game) -> Dictionary:
 
 func consider(game, street: Dictionary, best_score: float, best: Dictionary) -> float:
 	var gap := Vector2(street.centre.x - game.hole_position.x, street.centre.z - game.hole_position.z).length()
-	if gap < game.radius + 3.0: return best_score
+	if gap < game.radius + 3.0 or not game.layout.segment_open(street.centre): return best_score
 	var score := absf(gap - JAM_VIEW)
 	if score >= best_score: return best_score
 	best.merge(street, true)
@@ -168,6 +168,7 @@ func place_gates(game) -> void:
 	for spot in spots:
 		if gates.size() >= GATE_PAIRS*2: break
 		if spot.at.distance_to(Vector3(game.hole_position.x, 0, game.hole_position.z)) < 8.0: continue
+		if not game.layout.segment_open(spot.at): continue
 		if gates.any(func(gate): return gate.at.distance_to(spot.at) < 12.0): continue
 		var good_side := 1.0 if rng.randf() < 0.5 else -1.0
 		var pair := gates.size()/2

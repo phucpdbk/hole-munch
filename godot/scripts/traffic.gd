@@ -4,8 +4,8 @@ extends RefCounted
 # Cars keep a single "along" coordinate on their lane and wrap at the map edge, like
 # the 2D game. Signals alternate between the two road directions with an all-red
 # clearing phase long enough for a committed car to leave the crossing.
-# Each car carries its lane length ("wrap") and the crossings on its road, so the
-# same rules work for every map size.
+# Each car carries its stretch of road (lo..hi, the map edge or a shore at each
+# end) and the crossings on it, so the same rules work for every map and shape.
 const BOX := 2.35
 const FOLLOW_GAP := 2.5
 const ACCEL := 2.4
@@ -25,13 +25,15 @@ func green_axis() -> String:
 	if t >= GREEN + CLEAR and t < GREEN * 2.0 + CLEAR: return "v"
 	return ""
 
-static func make_car(item: Dictionary, axis: String, road: float, lane: int, along: float, speed: float, wrap: float, crossings: Array[float]) -> void:
+static func make_car(item: Dictionary, axis: String, road: float, lane: int, along: float, speed: float, span: Vector2, crossings: Array[float]) -> void:
 	item.move = "car"
-	item.wrap = wrap
+	item.lo = span.x
+	item.hi = span.y
+	item.wrap = (span.y - span.x)*0.5
 	item.crossings = crossings
 	item.axis = axis
 	item.direction = lane
-	item.lane_id = "%s%.0f%+d" % [axis, road, lane]
+	item.lane_id = "%s%.0f%+d@%.0f" % [axis, road, lane, span.x]
 	item.start_along = along
 	item.along = along
 	item.speed = speed
@@ -54,10 +56,10 @@ static func place_car(item: Dictionary) -> void:
 	var y: float = item.origin.y
 	item.position = Vector3(item.along, y, item.lateral) if item.axis == "h" else Vector3(item.lateral, y, item.along)
 
-# Cars shrink out of view at the map edge before wrapping to the other side.
+# Cars shrink out of view at the map edge (or a shore) before wrapping to the other end.
 static func edge_scale(item: Dictionary) -> float:
 	if item.get("move", "") != "car": return 1.0
-	return clampf((item.wrap - absf(item.along)) / EDGE_FADE, 0.0, 1.0)
+	return clampf(minf(item.along - item.lo, item.hi - item.along) / EDGE_FADE, 0.0, 1.0)
 
 static func is_active(item: Dictionary) -> bool:
 	return not item.eaten and item.fall < 0 and not item.get("hidden", false)
@@ -76,7 +78,7 @@ func update(items: Array, dt: float) -> void:
 		for car in lane: moves.append(allowed_move(car, lane, green, dt))
 		for i in lane.size():
 			var car: Dictionary = lane[i]
-			car.along = wrapf(car.along + car.direction * moves[i], -car.wrap, car.wrap)
+			car.along = wrapf(car.along + car.direction * moves[i], car.lo, car.hi)
 			place_car(car)
 	for item in items:
 		if item.get("move", "") == "walk" and is_active(item): place_walker(item)
@@ -86,7 +88,7 @@ func allowed_move(car: Dictionary, lane: Array, green: String, dt: float) -> flo
 	var room := INF
 	for other in lane:
 		if other != car:
-			var gap := wrapf((other.along - car.along) * car.direction, 0.0, car.wrap * 2.0)
+			var gap := wrapf((other.along - car.along) * car.direction, 0.0, car.hi - car.lo)
 			room = minf(room, maxf(0.0, gap - FOLLOW_GAP))
 	if green != car.axis:
 		for crossing in car.crossings:
@@ -96,7 +98,7 @@ func allowed_move(car: Dictionary, lane: Array, green: String, dt: float) -> flo
 	# A roadblock (map_features.gd) holds the lane until the hole eats it.
 	for block in car.get("blocks", []):
 		if not is_active(block.item): continue
-		var ahead: float = wrapf((block.at - car.along) * car.direction, 0.0, car.wrap * 2.0)
+		var ahead: float = wrapf((block.at - car.along) * car.direction, 0.0, car.hi - car.lo)
 		room = minf(room, maxf(0.0, ahead - BOX - 0.6))
 	var target: float = minf(car.speed, sqrt(2.0 * BRAKE * room))
 	car.velocity = target if target < car.velocity else move_toward(car.velocity, target, ACCEL * dt)

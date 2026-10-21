@@ -37,6 +37,27 @@ const REGIONS = [
 			["Auckland", "skytower"], ["Fiji", "fijitemple"], ["Rapa Nui", "moai"], ["Canberra", "parliament"]]},
 ]
 const CITIES_PER_REGION := 8
+# Festival cities: extra stops on a continent's route, each opened by beating the
+# city before it ("after", its level index) and never in the way of the next one. They come after
+# the 48 regular cities in save order (index 48 + position here), so the list
+# only ever grows at the end. Each has its own landmark, weather, colours
+# (palette as REGIONS), water colour, map shape (map_shapes.gd) and spot on the
+# journey map ("map": longitude, Mercator latitude like world_map_data.gd), and dresses
+# its trees, benches and opening snacks for the holiday (festive.gd).
+const HOLIDAYS = [
+	{"id":"tet", "region":0, "after":3, "city":"Sài Gòn", "boss":"tetmai", "cols":5, "rows":5, "shape":"river", "weather":"sun", "map":[106.7, 10.84],
+		"palette":["b98a5a", "6a5f5a", "f0dcb0", "b8c98a", "5f9f5a", "fbe3c8", "d6402f", "f2b632"], "water":"4f9fc4"},
+	{"id":"midautumn", "region":0, "after":2, "city":"Hội An", "boss":"starlantern", "cols":5, "rows":3, "shape":"hoian", "weather":"clear", "dusk":true, "map":[108.33, 16.09],
+		"palette":["8a7f9a", "4f5068", "e6d6a8", "93a882", "4f8a5f", "c9c3e6", "e0703a", "f2c14e"], "water":"3f6f9a"},
+	{"id":"valentine", "region":1, "after":12, "city":"Verona", "boss":"juliet", "cols":5, "rows":5, "shape":"verona", "weather":"clear", "map":[10.99, 51.12],
+		"palette":["c9a3a8", "6f6670", "f3e3df", "b6c99a", "7fae78", "ffe3ea", "e5566e", "f29ab2"], "water":"5fa8c4"},
+	{"id":"christmas", "region":1, "after":14, "city":"Nürnberg", "boss":"xmastree", "cols":5, "rows":5, "shape":"canal", "weather":"snow", "map":[11.08, 57.06],
+		"palette":["8f9a8c", "666d77", "e3d6bf", "b3c490", "2f7d46", "dfe9f2", "c0392b", "2f6e46"], "water":"5f97b4"},
+	{"id":"halloween", "region":3, "after":26, "city":"Salem", "boss":"jackolantern", "cols":5, "rows":5, "shape":"harbour", "weather":"wind", "dusk":true, "map":[-70.9, 47.06],
+		"palette":["6b5a7a", "4a4552", "cdbfae", "8a8f5a", "7a6a3a", "b9a7d6", "5b3a7a", "e07b2a"], "water":"3f5a62"},
+	{"id":"easter", "region":5, "after":40, "city":"Sydney", "boss":"easteregg", "cols":5, "rows":7, "shape":"isles", "weather":"sun", "map":[151.21, -36.03],
+		"palette":["9fd0c0", "6c8591", "f5ecd0", "b9d99a", "7cc48a", "d6f0ff", "f29ab2", "8fd3ff"], "water":"4fb8c9"},
+]
 const LANDMARKS = {
 	"namsan":"THÁP NAMSAN",
 	"watarun":"CHÙA WAT ARUN",
@@ -67,7 +88,9 @@ const LANDMARKS = {
 	"pyramid":"KIM TỰ THÁP", "sphinx":"TƯỢNG NHÂN SƯ", "djenne":"ĐẠI THÁNH ĐƯỜNG", "baobab":"CÂY BAOBAB",
 	"liberty":"TƯỢNG NỮ THẦN TỰ DO", "empire":"TÒA NHÀ EMPIRE STATE", "needle":"THÁP SPACE NEEDLE", "chichen":"KIM TỰ THÁP MAYA",
 	"christ":"TƯỢNG CHÚA CỨU THẾ", "machu":"MACHU PICCHU", "obelisco":"ĐÀI TƯỞNG NIỆM OBELISCO", "sugarloaf":"NÚI SUGARLOAF",
-	"sydney":"NHÀ HÁT SYDNEY", "uluru":"ĐÁ ULURU", "skytower":"THÁP SKY TOWER", "moai":"TƯỢNG MOAI"}
+	"sydney":"NHÀ HÁT SYDNEY", "uluru":"ĐÁ ULURU", "skytower":"THÁP SKY TOWER", "moai":"TƯỢNG MOAI",
+	"tetmai":"CÂY MAI NGÀY TẾT", "starlantern":"ĐÈN ÔNG SAO", "juliet":"BAN CÔNG JULIET", "xmastree":"CÂY THÔNG NOEL",
+	"jackolantern":"BÍ NGÔ HALLOWEEN", "easteregg":"TRỨNG PHỤC SINH"}
 # Earth's defence units flee the hole and leave small minions behind.
 const DEFENSES = {"tank":"XE TĂNG", "heli":"TRỰC THĂNG", "mech":"ROBOT CHIẾN ĐẤU", "titan":"SIÊU ROBOT TITAN"}
 const MINIONS = {"tank":"soldier", "heli":"soldier", "mech":"drone", "titan":"drone"}
@@ -140,7 +163,31 @@ const TEST_SAVE_PATH := "user://test_save.json"
 var test_mode := false
 
 static func level_count() -> int:
+	return regular_count() + HOLIDAYS.size()
+
+# The 48 cities on the main route; festival cities come after them.
+static func regular_count() -> int:
 	return REGIONS.size()*CITIES_PER_REGION
+
+static func is_holiday(index: int) -> bool:
+	return index >= regular_count() and index < level_count()
+
+static func holiday(index: int) -> Dictionary:
+	return HOLIDAYS[index - regular_count()] if is_holiday(index) else {}
+
+static func region_of(index: int) -> int:
+	return int(holiday(index).region) if is_holiday(index) else index/CITIES_PER_REGION
+
+# A continent's stops in route order: its eight cities with each festival city
+# right after the city that opens it.
+static func route(region_index: int) -> Array[int]:
+	var result: Array[int] = []
+	for slot in CITIES_PER_REGION:
+		var index := region_index*CITIES_PER_REGION + slot
+		result.append(index)
+		for k in HOLIDAYS.size():
+			if int(HOLIDAYS[k].region) == region_index and int(HOLIDAYS[k].after) == index: result.append(regular_count() + k)
+	return result
 
 # Display names follow the chosen language (i18n_strings.gd); the Vietnamese
 # tables above stay as the source of ids.
@@ -169,6 +216,7 @@ static func trail_name(index: int) -> String:
 
 # Everything a level needs, derived from its place in the campaign.
 static func level_info(index: int) -> Dictionary:
+	if is_holiday(index): return holiday_info(index)
 	var region_index := index/CITIES_PER_REGION
 	var slot := index%CITIES_PER_REGION
 	var region: Dictionary = REGIONS[region_index]
@@ -185,14 +233,39 @@ static func level_info(index: int) -> Dictionary:
 		"cols":grid[0], "rows":grid[1],
 		"seconds":level_seconds(index, blocks, progress),
 		"rival":has_rival(index),
-		# Share of the map's food the hole must eat before the boss fits. Dense
-		# street fronts hold about four times the food of the old detached houses.
-		"share":lerpf(0.2, 0.3, progress)}
+		"share":share_at(progress)}
 
-# Par times: how long the real-time greedy test route (smoke.gd) needs per city.
+# Share of the map's food the hole must eat before the boss fits. Dense street
+# fronts hold about four times the food of the old detached houses. Raised from
+# 0.2-0.3 (the game felt easy): the landmark now waits for a bigger hole.
+const SHARE_START := 0.27
+const SHARE_END := 0.4
+# Festival cities ask for a little more on top.
+const HOLIDAY_SHARE := 0.03
+
+static func share_at(progress: float) -> float:
+	return lerpf(SHARE_START, SHARE_END, progress)
+
+# A festival city plays like the city after the one that opens it ("index" is
+# that difficulty rank: defence, goals, tips and the rival follow it), with its
+# own map, weather and colours and a slightly bigger meal for the landmark.
+static func holiday_info(index: int) -> Dictionary:
+	var h := holiday(index)
+	var rank: int = int(h.after) + 1
+	var progress := float(rank)/float(regular_count()-1)
+	var region: Dictionary = REGIONS[h.region]
+	var city_label := city_name(h.boss, h.city)
+	return {"index":rank, "level":index, "region":int(h.region), "slot":-1, "city":city_label, "boss":h.boss,
+		"title":"%s · %s" % [city_label, boss_name(h.boss)], "holiday":h.id, "theme":h.id,
+		"weather":h.weather, "palette":h.palette, "style":region.id, "water":h.water, "shape":h.shape,
+		"dusk":h.get("dusk", false), "cols":int(h.cols), "rows":int(h.rows), "seconds":level_seconds(index, int(h.cols)*int(h.rows), progress),
+		"rival":has_rival(rank), "share":share_at(progress) + HOLIDAY_SHARE}
+
+# Par times: how long the real-time greedy test route (smoke.gd) needs per city
+# (the 48 cities, then the festival cities in HOLIDAYS order).
 # timer gives generous slack early and less later; regenerate with --campaign-smoke
 # (it prints each route) after changing map contents.
-const PAR_SECONDS: Array[int] = [22, 36, 27, 19, 26, 33, 23, 32, 26, 27, 30, 29, 41, 38, 27, 39, 27, 23, 27, 38, 43, 26, 57, 31, 35, 32, 38, 20, 38, 22, 32, 40, 20, 29, 47, 35, 22, 30, 32, 39, 25, 32, 41, 27, 30, 53, 38, 40]
+const PAR_SECONDS: Array[int] = [20, 38, 30, 26, 24, 19, 23, 34, 24, 22, 22, 36, 41, 30, 39, 47, 39, 39, 36, 41, 38, 33, 54, 44, 20, 34, 33, 29, 39, 45, 56, 32, 43, 30, 54, 40, 35, 34, 51, 42, 44, 34, 53, 40, 42, 50, 56, 41, 38, 44, 41, 47, 44, 40]
 
 # Timer = par × slack, never below a floor. The par route plays like a sharp
 # player who knows the whole map and takes the landmark the moment it fits, so
@@ -240,8 +313,22 @@ func total_stars() -> int:
 func region_open(region_index: int) -> bool:
 	return unlock_all_for_testing or total_stars() >= stars_needed(region_index)
 
+# A festival city opens once the city before it on the route is beaten.
 func can_select(index: int) -> bool:
-	return index >= 0 and index < level_count() and (unlock_all_for_testing or (index <= unlocked and region_open(index/CITIES_PER_REGION)))
+	if index < 0 or index >= level_count(): return false
+	if unlock_all_for_testing: return true
+	if is_holiday(index): return unlocked > int(holiday(index).after) and region_open(region_of(index))
+	return index <= unlocked and region_open(index/CITIES_PER_REGION)
+
+# The stop after this one on its continent's route (a festival city not yet
+# beaten comes first), then the next continent's first city; -1 after the last.
+func next_level(index: int) -> int:
+	var stops := route(region_of(index))
+	var at := stops.find(index)
+	for k in range(at + 1, stops.size()):
+		if not is_holiday(stops[k]) or goals[stops[k]] == 0: return stops[k]
+	var next := (region_of(index) + 1)*CITIES_PER_REGION
+	return next if next < regular_count() else -1
 
 func upgrade_cost(id: String) -> int:
 	for u in UPGRADES:
@@ -354,7 +441,7 @@ func restore(value: Variant) -> void:
 	for field in ["unlocked", "selected"]:
 		if value.get(field) is float or value.get(field) is int:
 			set(field, maxi(0, int(value[field])))
-	unlocked = mini(unlocked, level_count()-1)
+	unlocked = mini(unlocked, regular_count()-1)
 	selected = mini(selected, unlocked)
 	if saved is Array:
 		for i in mini(saved.size(), medals.size()):
@@ -447,11 +534,13 @@ func complete(stars: int, score: int) -> void:
 # Stars are kept per goal, so different replays can collect different stars.
 func complete_goals(mask: int, score: int) -> void:
 	best = maxi(best, score)
-	if selected > unlocked: return
+	# A preview (test unlock) never awards stars: the city must really be open.
+	if selected > unlocked if not is_holiday(selected) else unlocked <= int(holiday(selected).after): return
 	if mask & 1 == 0: return
 	goals[selected] |= mask & 7
 	medals[selected] = Challenges.count(goals[selected])
-	unlocked = maxi(unlocked, mini(selected+1, level_count()-1))
+	# Festival cities are side stops: the main route only opens through its own cities.
+	if not is_holiday(selected): unlocked = maxi(unlocked, mini(selected+1, regular_count()-1))
 
 # --- Daily challenge -------------------------------------------------------------
 # One city and one mini-game per calendar day, the same for everyone, three tries.

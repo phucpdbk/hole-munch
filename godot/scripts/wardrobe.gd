@@ -36,7 +36,7 @@ func _ready() -> void:
 
 func open(value: String) -> void:
 	tab = value
-	page = game.campaign.selected/Campaign.CITIES_PER_REGION
+	page = Campaign.region_of(game.campaign.selected)
 	show()
 	rebuild()
 	if tab == "levels":

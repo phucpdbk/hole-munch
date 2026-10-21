@@ -26,6 +26,7 @@ func plan(layout, city_profile: Dictionary, farms: bool, seed_value: int) -> voi
 	for x in layout.blocks_x:
 		for z in layout.blocks_z:
 			var key := Vector2(x, z)
+			if not layout.is_land(x, z): continue
 			if x == 0 and z == 0:
 				districts[key] = "plaza"
 				continue

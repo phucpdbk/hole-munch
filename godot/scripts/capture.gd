@@ -124,6 +124,28 @@ func run(game, campaign_mode: bool) -> void:
 		await challenge_preview()
 		g.get_tree().quit()
 		return
+	# Whole shaped cities from above (bays, lakes, rivers, festival dress):
+	# test-output/shape-XX.png, `--levels=4,48` picks cities (0-based).
+	if "--shape-capture" in OS.get_cmdline_user_args():
+		var picks: Array = [4, 13, 24, 32, 47, 48, 49, 50, 51, 52, 53]
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--levels="): picks = Array(arg.trim_prefix("--levels=").split(",")).map(func(value): return int(value))
+		for index in picks:
+			g.load_level(index)
+			g.on_play()
+			g.started = true
+			g.defense.grace = INF
+			g.overview_size = maxf(g.layout.half_x, g.layout.half_z)*2.3
+			g.camera.far = 600
+			await frames(90)
+			await snapshot("shape-%02d" % (index + 1))
+			g.overview_size = 0.0
+			g.camera.far = 200
+			g.hole_position = g.SPAWN
+			await frames(60)
+			await snapshot("shape-%02d-street" % (index + 1))
+		g.get_tree().quit()
+		return
 	# Gold district, roadblock and danger zone of a later city, with the minimap.
 	if "--map-capture" in OS.get_cmdline_user_args():
 		g.load_level(26)

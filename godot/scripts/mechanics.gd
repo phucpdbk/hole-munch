@@ -8,6 +8,9 @@ const Traffic = preload("res://scripts/traffic.gd")
 const Mascot = preload("res://scripts/mascot.gd")
 const MascotAttacks = preload("res://scripts/mascot_attacks.gd")
 const KNOCK_FADE := 6.0
+# The first city is just eat, grow and swallow the landmark: its guardian
+# (and the fight) joins from the second city on, with its intro card.
+const GUARDIAN_FROM := 1
 const MascotSpecs = preload("res://scripts/mascot_specs.gd")
 # The guardian is about half the landmark's size, so it falls mid-way up the ladder.
 const GUARDIAN_SHARE := 0.55
@@ -187,6 +190,7 @@ func place_bombs(game, seed_value: int) -> void:
 		var free := picker.randf_range(-0.8, 0.8)
 		var at := Vector3(line, 0.16, free*game.layout.move_z) if along_x else Vector3(free*game.layout.move_x, 0.16, line)
 		if at.distance_to(game.SPAWN) < 5.0 or at.distance_to(game.BOSS_HOME) < game.boss_radius + 3.0: continue
+		if not game.layout.segment_open(at) or not game.layout.inside(at): continue
 		var bomb: Dictionary = game.add_item("bomb", at, BOMB_SIZE)
 		bomb.bomb = true
 		bomb.optional = true
@@ -309,7 +313,9 @@ func spawn_pickup(game) -> void:
 		var free := rng.randf_range(-0.9, 0.9)
 		at = Vector3(xs[rng.randi()%xs.size()], 0.16, free*game.layout.move_z) if rng.randf() < 0.5 \
 			else Vector3(free*game.layout.move_x, 0.16, zs[rng.randi()%zs.size()])
+		if not game.layout.segment_open(at) or not game.layout.inside(at): continue
 		if Vector2(at.x-game.hole_position.x, at.z-game.hole_position.z).length() > 4.0: break
+	at = game.layout.clamp_point(at)
 	var kinds: Array = PICKUPS.keys().filter(func(k): return k != "time" or game.clock_can_grow())
 	var kind: String = kinds[rng.randi()%kinds.size()]
 	pickup = {"kind":kind, "position":at, "life":PICKUP_LIFE, "drop":DROP_TIME}

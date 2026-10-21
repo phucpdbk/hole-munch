@@ -34,7 +34,8 @@ static func clear(g, at: Vector3) -> bool:
 	if flat(at, g.BOSS_HOME) < g.boss_radius + BOSS_GAP: return false
 	var guardian: Dictionary = g.mechanics.guardian
 	if not guardian.is_empty() and flat(at, guardian.origin) < GUARDIAN_GAP: return false
-	if g.level.get("rival", false) and flat(at, Vector3(g.layout.move_x*0.8, 0, -g.layout.move_z*0.8)) < RIVAL_GAP: return false
+	if not g.layout.segment_open(at) or not g.layout.inside(at): return false
+	if g.level.get("rival", false) and flat(at, g.rival_corner()) < RIVAL_GAP: return false
 	for bomb in g.mechanics.bombs:
 		if flat(at, bomb.origin) < BOMB_GAP: return false
 	return true

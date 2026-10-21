@@ -133,7 +133,7 @@ func check_traffic() -> void:
 	check(crashes==0,"signals and queues keep cars from overlapping")
 	check(stops>0,"cars stop at red lights and queues")
 	check(travelled.values().all(func(d): return d>20.0),"no car stays stuck in traffic")
-	check(cars.all(func(c): return absf(c.along)<=c.wrap),"cars wrap around the map edge")
+	check(cars.all(func(c): return c.along >= c.lo and c.along <= c.hi),"cars wrap around the map edge")
 
 func check_walkers() -> void:
 	g.reset_round()
@@ -213,7 +213,8 @@ func check_growth_route() -> void:
 	while g.playing and not g.boss_down and route_seconds < ROUTE_LIMIT:
 		var target: Dictionary = g.Rival.best_target(g.items, boss, g.hole_position, g.radius)
 		if not target.is_empty():
-			var offset := Vector3(target.position.x-g.hole_position.x, 0, target.position.z-g.hole_position.z)
+			var aim: Vector3 = g.layout.steer(g.hole_position, target.position)
+			var offset := Vector3(aim.x-g.hole_position.x, 0, aim.z-g.hole_position.z)
 			var speed: float = (5.8+minf(g.radius,4.0)*0.45)*float(g.stats.speed)
 			g.hole_position += offset.limit_length(speed*ROUTE_STEP)
 		g.step(ROUTE_STEP,Vector2.ZERO)
@@ -305,6 +306,7 @@ func check_guardian_fight() -> void:
 	g.hole_position.y = 0
 	for i in 60: g.step(0.02, Vector2.ZERO)
 	check(mascot.state == "hunt" and guardian.position.x > home.x + 1.0, "the guardian leaves the landmark to hunt a nearby hole")
+	g.update_hud()
 	check(g.hud.guardian_max == mascot.HP and g.minimap_data().has("guardian"), "the HUD shows the guardian's hearts and the minimap its position")
 	check_guardian_streets(mascot, guardian)
 	check_guardian_routes(mascot.Roads)
@@ -571,6 +573,9 @@ func check_updates() -> void:
 # Shield pylons, bombs, hunger and pickups (scripts/mechanics.gd).
 func check_mechanics() -> void:
 	g.load_level(0)
+	check(g.mechanics.guardian.is_empty() and not g.items[g.boss_index].get("shielded", false), "the first city's landmark has no guardian")
+	# Agra (city 5): clear weather and a guardian.
+	g.load_level(4)
 	g.reset_round()
 	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
 	g.defense.grace = INF

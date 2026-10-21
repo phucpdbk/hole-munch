@@ -52,6 +52,14 @@ const PROFILES = {
 	"sugarloaf": {"style":"colonial", "walls":["ff8c69","7ec8e3","f7dc6f"], "signs":["2e8b57","c0392b","1d3f6e"], "roof":"b8603f", "towers":0.4, "tower":["hotel","hotel"]},
 	"costanera": {"style":"stucco", "walls":["e6dccb","f0e2c2","c9d6df"], "signs":["c0392b","2a7ab0","f2b134"], "roof":"8a8f96", "towers":0.8, "tower":["glass","glass"]},
 	# Oceania
+	# Festival cities: Saigon and Hoi An shophouses (Hoi An's yellow walls),
+	# Verona's Italian fronts, Nuremberg's Altbau, Salem's brick and Sydney.
+	"tetmai": {"style":"tube", "walls":["f6d36b","f4a6a0","b8e0c8"], "signs":["d93a2f","e8a33d","2f6fd9"], "roof":"8e8f93", "towers":0.55, "tower":["concrete","glass"]},
+	"starlantern": {"style":"tube", "walls":["f2c94c","f0d27a","e9b84a"], "signs":["c8322b","2e8b57","e8c23d"], "roof":"9a5b3f", "towers":0.0, "tower":["concrete","concrete"]},
+	"juliet": {"style":"mediterranean", "walls":["e8b48a","f0d9a8","d98c5f"], "signs":["8e2a2a","2e6b3a","1f4f7a"], "roof":"b8603f", "towers":0.05, "tower":["stone","stone"]},
+	"xmastree": {"style":"altbau", "walls":["efe0c0","d7c2a0","e6c3a8"], "signs":["b22a2a","2e6b3a","1d3f6e"], "roof":"8a3b2e", "towers":0.15, "tower":["stone","concrete"]},
+	"jackolantern": {"style":"brownstone", "walls":["7a4a3a","5e4b4a","8c5a4a"], "signs":["e07b2a","5b3a7a","2e6b3a"], "roof":"3f3a46", "towers":0.2, "tower":["deco","glass"]},
+	"easteregg": {"style":"victorian", "walls":["f0e6d2","f4c7d0","d8ecf0"], "signs":["1d3f6e","2e6b3a","e5566e"], "roof":"7d858c", "towers":0.6, "tower":["glass","glass"]},
 	"sydney": {"style":"victorian", "walls":["e8d8b8","b5654a","f0e6d2"], "signs":["1d3f6e","2e6b3a","b22a2a"], "roof":"7d858c", "towers":0.7, "tower":["glass","glass"]},
 	"flinders": {"style":"victorian", "walls":["c9a27a","e6d3b0","8b5a3c"], "signs":["2e6b3a","b22a2a","e0a030"], "roof":"7d858c", "towers":0.7, "tower":["glass","glass"]},
 	"uluru": {"style":"island", "walls":["c1502e","e0a070","f0e0c0"], "signs":["2a7ab0","2e8b57","e0a030"], "roof":"9aa0a6", "towers":0.0, "tower":["hotel","hotel"]},

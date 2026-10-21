@@ -22,6 +22,12 @@ static func draw(canvas: CanvasItem, top_right: Vector2, data: Dictionary) -> vo
 		canvas.draw_line(to_map(rect, half, scale, Vector2(x, -half.y)), to_map(rect, half, scale, Vector2(x, half.y)), Color("3c4650"), 3.0)
 	for z in data.streets_z:
 		canvas.draw_line(to_map(rect, half, scale, Vector2(-half.x, z)), to_map(rect, half, scale, Vector2(half.x, z)), Color("3c4650"), 3.0)
+	# Bays, lakes and rivers cover the streets they swallowed; bridges cross them.
+	for water in data.get("water", []):
+		var pool: Rect2 = water
+		canvas.draw_rect(Rect2(to_map(rect, half, scale, pool.position), pool.size*scale).intersection(rect), Color("4f9fc4"))
+	for bridge in data.get("bridges", []):
+		canvas.draw_line(to_map(rect, half, scale, bridge[0]), to_map(rect, half, scale, bridge[1]), Color("3c4650"), 3.0)
 	for lane in data.get("shortcuts", []):
 		canvas.draw_dashed_line(to_map(rect, half, scale, lane[0]), to_map(rect, half, scale, lane[1]), UiStyle.MINT, 2.0, 4.0)
 	for spot in data.get("barriers", []):

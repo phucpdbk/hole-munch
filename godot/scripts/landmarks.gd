@@ -682,3 +682,73 @@ func lm_moai() -> void:
 		box(at + Vector3(0, h*0.68, 0.32), Vector3(0.36, 0.06, 0.1), rock.darkened(0.2))
 		for side in [-0.36, 0.36]: box(at + Vector3(side, h*0.84, 0), Vector3(0.07, h*0.26, 0.16), rock.darkened(0.1))
 		if i % 2 == 0: add("cyl", at + Vector3(0, h+0.12, 0.02), Vector3(0.3, 0.24, 0.3), Color("a8553f"))
+
+# --- Festival landmarks (campaign.gd HOLIDAYS) -------------------------------------
+# Primitive stand-ins until the Meshy bakes (assets/landmarks/<id>.res) exist.
+
+func lm_tetmai() -> void:
+	box(Vector3(0, 0.08, 0), Vector3(5, 0.16, 4.6), STONE)
+	add("cyl", Vector3(0, 0.75, 0), Vector3(1.3, 1.2, 1.3), Color("c8302c"))
+	add("cyl", Vector3(0, 1.37, 0), Vector3(1.38, 0.1, 1.38), GOLD)
+	beam(Vector3(0, 1.3, 0), Vector3(0.2, 3.4, 0.1), 0.32, WOOD, "cyl")
+	for i in 9:
+		var a := i*TAU/9.0
+		add("ball", Vector3(cos(a)*1.4, 3.6 + sin(a*2.0)*0.4, sin(a)*1.4), Vector3.ONE*0.75, Color("ffd23f") if i % 3 else Color("ffc61a"))
+		if i % 2 == 0: box(Vector3(cos(a)*1.9, 3.0, sin(a)*1.9), Vector3(0.22, 0.34, 0.06), Color("e63946"))
+	add("ball", Vector3(0, 4.3, 0), Vector3.ONE*0.95, Color("ffe066"))
+	for at in [Vector3(1.7, 0.36, 1.3), Vector3(1.7, 1.0, 1.3), Vector3(1.0, 0.36, 1.6)]:
+		box(at, Vector3(0.75, 0.6, 0.75), Color("3f8f4a"))
+		box(at, Vector3(0.78, 0.62, 0.1), Color("e8d9a8"))
+
+func lm_starlantern() -> void:
+	box(Vector3(0, 0.08, 0), Vector3(4.6, 0.16, 4.6), STONE)
+	beam(Vector3(0, 0.1, 0), Vector3(0, 4.6, 0), 0.22, Color("c9a45a"), "cyl")
+	for turn in [0.0, PI]: add("prism", Vector3(0, 5.2, 0), Vector3(1.7, 0.35, 1.7), Color("e63946"), Vector3(PI/2, turn, 0))
+	add("ball", Vector3(0, 5.2, 0.2), Vector3.ONE*0.4, Color("fff1a8"))
+	for side in [-1, 1]:
+		beam(Vector3(0, 3.6, 0), Vector3(side*1.3, 3.6, 0), 0.08, Color("c9a45a"), "cyl")
+		add("ball", Vector3(side*1.3, 3.0, 0), Vector3(0.45, 0.55, 0.45), Color("ff8a2a") if side < 0 else Color("ffd23f"))
+	for at in [Vector3(1.2, 0.3, 1.1), Vector3(0.6, 0.3, 1.5), Vector3(0.9, 0.62, 1.3)]: add("cyl", at, Vector3(0.45, 0.3, 0.45), Color("c8823e"))
+
+func lm_juliet() -> void:
+	box(Vector3(0, 0.08, 0), Vector3(5, 0.16, 4), STONE)
+	box(Vector3(0, 2.6, -0.6), Vector3(3.6, 5.0, 1.4), Color("e6cfa6"))
+	box(Vector3(0, 3.0, 0.3), Vector3(2.2, 0.2, 1.0), Color("d8c39a"))
+	for i in 7: add("cyl", Vector3(-0.9 + i*0.3, 3.35, 0.75), Vector3(0.07, 0.5, 0.07), Color("efe2c4"))
+	box(Vector3(0, 3.62, 0.75), Vector3(2.1, 0.08, 0.12), Color("efe2c4"))
+	box(Vector3(0, 3.9, 0.13), Vector3(0.9, 1.2, 0.06), Color("7a4b2a"))
+	for side in [-1, 1]: add("ball", Vector3(side*0.28, 5.0, 0.2), Vector3.ONE*0.42, Color("e5566e"))
+	box(Vector3(0, 4.7, 0.2), Vector3(0.6, 0.6, 0.3), Color("e5566e"), Vector3(0, 0, PI/4))
+	for i in 10: add("ball", Vector3(-1.6 + (i % 2)*3.2, 0.5 + i*0.42, 0.15), Vector3.ONE*0.22, Color("c0213a"))
+
+func lm_xmastree() -> void:
+	box(Vector3(0, 0.08, 0), Vector3(5, 0.16, 5), Color("eef3f6"))
+	beam(Vector3(0, 0.1, 0), Vector3(0, 1.0, 0), 0.5, WOOD, "cyl")
+	for i in 4: add("point", Vector3(0, 1.5 + i*1.05, 0), Vector3(2.1 - i*0.42, 1.8, 2.1 - i*0.42), Color("2f7d46"))
+	for i in 12:
+		var a := i*2.4
+		var y := 1.2 + (i % 4)*1.0
+		add("ball", Vector3(cos(a)*(1.8 - (i % 4)*0.4), y, sin(a)*(1.8 - (i % 4)*0.4)), Vector3.ONE*0.18, [Color("e8423f"), GOLD, Color("3a7bd5")][i % 3])
+	add("ball", Vector3(0, 6.1, 0), Vector3.ONE*0.38, GOLD)
+	for at in [Vector3(1.3, 0.35, 1.4), Vector3(-1.2, 0.3, 1.5), Vector3(0.2, 0.3, 1.9)]:
+		box(at, Vector3(0.6, 0.5, 0.6), Color("e8423f") if at.x > 0 else Color("3a7bd5"))
+
+func lm_jackolantern() -> void:
+	box(Vector3(0, 0.08, 0), Vector3(5, 0.16, 5), Color("8a8590"))
+	add("ball", Vector3(0, 1.9, 0), Vector3(2.0, 1.6, 2.0), Color("ff7a1a"))
+	beam(Vector3(0, 3.3, 0), Vector3(0.1, 3.8, 0), 0.24, Color("4f7a2a"), "cyl")
+	add("cyl", Vector3(0, 3.55, 0), Vector3(1.7, 0.12, 1.7), Color("5b3a7a"))
+	add("point", Vector3(0.2, 4.6, 0), Vector3(0.9, 2.0, 0.9), Color("5b3a7a"), Vector3(0, 0, -0.25))
+	for side in [-0.6, 0.6]: add("prism", Vector3(side, 2.3, 1.75), Vector3(0.32, 0.12, 0.32), Color("ffd23f"), Vector3(PI/2, 0, 0))
+	box(Vector3(0, 1.45, 1.8), Vector3(1.2, 0.26, 0.12), Color("ffd23f"))
+	for at in [Vector3(1.9, 0.45, 1.4), Vector3(-1.9, 0.4, 1.3), Vector3(-1.6, 0.4, -1.5)]: add("ball", at, Vector3(0.5, 0.4, 0.5), Color("ff8c1a"))
+	for at in [Vector3(1.8, 0.6, -1.6), Vector3(-0.4, 0.6, -2.0)]: box(at, Vector3(0.6, 0.9, 0.18), Color("9a96a0"))
+
+func lm_easteregg() -> void:
+	box(Vector3(0, 0.08, 0), Vector3(5, 0.16, 5), STONE)
+	add("cyl", Vector3(0, 0.45, 0), Vector3(2.2, 0.7, 2.2), Color("d9b26f"))
+	add("ball", Vector3(0, 2.7, 0), Vector3(1.5, 2.1, 1.5), Color("ffd1dc"))
+	for band in [[2.2, Color("8fd3ff")], [3.0, Color("fff59d")], [3.7, Color("b39ddb")]]:
+		add("cyl", Vector3(0, band[0], 0), Vector3(1.52 - absf(band[0] - 2.7)*0.25, 0.22, 1.52 - absf(band[0] - 2.7)*0.25), band[1])
+	for at in [Vector3(1.4, 0.95, 1.2), Vector3(-1.5, 0.95, 0.9), Vector3(0.3, 0.95, 1.8)]:
+		add("ball", at, Vector3(0.35, 0.45, 0.35), Color("c8f7c5") if at.x > 0 else Color("ff9fbf"))

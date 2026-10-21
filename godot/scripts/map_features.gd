@@ -58,10 +58,11 @@ func plan(layout, districts: Dictionary, index: int, seed_value: int, spawn: Vec
 			districts[key] = "commercial"
 	for i in wanted.shortcuts:
 		if not free.is_empty(): shortcut_blocks.append(free.pop_back())
+	# Roadblocks stand only where land holds all four corners, so a shaped map
+	# never loses its only way over a bridge.
 	var crossings: Array[Vector2] = []
-	for x in layout.crossings_x:
-		for z in layout.crossings_z:
-			if Vector2(x - spawn.x, z - spawn.z).length() > SAFE_SPAWN: crossings.append(Vector2(x, z))
+	for spot in layout.land_junctions():
+		if Vector2(spot.x - spawn.x, spot.y - spawn.z).length() > SAFE_SPAWN: crossings.append(spot)
 	shuffle(crossings, rng)
 	for i in mini(wanted.barriers, crossings.size()): barrier_spots.append(crossings[i])
 

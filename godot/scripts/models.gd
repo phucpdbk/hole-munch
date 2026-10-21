@@ -13,11 +13,15 @@ const ROOFS = [Color("ec8777"), Color("81b7cb"), Color("e7be78"), Color("a999cc"
 var roofs: Array = ROOFS.duplicate()
 var foliage := Color("75ab87")
 var boss_style := "eiffel"
+# The festival city's holiday (campaign.gd HOLIDAYS id) for "fest_*" props.
+var festive_theme := ""
 var region_style := "europe"
 const CityProfiles = preload("res://scripts/city_profiles.gd")
 const StreetModels = preload("res://scripts/street_models.gd")
 var city_profile: Dictionary = CityProfiles.profile(CityProfiles.DEFAULT)
 const Landmarks = preload("res://scripts/landmarks.gd")
+const FestiveModels = preload("res://scripts/festive_models.gd")
+const Boats = preload("res://scripts/boats.gd")
 const RegionModels = preload("res://scripts/region_models.gd")
 const ArmyModels = preload("res://scripts/army_models.gd")
 const ArmyForces = preload("res://scripts/army_forces.gd")
@@ -130,6 +134,12 @@ func toy(kind: String, variant: int = 0) -> ArrayMesh:
 	var color: Color = roofs[variant % roofs.size()]
 	if kind.begins_with("farm_"):
 		cache[key] = farm_mesh(kind.trim_prefix("farm_"))
+		return cache[key]
+	if kind == "boat":
+		cache[key] = bake(Boats.parts(self, variant))
+		return cache[key]
+	if kind.begins_with("fest_"):
+		cache[key] = bake(FestiveModels.new(self).prop(festive_theme, kind.trim_prefix("fest_"), variant), snow_material)
 		return cache[key]
 	if kind in ["shop", "tower"]:
 		var street = StreetModels.new(self)

@@ -6,7 +6,7 @@ release AAB pipeline, AdMob IDs, upload signing, consent/privacy and verificatio
 An alien saucer drops a black hole on Earth. Swallow each city, grow, then swallow
 its landmark to conquer it, while dodging independent military defenders.
 
-- **6 continents × 8 cities = 48 levels** (Asia, Europe, Africa, North America,
+- **6 continents × 8 cities = 48 levels, plus 6 festival cities** (Asia, Europe, Africa, North America,
   South America, Oceania). Each continent has its own palette, houses, trees and
   weather. All 48 objectives are city landmarks. Tanks and rifle infantry approach along roads and attack independently of the landmark.
 - **Street fronts follow the landmark city** (`city_profiles.gd`): each city
@@ -20,10 +20,42 @@ its landmark to conquer it, while dodging independent military defenders.
   `-- --capture --street-capture` (writes `test-output/street-XX.png`).
 - **Map size follows difficulty**: 3×3 blocks at the start, 5×3, then 5×5;
   continent finales use the next size up (5×7 from the fourth continent).
-  The boss size comes from the map's own food (3.0–5.6, finales up to 6.2).
+  The boss size comes from the map's own food: the hole must eat 27% of it
+  at the start, rising to 40% (`campaign.gd` `share_at`), landmarks 3.0–6.6,
+  finales up to 7.2 (still under the hole's 8.5 cap).
   Blocks around the plaza are 24/31/38 units street to street
   (`map_layout.gd`) and sparsely built: about a quarter of shop lots stay
   empty, commercial blocks only front the north and south streets.
+- **Shaped cities** (`map_shapes.gd`, `map_layout.gd`): from city 4 on, some
+  grid cells are water — a bay, a lake, a river, a canal — chosen per grid size
+  and mirrored per city, so a map is no longer a rectangle. The hole's centre
+  stays a little off the shore (`clamp_point` slides it along), streets with
+  water on both sides disappear unless bridged, and traffic, signals, squads,
+  roadblocks (never at a bridge end), drop points, gates and pickups only use
+  streets that exist. The rival, the par route and the ad autopilot steer round
+  the water (`steer`: corners of the water plus a short Dijkstra); the guardian
+  routes over existing street stretches only. `--campaign-smoke --shapes`
+  checks every city (reachable blocks, nothing in the water, shore push-out,
+  the rival's way to the landmark) without the slow routes;
+  `-- --capture --shape-capture [--levels=4,48]` shoots each city whole and at
+  its opening street (`test-output/shape-XX.png`). Boats (`boats.gd`: sampans,
+  sailboats, ferries, gondolas by continent) drift and rock on the water; only
+  a hole big enough to reach out from the shore can eat one (optional food).
+- **Festival cities** (`campaign.gd` `HOLIDAYS`, `festive.gd`,
+  `festive_models.gd`): six extra stops, after the 48 cities in save order:
+  Lunar New Year in Saigon and Mid-Autumn in Hội An (Asia), Valentine's in
+  Verona and Christmas in Nuremberg (Europe), Halloween in Salem (North
+  America) and Easter in Sydney (Oceania). Each hangs off the city before it on
+  the journey map (a pink side trip), opens when that city is beaten, never
+  blocks the route, and plays at that city's difficulty rank with its own
+  landmark, guardian, weather, colours (Mid-Autumn and Halloween at dusk), water
+  and shape (Verona's Adige, Hội An's Thu Bồn) and +3% food share. Trees,
+  benches and opening cones become the holiday's trees, stands and snacks at
+  the same size, so food totals match. NEXT after the opening city goes to the
+  festival while it is unbeaten. Festival guardians: a banh chung (Tết), a lion
+  dance lion (Mid-Autumn), a cupid (Valentine's), a snowman (Christmas), a
+  pumpkin-head scarecrow (Halloween) and an Easter bunny, all Meshy rigs with
+  the six clips; the festival landmarks are Meshy bakes too.
 - **Weather** (`weather.gd`): rain and storm add a dense screen layer of
   streaks (`shaders/precipitation.gdshader`) over 3D drops and ground
   splashes; snow uses parallax flake layers plus soft 3D flakes. Fog covers
@@ -66,8 +98,10 @@ its landmark to conquer it, while dodging independent military defenders.
   a cored bolt; splash, embers or sparks where they hit, a charge glow before),
   a leap that rams it, a stomp ring and a charge. A hit rocks the
   saucer, shakes the camera and shoves the hole. `-- --capture --guardian-capture`
-  shoots every style. Hà Nội (Chùa Một Cột), Agra, Paris, New York (Liberty)
-  and Sydney have Meshy guardians (`assets/mascots/<id>.scn`, auto-rigged,
+  shoots every style. The first city has no guardian (`mechanics.gd`
+  `GUARDIAN_FROM`): it is only eat, grow and swallow the landmark; the guardian
+  and its intro card join from city 2. Hà Nội (Chùa Một Cột), Agra, Paris, New
+  York (Liberty), Sydney and all six festival cities have Meshy guardians (`assets/mascots/<id>.scn`, auto-rigged,
   clips idle/walk/run/attack = Charged Spell Cast/hit/leap = Jump Attack via
   `tools/meshy/meshy.mjs mascots rig --actions idle=0,attack=125,hit=178,leap=86`,
   baked by `tools/bake_mascots.gd`, scaled to the toy rig's two-unit height);

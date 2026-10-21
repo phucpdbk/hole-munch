@@ -27,8 +27,12 @@ static func line_of(value: float, lines: Array) -> Variant:
 		if absf(value - line) <= ON_ROAD: return line
 	return null
 
+# On a road centre line whose stretch exists (a shaped map has none over water).
 static func on_road(layout, at: Vector3) -> bool:
-	return line_of(at.x, roads_x(layout)) != null or line_of(at.z, roads_z(layout)) != null
+	var lx = line_of(at.x, roads_x(layout))
+	if lx != null and layout.segment_open(Vector3(lx, 0, at.z)): return true
+	var lz = line_of(at.z, roads_z(layout))
+	return lz != null and layout.segment_open(Vector3(at.x, 0, lz))
 
 static func walkable(layout, at: Vector3) -> bool:
 	return in_plaza(at) or on_road(layout, at)
@@ -44,15 +48,17 @@ static func road_point(layout, at: Vector3) -> Vector3:
 	var best := at
 	var best_distance := INF
 	for x in xs:
-		var point := Vector3(x, at.y, clampf(at.z, -layout.move_z, layout.move_z))
-		if absf(point.x - at.x) + absf(point.z - at.z) < best_distance:
-			best_distance = absf(point.x - at.x) + absf(point.z - at.z)
-			best = point
+		for span in layout.street_spans("v", x):
+			var point := Vector3(x, at.y, clampf(at.z, maxf(span.x, -layout.move_z), minf(span.y, layout.move_z)))
+			if absf(point.x - at.x) + absf(point.z - at.z) < best_distance:
+				best_distance = absf(point.x - at.x) + absf(point.z - at.z)
+				best = point
 	for z in zs:
-		var point := Vector3(clampf(at.x, -layout.move_x, layout.move_x), at.y, z)
-		if absf(point.x - at.x) + absf(point.z - at.z) < best_distance:
-			best_distance = absf(point.x - at.x) + absf(point.z - at.z)
-			best = point
+		for span in layout.street_spans("h", z):
+			var point := Vector3(clampf(at.x, maxf(span.x, -layout.move_x), minf(span.y, layout.move_x)), at.y, z)
+			if absf(point.x - at.x) + absf(point.z - at.z) < best_distance:
+				best_distance = absf(point.x - at.x) + absf(point.z - at.z)
+				best = point
 	return best
 
 static func nearest(value: float, lines: Array) -> float:
@@ -81,7 +87,7 @@ static func plan(layout, from: Vector3, target: Vector3) -> Dictionary:
 	# Standing on a crossing: set off toward one of its neighbours.
 	var here := grid_key(from, xs, zs)
 	if flat_gap(from, Vector3(xs[here.x], from.y, zs[here.y])) < 0.05:
-		starts = neighbours(here, xs, zs).map(func(key): return Vector3(xs[key.x], from.y, zs[key.y]))
+		starts = neighbours(layout, here, xs, zs).map(func(key): return Vector3(xs[key.x], from.y, zs[key.y]))
 	var ends := exits(layout, goal, xs, zs)
 	# Dijkstra over crossings keyed by grid index; a few dozen nodes at most.
 	var cost := {}
@@ -107,7 +113,7 @@ static func plan(layout, from: Vector3, target: Vector3) -> Dictionary:
 				if total < best:
 					best = total
 					best_next = first[key]
-		for next in neighbours(key, xs, zs):
+		for next in neighbours(layout, key, xs, zs):
 			var value: float = cost[key] + flat_gap(at, Vector3(xs[next.x], from.y, zs[next.y]))
 			if value < float(cost.get(next, INF)):
 				cost[next] = value
@@ -165,11 +171,14 @@ static func bracket(value: float, lines: Array) -> Array:
 	if above < INF and not is_equal_approx(above, below): result.append(above)
 	return result
 
-static func neighbours(key: Vector2i, xs: Array, zs: Array) -> Array:
+static func neighbours(layout, key: Vector2i, xs: Array, zs: Array) -> Array:
 	var result: Array = []
 	for step in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 		var next: Vector2i = key + step
-		if next.x >= 0 and next.x < xs.size() and next.y >= 0 and next.y < zs.size(): result.append(next)
+		if next.x < 0 or next.x >= xs.size() or next.y < 0 or next.y >= zs.size(): continue
+		# The stretch between the two crossings must exist (not under water).
+		var middle := Vector3((xs[key.x] + xs[next.x])*0.5, 0, (zs[key.y] + zs[next.y])*0.5)
+		if layout.segment_open(middle): result.append(next)
 	# The plaza is open: its rim crossings reach one another straight across.
 	var here := Vector3(xs[key.x], 0, zs[key.y])
 	if in_plaza(here):
