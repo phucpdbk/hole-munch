@@ -7,7 +7,7 @@ No store upload or account creation is performed by these scripts.
 
 ## Before the first production build
 
-1. Choose the permanent package ID. The example suggests `com.phucp.holemunch`; confirm it is yours and available before creating the Play listing. Changing it later creates a separate app. Prototype saves do not migrate to a different package.
+1. Choose the permanent package ID. The example uses `com.phucpdbk.holemunch`; confirm it is yours and available before creating the Play listing. Changing it later creates a separate app. Prototype saves do not migrate to a different package.
 2. Create and verify your Google Play developer account and create the app listing.
 3. In AdMob create the Android app, then one rewarded unit and one interstitial unit. Link the published store listing when available. In **Privacy & messaging**, configure and publish the applicable messages. The SDK cannot publish those messages for you.
 4. Copy `tools/release-settings.example.json` to `builds/release-settings.json`; fill the three AdMob IDs. These IDs are public identifiers, not signing secrets. Release builds reject empty IDs and Google's sample publisher ID.
