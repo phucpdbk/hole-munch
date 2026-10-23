@@ -17,16 +17,17 @@ const CowHunt = preload("res://scripts/cow_hunt.gd")
 const SkyHop = preload("res://scripts/sky_hop.gd")
 const SlidePuzzle = preload("res://scripts/slide_puzzle.gd")
 const SkySiege = preload("res://scripts/sky_siege.gd")
-const SECONDS := {"stampede":45.0, "coinrain":45.0, "goldrush":60.0, "findcow":75.0, "skyhop":120.0, "slide":240.0, "siege":90.0}
-# The slide puzzle and the siege count their boards and stages (a star each),
-# so their target is clearing the first one.
-const TARGET := {"stampede":15, "coinrain":24, "goldrush":30, "findcow":1, "skyhop":20, "slide":1, "siege":1}
+const SECONDS := {"stampede":45.0, "coinrain":45.0, "goldrush":60.0, "findcow":75.0, "skyhop":120.0, "slide":30.0, "siege":90.0}
+# The slide puzzle counts boards solved (its first star at 5); the siege counts
+# its stages, so its target is clearing the first one. The puzzle's own board
+# clock replaces SECONDS once a board is up.
+const TARGET := {"stampede":15, "coinrain":24, "goldrush":30, "findcow":1, "skyhop":20, "slide":5, "siege":1}
 # Coins paid per catch (gold pays per value point, the sky hop per gap, the
 # siege per enemy point plus a stage bonus); the slide puzzle pays a base,
 # this per board solved and SLIDE_PAR_COINS per board solved in par.
-const COIN_RATE := {"stampede":6, "coinrain":4, "goldrush":4, "findcow":1, "skyhop":5, "slide":20, "siege":3}
+const COIN_RATE := {"stampede":6, "coinrain":4, "goldrush":4, "findcow":1, "skyhop":5, "slide":6, "siege":3}
 const SLIDE_BASE_COINS := 15
-const SLIDE_PAR_COINS := 10
+const SLIDE_PAR_COINS := 4
 const SIEGE_STAGE_COINS := 15
 const ICON := {"stampede":"target", "coinrain":"coin", "goldrush":"chest", "findcow":"target", "skyhop":"star", "slide":"gem", "siege":"fire"}
 const STAR_SHARES := [0.5, 1.0, 1.5]
@@ -206,7 +207,7 @@ func update(game, dt: float) -> void:
 		count = hop.passed
 	elif kind == "slide":
 		puzzle.update(game, dt)
-		count = puzzle.stars()
+		count = puzzle.cleared
 	elif kind == "siege":
 		siege.update(game, dt, game.hole_position, game.move_direction().length() < 0.1)
 		count = siege.stages_cleared()
@@ -333,7 +334,7 @@ func stars() -> int:
 
 func goal_labels() -> Array:
 	if kind == "findcow": return hunt.goal_labels()
-	if kind == "slide": return [I18n.t("slide_g1"), I18n.t("slide_g2"), I18n.t("slide_g3")]
+	if kind == "slide": return SlidePuzzle.STAR_BOARDS.map(func(need): return I18n.t("slide_goal", need))
 	if kind == "siege": return [I18n.t("siege_g1"), I18n.t("siege_g2"), I18n.t("siege_g3")]
 	return STAR_SHARES.map(func(share): return I18n.t("dg_count_" + kind, ceili(target()*share)))
 
@@ -356,7 +357,7 @@ func dots() -> Array:
 
 # The HUD's note line: the cow hunt's open clues, the puzzle's moves and size.
 func note() -> String:
-	if kind == "slide": return I18n.t("slide_note", [puzzle.board + 1, puzzle.moves, puzzle.par, puzzle.level()])
+	if kind == "slide": return I18n.t("slide_note", [puzzle.board + 1, SlidePuzzle.BOARD_COUNT, puzzle.moves, puzzle.par, puzzle.level()])
 	if kind == "siege" and not siege.won(): return I18n.t("siege_boss_note") if siege.stage_goal() == 0 else I18n.t("siege_note", [siege.stage + 1, siege.stage_points, siege.stage_goal()])
 	return hunt.note() if kind == "findcow" else ""
 

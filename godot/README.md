@@ -252,22 +252,25 @@ its landmark to conquer it, while dodging independent military defenders.
   hole until a building, the edge or something bigger than the hole stops it,
   swallowing every snack that fits on the way. Snacks are size 1 and 2, the
   hole grows a size at each of the board's two growth points, and the landmark
-  needs size 3. Each day brings three boards in a row (`BOARDS`): easy 6×6
-  (par 4–6), medium 7×7 (par 7–10) and hard 7×7 with more walls and snacks
-  (par 11–16). Each board has its own seed; a breadth-first solver keeps a
-  layout whose shortest solution (par) falls in the board's range, or the
-  closest one. A star per board solved; 15 coins, 20 a board and 10 more for
-  each board solved in par. Undo (U) and reset (R) are free buttons beside the
-  board; the 240 s clock covers all three and starts with the first slide. The
-  HUD lays the board out between its chips (`hud.gd puzzle_layout`) and the
-  camera fits the biggest board to that frame. `-- --capture --slide-capture`
-  shoots it.
+  needs size 3. Each day is a ladder of 30 boards, five from each of six
+  tiers (`TIERS`): 5×5 with par 3–5 up to 7×7 with more walls and snacks and
+  par 12–17. Each board has its own seed and is made when it comes up (all 30
+  take about a quarter of a second); a breadth-first solver keeps a layout
+  whose shortest solution (par) falls in the tier's range, or the closest one.
+  Every board has its own clock, 15 s plus 3 s a par slide, started by the
+  first slide; running out costs one of three lives and starts that board
+  over, and the last life ends the run. Stars at 5, 15 and 30 boards; 15
+  coins, 6 a board and 4 more for each board solved in par. Undo (U) and reset
+  (R) are free buttons beside the board. The HUD lays the board out between
+  its chips (`hud.gd puzzle_layout`) and the camera fits the biggest board to
+  that frame. `-- --capture --slide-capture` shoots it.
   **Sky siege** (`sky_siege.gd`): the air force attacks the saucer over today's
   city, 90 s on the clock. The player only steers; the saucer fires at the
   nearest enemy within 8 units. Three stages (`STAGES`): helicopters (10
   points), then jets join (14 points), then flak guns and the command blimp,
   whose fall wins the run. Clearing a stage gives a life back and a 2.5 s
-  breather; each stage is a star. Helicopters circle and shoot, jets strafe
+  breather; each stage is a star. Helicopters circle with their nose on the
+  saucer and shoot (escorts turn to what they shoot), jets strafe
   along a lane that glows red for 1 s first, flak guns drop warned blasts where
   the saucer is, and the blimp fires rings. Holding still beside a helicopter
   for 0.6 s reels it into the beam: it counts as downed and flies as an escort
@@ -275,7 +278,8 @@ its landmark to conquer it, while dodging independent military defenders.
   (blimp) and sometimes drop a spread or rapid-fire power (5 s). Three hits end
   the run; 3 coins a point plus 15 a stage. The aircraft are Meshy models
   (`assets/aircraft`, baked by `tools/bake_aircraft.gd`, nose turned to +z),
-  with block models as the fallback. `-- --capture --siege-capture` shoots
+  with block models as the fallback. The bake cuts the helicopter's main rotor
+  (its top band) into `heli_rotor.res` around the hub so the game spins it. `-- --capture --siege-capture` shoots
   mid-round, the late stage, the beam and a strafing jet.
 - **Extra daily tries**: with no tries left, the daily button (and PLAY on a
   daily result) offers a rewarded ad for one more try, up to

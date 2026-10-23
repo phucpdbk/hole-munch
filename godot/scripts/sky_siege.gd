@@ -38,6 +38,8 @@ const DROP_SHARE := 0.18
 const MAX_FOES := 8
 # Helicopters circle this far out, inside the screen.
 const HELI_ORBIT := 5.5
+# Main rotor turn rate, radians per second.
+const ROTOR_SPIN := 18.0
 const SPAWN_DISTANCE := 15.0
 # goal: enemy points to clear the stage (0: down the blimp); gap: seconds
 # between spawns.
@@ -172,10 +174,11 @@ func part(root: Node3D, size: Vector3, at: Vector3, color: Color) -> MeshInstanc
 	return node
 
 # The baked Meshy model of a kind, textured like the saucers, or null.
+# The rotor ("heli_rotor") shares the helicopter's texture.
 func baked_mesh(game, kind: String) -> ArrayMesh:
 	if baked.has(kind): return baked[kind]
 	var path := MODEL_DIR + kind + ".res"
-	var texture := MODEL_DIR + kind + "_albedo.res"
+	var texture := MODEL_DIR + kind.trim_suffix("_rotor") + "_albedo.res"
 	var mesh: ArrayMesh = null
 	if ResourceLoader.exists(path) and ResourceLoader.exists(texture):
 		mesh = load(path).duplicate()
@@ -196,6 +199,14 @@ func foe_model(game, kind: String) -> Node3D:
 		body.mesh = mesh
 		root.add_child(body)
 		root.set_meta("scale", 1.0)
+		# The baked helicopter's main rotor spins on its hub (tools/bake_aircraft.gd).
+		var blades := baked_mesh(game, kind + "_rotor") if kind == "heli" else null
+		if blades:
+			var rotor := MeshInstance3D.new()
+			rotor.name = "Rotor"
+			rotor.mesh = blades
+			rotor.position = blades.get_meta("hub", Vector3.ZERO)
+			root.add_child(rotor)
 		return root
 	root.set_meta("scale", MODEL_SCALE)
 	match kind:
@@ -320,7 +331,9 @@ func move_foe(game, foe: Dictionary, dt: float, player: Vector3) -> void:
 	foe.timer -= dt
 	match foe.kind:
 		"heli":
-			# A helicopter in the beam stops circling; the beam reels it in.
+			# Nose on the saucer while it circles; one in the beam stops
+			# circling and is reeled in.
+			foe.face = player - foe.pos
 			if foe != capture_target:
 				foe.angle += dt*0.5
 				var orbit: Vector3 = player + Vector3(cos(foe.angle), 0, sin(foe.angle))*HELI_ORBIT
@@ -360,10 +373,12 @@ func place_foe(foe: Dictionary) -> void:
 	match foe.kind:
 		"jet": node.rotation.y = atan2(foe.dir.x, foe.dir.z)
 		"heli":
-			# Nose along the orbit (+z for the Meshy model, -z for the blocks).
-			node.rotation.y = -foe.angle + (0.0 if node.get_meta("scale", MODEL_SCALE) == 1.0 else PI)
+			# Nose toward foe.face (+z on the Meshy model, -z on the blocks).
+			var face: Vector3 = foe.get("face", Vector3.FORWARD)
+			if Vector2(face.x, face.z).length() > 0.01:
+				node.rotation.y = atan2(face.x, face.z) + (0.0 if node.get_meta("scale", MODEL_SCALE) == 1.0 else PI)
 			var rotor := node.get_node_or_null("Rotor")
-			if rotor: rotor.rotation.y = clock*18.0
+			if rotor: rotor.rotation.y = clock*ROTOR_SPIN
 		"blimp": node.rotation.y = clock*0.2
 	node.scale = Vector3.ONE*float(node.get_meta("scale", MODEL_SCALE))*(1.15 if foe.flash > 0.0 else 1.0)
 
@@ -523,7 +538,7 @@ func update_capture(game, dt: float, player: Vector3, still: bool) -> void:
 	down(game, heli)
 	game.sfx.play("grow")
 	game.fx.ripple(player, 2.0, POWERS.spread)
-	escort = {"kind":"heli", "pos":heli.pos, "node":heli.node, "time":ESCORT_TIME, "timer":0.0, "angle":0.0, "flash":0.0}
+	escort = {"kind":"heli", "pos":heli.pos, "node":heli.node, "time":ESCORT_TIME, "timer":0.0, "angle":0.0, "flash":0.0, "face":heli.pos - player}
 	for node in heli.node.get_children():
 		if node is MeshInstance3D and node.name != "Rotor": node.material_override = flat(Color("62ead3"))
 
@@ -537,6 +552,8 @@ func update_escort(game, dt: float, player: Vector3) -> void:
 		var target := nearest(escort.pos, RANGE)
 		if not target.is_empty():
 			escort.timer = ESCORT_FIRE
+			# The escort turns its nose on what it shoots.
+			escort.face = target.pos - escort.pos
 			add_shot(shots, escort.pos, (target.pos - escort.pos).normalized()*SHOT_SPEED, SHOT_LIFE, materials.shot)
 	place_foe(escort)
 	if escort.time <= 0.0:

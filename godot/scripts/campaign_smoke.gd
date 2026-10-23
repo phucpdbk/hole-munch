@@ -722,25 +722,31 @@ func check_sky_hop(g) -> void:
 	g.update_view(0.02)
 	check(not hop.visible and g.camera.current, "home hands the view back to the city camera")
 
-# Slide puzzle (slide_puzzle.gd): today's three boards are seeded, get harder
-# and are solvable in par; the clock waits for the first slide, undo and reset
-# are free, and playing each board's solver path wins all three stars.
+# Slide puzzle (slide_puzzle.gd): today's 30-board ladder is seeded, gets
+# harder and every board is solvable in its tier's par range; each board has
+# its own clock that costs a life when it runs out; undo and reset are free;
+# the solver's path climbs the whole ladder for three stars.
 func check_slide_puzzle(g) -> void:
 	g.campaign.daily = {}
 	g.daily_override = "slide"
 	g.start_daily()
 	var puzzle = g.daily.puzzle
-	var pars: Array = puzzle.boards.map(func(entry): return int(entry.get("par", 0)))
-	var ranged := true
-	for i in pars.size():
-		var bounds: Array = puzzle.BOARDS[i].par
-		ranged = ranged and pars[i] >= int(bounds[0]) and pars[i] <= int(bounds[1])
-	check(g.slide_puzzle() and pars.size() == 3 and ranged and pars[0] < pars[1] and pars[1] < pars[2], "today's three boards get harder, each par in its range %s" % [pars])
 	var path: Array = puzzle.solution()
-	check(puzzle.board == 0 and puzzle.par == path.size(), "the day opens on the easy board, solvable in par")
+	check(g.slide_puzzle() and puzzle.board == 0 and puzzle.boards.size() == 1 and puzzle.par == path.size(), "the ladder opens on its first board, made on its own")
+	check(is_equal_approx(g.remaining, puzzle.board_seconds()) and puzzle.lives == puzzle.LIVES, "the board's own clock is set and every life is there")
 	var twin = load("res://scripts/slide_puzzle.gd").new()
 	twin.generate(g.daily.seed_value)
-	check(twin.walls == puzzle.walls and twin.start == puzzle.start and twin.par == puzzle.par and twin.boards.size() == 3, "the same day builds the same boards")
+	var started := Time.get_ticks_msec()
+	twin.layout_of(puzzle.BOARD_COUNT - 1)
+	var made_in := Time.get_ticks_msec() - started
+	var pars: Array = twin.boards.map(func(entry): return int(entry.get("par", 0)))
+	var misses: Array = []
+	for i in pars.size():
+		var bounds: Array = puzzle.tier_of(i).par
+		if pars[i] < int(bounds[0]) or pars[i] > int(bounds[1]): misses.append([i + 1, pars[i]])
+	print("SLIDE pars %s (made in %d ms)" % [pars, made_in])
+	check(pars.size() == puzzle.BOARD_COUNT and misses.is_empty() and pars[0] < pars[-1], "all 30 boards land in their tier's par range %s" % [misses])
+	check(twin.boards[0].walls == puzzle.walls and twin.boards[0].start == puzzle.start and int(twin.boards[0].par) == puzzle.par, "the same day builds the same boards")
 	twin.free()
 	var before: float = g.remaining
 	for frame in 30: g.step(0.02, Vector2.ZERO)
@@ -755,14 +761,28 @@ func check_slide_puzzle(g) -> void:
 			blocked = not g.daily.puzzle.move(g, dir) and puzzle.moves == 0
 			break
 	check(blocked or puzzle.DIRS.all(func(dir): return puzzle.slide(puzzle.start, 0, dir)[0] != puzzle.start), "a slide that cannot move is not a move")
-	for i in puzzle.BOARDS.size():
-		check(puzzle.board == i and not puzzle.solved, "board %d comes up after the one before" % (i + 1))
+	g.slide(path[0])
+	g.remaining = 0.01
+	g.step(0.02, Vector2.ZERO)
+	check(g.mode == "playing" and puzzle.lives == puzzle.LIVES - 1 and puzzle.moves == 0 and is_equal_approx(g.remaining, puzzle.board_seconds()), "running out of time costs a life and restarts the board")
+	var climbed := true
+	for i in puzzle.BOARD_COUNT:
+		climbed = climbed and puzzle.board == i and not puzzle.solved
 		for dir in puzzle.solution(): g.slide(dir)
-		check(puzzle.solved and puzzle.moves == puzzle.par and puzzle.cleared == i + 1, "the solver's path clears board %d in par" % (i + 1))
+		climbed = climbed and puzzle.solved and puzzle.moves == puzzle.par and puzzle.cleared == i + 1
 		for frame in 200:
 			if g.mode != "playing" or puzzle.board != i: break
 			g.step(0.02, Vector2.ZERO)
-	check(g.mode == "result" and g.hud.won and g.hud.stars == 3 and puzzle.in_par == 3 and g.reward > 0, "three boards solved in par win three stars")
+	check(climbed and puzzle.cleared == puzzle.BOARD_COUNT, "the solver's path clears every board in par, one after another")
+	check(g.mode == "result" and g.hud.won and g.hud.stars == 3 and puzzle.in_par == puzzle.BOARD_COUNT and g.reward > 0, "the whole ladder wins three stars")
+	g.go_menu()
+	g.campaign.daily = {}
+	g.start_daily()
+	for i in puzzle.LIVES:
+		g.slide(puzzle.solution()[0])
+		g.remaining = 0.01
+		g.step(0.02, Vector2.ZERO)
+	check(g.mode == "result" and not g.hud.won and puzzle.lives == 0, "the last life lost ends the run")
 	g.go_menu()
 	g.update_view(0.02)
 	check(not puzzle.visible and g.camera.current, "home hands the view back from the puzzle board")

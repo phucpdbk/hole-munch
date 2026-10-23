@@ -1,22 +1,35 @@
 extends Node3D
+const I18n = preload("res://scripts/i18n.gd")
 
 # Daily mini-game "slide" (daily_games.gd): a turn-based puzzle on a small city
 # block high above the city. A swipe sends the hole sliding in a straight line
 # until a building, the edge or something too big stops it, swallowing every
 # snack small enough on the way. The hole grows a size at each of the board's
 # "grow" points eaten; the landmark only fits a size-3 hole, so the order of
-# the slides matters. A day brings three boards in a row, easy to hard (BOARDS),
-# all from the date's seed; a breadth-first solver keeps only boards with a
-# known shortest solution (par) in the board's range. Each board solved is a
-# star, and one solved in par pays extra. The board has its own camera.
+# the slides matters. A day is a ladder of BOARD_COUNT boards, BOARDS_PER_TIER
+# from each of the TIERS in turn, each from the date's seed and made when it
+# comes up; a breadth-first solver keeps only layouts with a known shortest
+# solution (par) in the tier's range. Every board has its own clock
+# (BASE_SECONDS plus SECONDS_PER_PAR a par slide); running out costs one of
+# LIVES and starts the board over. The run ends with the last life or the last
+# board. Stars at STAR_BOARDS boards solved. The board has its own camera.
 const ALTITUDE := 800.0
 const CELL := 2.0
 # Snacks are [size, count]; the landmark comes on top and needs a size-3 hole.
-const BOARDS := [
-	{"size":6, "walls":6, "snacks":[[1, 4], [2, 2]], "grow":[3, 7], "par":[4, 6]},
-	{"size":7, "walls":9, "snacks":[[1, 5], [2, 3]], "grow":[3, 8], "par":[7, 10]},
-	{"size":7, "walls":11, "snacks":[[1, 5], [2, 4]], "grow":[3, 9], "par":[11, 16]},
+const TIERS := [
+	{"size":5, "walls":3, "snacks":[[1, 3], [2, 1]], "grow":[2, 5], "par":[3, 5]},
+	{"size":6, "walls":5, "snacks":[[1, 4], [2, 2]], "grow":[3, 7], "par":[4, 7]},
+	{"size":6, "walls":7, "snacks":[[1, 4], [2, 3]], "grow":[3, 8], "par":[6, 9]},
+	{"size":7, "walls":9, "snacks":[[1, 5], [2, 3]], "grow":[3, 8], "par":[8, 11]},
+	{"size":7, "walls":11, "snacks":[[1, 5], [2, 4]], "grow":[3, 9], "par":[10, 14]},
+	{"size":7, "walls":12, "snacks":[[1, 6], [2, 4]], "grow":[4, 10], "par":[12, 17]},
 ]
+const BOARD_COUNT := 30
+const BOARDS_PER_TIER := 5
+const LIVES := 3
+const BASE_SECONDS := 15.0
+const SECONDS_PER_PAR := 3.0
+const STAR_BOARDS := [5, 15, 30]
 const LANDMARK := 3
 # The camera frames the biggest board, so it never jumps between boards.
 const VIEW_SIZE := 7
@@ -39,6 +52,8 @@ var boards: Array[Dictionary] = []
 var board := 0
 var cleared := 0
 var in_par := 0
+var lives := LIVES
+var seed_value := 0
 var size := 7
 var grow_at: Array = []
 var walls := {}
@@ -107,7 +122,7 @@ func solution() -> Array:
 	var parent := {key(start, 0):[-1, Vector2i.ZERO]}
 	var frontier: Array = [[start, 0]]
 	var depth := 0
-	while not frontier.is_empty() and depth < int(BOARDS[board].par[1]) + 4:
+	while not frontier.is_empty() and depth < int(tier_of(board).par[1]) + 4:
 		depth += 1
 		var next_frontier: Array = []
 		for state in frontier:
@@ -133,19 +148,28 @@ func path_to(parent: Dictionary, k: int) -> Array:
 func key(at: Vector2i, eaten: int) -> int:
 	return eaten*64 + at.y*size + at.x
 
-# The day's three boards, each from its own seed.
+static func tier_of(index: int) -> Dictionary:
+	return TIERS[mini(index/BOARDS_PER_TIER, TIERS.size() - 1)]
+
+# The day's ladder starts with only its first board made.
 func generate(value: int) -> void:
+	seed_value = value
 	boards.clear()
-	for index in BOARDS.size():
-		rng.seed = value + index*BOARD_SEED_STEP
-		boards.append(generate_board(index))
 	load_board(0)
 
-# Seeded layouts until one's par is in the board's range; otherwise the
+# Board `index`, made from its own seed the first time it is asked for.
+func layout_of(index: int) -> Dictionary:
+	while boards.size() <= index:
+		var next := boards.size()
+		rng.seed = seed_value + next*BOARD_SEED_STEP
+		boards.append(generate_board(next))
+	return boards[index]
+
+# Seeded layouts until one's par is in the tier's range; otherwise the
 # solvable one whose par came closest.
 func generate_board(index: int) -> Dictionary:
 	board = index
-	var spec: Dictionary = BOARDS[index]
+	var spec: Dictionary = tier_of(index)
 	size = int(spec.size)
 	grow_at = spec.grow
 	var best := {}
@@ -162,11 +186,11 @@ func generate_board(index: int) -> Dictionary:
 	return best
 
 func load_board(index: int) -> void:
+	var chosen: Dictionary = layout_of(index)
 	board = index
-	var spec: Dictionary = BOARDS[index]
+	var spec: Dictionary = tier_of(index)
 	size = int(spec.size)
 	grow_at = spec.grow
-	var chosen: Dictionary = boards[index]
 	walls = chosen.get("walls", {})
 	items.assign(chosen.get("items", []))
 	start = chosen.get("start", Vector2i.ZERO)
@@ -174,10 +198,11 @@ func load_board(index: int) -> void:
 	item_at.clear()
 	for i in items.size(): item_at[items[i].cell] = i
 
+# Fresh containers: the loaded board may share the stored layout's ones.
 func lay_out(spec: Dictionary) -> void:
-	walls.clear()
-	items.clear()
-	item_at.clear()
+	walls = {}
+	items = []
+	item_at = {}
 	var free: Array[Vector2i] = []
 	for y in size:
 		for x in size: free.append(Vector2i(x, y))
@@ -201,15 +226,18 @@ func build(game, value: int) -> void:
 	reset(game)
 	visible = false
 
-# Back to the first board of the day.
+# Back to the first board of the day, all lives back.
 func reset(game) -> void:
 	cleared = 0
 	in_par = 0
+	lives = LIVES
 	start_board(game, 0)
 
+# Loads a board and sets the round clock to its own time.
 func start_board(game, index: int) -> void:
 	load_board(index)
 	dress(game)
+	game.remaining = board_seconds()
 	cell = start
 	mask = 0
 	moves = 0
@@ -269,12 +297,26 @@ func restart() -> void:
 func level() -> int:
 	return level_of(value_of(mask))
 
-# One star per board solved.
+func board_seconds() -> float:
+	return BASE_SECONDS + par*SECONDS_PER_PAR
+
+# The board's clock ran out: a life gone and the same board from the start.
+func time_out(game) -> void:
+	lives -= 1
+	game.add_floater(game.hole_position, I18n.t("slide_time_out"), true)
+	game.sfx.play("tick")
+	if lives <= 0: return
+	restart()
+	game.remaining = board_seconds()
+
 func stars() -> int:
-	return cleared
+	var total := 0
+	for need in STAR_BOARDS:
+		if cleared >= need: total += 1
+	return total
 
 func last_board() -> bool:
-	return board >= BOARDS.size() - 1
+	return board >= BOARD_COUNT - 1
 
 # A solved board rests a moment, then the next one comes up.
 func update(game, dt: float) -> void:
@@ -285,7 +327,7 @@ func update(game, dt: float) -> void:
 	place()
 
 func done() -> bool:
-	return solved and last_board() and finish_clock >= FINISH_TIME
+	return lives <= 0 or (solved and last_board() and finish_clock >= FINISH_TIME)
 
 # --- view --------------------------------------------------------------------------
 

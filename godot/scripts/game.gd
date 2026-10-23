@@ -1378,11 +1378,14 @@ func screen_move(input: Vector2) -> Vector3:
 func slide_puzzle() -> bool:
 	return run_kind == "daily" and daily_kind == "slide"
 
+# Each board has its own clock (slide_puzzle.gd start_board); running out costs
+# a life and restarts the board instead of ending the round.
 func slide_step(dt: float) -> void:
 	daily.update(self, dt)
 	started = daily.puzzle.moves > 0 or started
 	if started and not daily.puzzle.solved: remaining = maxf(0, remaining-dt)
-	if playing and (remaining <= 0 or daily.done()): finish(daily.reached())
+	if playing and remaining <= 0 and not daily.puzzle.solved: daily.puzzle.time_out(self)
+	if playing and daily.done(): finish(daily.reached())
 
 # Swipes, arrow keys or WASD slide the hole; the HUD's two buttons (or U and R)
 # undo the last slide and start the board over.
@@ -2083,6 +2086,9 @@ func update_hud() -> void:
 	if siege():
 		hud.guardian_max = DailyGames.SkySiege.LIVES
 		hud.guardian_hp = daily.siege.lives
+	elif slide_puzzle():
+		hud.guardian_max = DailyGames.SlidePuzzle.LIVES
+		hud.guardian_hp = daily.puzzle.lives
 	hud.puzzle_buttons = slide_puzzle() and mode == "playing"
 	hud.revive_left = revive_left
 	hud.revive_seconds = int(Ads.REVIVE_SECONDS)
@@ -2134,8 +2140,8 @@ func update_hud() -> void:
 	hud.daily_icon = DailyGames.ICON.get(daily_kind if run_kind == "daily" else next_daily, "daily")
 	hud.start_hint = I18n.t("hop_hint") if sky_hop() else I18n.t("slide_hint") if slide_puzzle() else I18n.t("siege_hint") if siege() else ""
 	hud.daily_count = daily.count
-	# The puzzle's boards and the siege's stages read as stars out of three.
-	hud.daily_target = 3 if slide_puzzle() or siege() else daily.target()
+	# The puzzle counts boards of its ladder; the siege's stages read as stars.
+	hud.daily_target = DailyGames.SlidePuzzle.BOARD_COUNT if slide_puzzle() else 3 if siege() else daily.target()
 	hud.items = campaign.items
 	hud.goal_mask = goal_mask if mode == "result" else campaign.goals[campaign.selected] if run_kind == "campaign" else 0
 	hud.rival_growth = clampf(rival.radius*EAT_RATIO/boss_radius, 0, 1) if rival.active else -1.0
