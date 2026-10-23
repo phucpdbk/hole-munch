@@ -50,6 +50,9 @@ func run(game, campaign_mode: bool) -> void:
 	# first tap, then mid-flight past a few gaps (test-output/hop-menu.png,
 	# hop-start.png, hop-play.png).
 	if "--hop-capture" in OS.get_cmdline_user_args():
+		# A big saucer equipped: the hop must still fly the default one.
+		g.campaign.craft = 5
+		g.apply_style()
 		g.campaign.daily = {}
 		g.campaign.test_mode = true
 		g.campaign.unlock_all_for_testing = true

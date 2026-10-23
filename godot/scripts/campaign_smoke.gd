@@ -666,8 +666,15 @@ func check_cow_hunt(g) -> void:
 func check_sky_hop(g) -> void:
 	g.campaign.daily = {}
 	g.daily_override = "skyhop"
+	# A bigger equipped craft still flies the hop as the default saucer.
+	var craft: int = g.campaign.craft
+	g.campaign.craft = 5
+	g.apply_style()
 	g.start_daily()
 	var hop = g.daily.hop
+	check(hop.craft.mesh == g.craft_meshes[0] and g.saucer.mesh != hop.craft.mesh, "the sky hop always flies the default saucer")
+	g.campaign.craft = craft
+	g.apply_style()
 	var before: float = g.remaining
 	for frame in 50: g.step(0.02, Vector2.ZERO)
 	check(not hop.running and g.remaining == before, "the sky hop waits for the first tap")

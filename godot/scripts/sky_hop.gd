@@ -1,8 +1,9 @@
 extends Node3D
 
 # Daily mini-game "skyhop" (daily_games.gd): a side view high above the city.
-# The player's own craft flies right on its own; gravity pulls it down and every
-# tap gives it a hop. Gaps open between towers rising from the street and storm
+# The default saucer flies right on its own, whatever craft is equipped (the
+# others are bigger than the gaps and RADIUS are tuned for). Gravity pulls it
+# down and every tap gives it a hop. Gaps open between towers rising from the street and storm
 # clouds hanging from the sky, and each gap flown through scores. The gaps narrow
 # over the first NARROW_BY, and from SWAY_FROM on some drift up and down.
 # Touching a tower, a cloud or the street ends the run. The course is the same
@@ -71,7 +72,8 @@ static func is_tap(event: InputEvent) -> bool:
 func build(game, value: int) -> void:
 	seed_value = value
 	if not is_instance_valid(camera): make_nodes()
-	craft.mesh = game.saucer.mesh
+	if not game.craft_meshes.has(0): game.craft_meshes[0] = preload("res://scripts/fleet.gd").new().build(game.models, 0)
+	craft.mesh = game.craft_meshes[0]
 	var palette: Array = game.palette
 	ground.material_override = flat(Color(palette[3]).darkened(0.15))
 	for i in gates.size():
