@@ -540,12 +540,13 @@ func restore_settings(value: Dictionary) -> void:
 func restore_records(value: Dictionary) -> void:
 	var saved_daily = value.get("daily", {})
 	if saved_daily is Dictionary and saved_daily.get("date") is String and saved_daily.date.length() <= 10:
-		var record := {"date":saved_daily.date, "type":daily_type(saved_daily.date), "attempts":0, "best":0,
+		var record := {"date":saved_daily.date, "type":daily_type(saved_daily.date), "attempts":0, "bonus":0, "best":0,
 			"won":saved_daily.get("won", false) == true}
-		for field in ["best", "attempts"]:
+		for field in ["best", "attempts", "bonus"]:
 			var number = saved_daily.get(field, 0)
 			if number is float or number is int: record[field] = maxi(0, int(number))
-		record.attempts = mini(record.attempts, DAILY_ATTEMPTS)
+		record.bonus = mini(record.bonus, DAILY_AD_TRIES)
+		record.attempts = mini(record.attempts, DAILY_ATTEMPTS + record.bonus)
 		daily = record
 	var saved_items = value.get("items", {})
 	if saved_items is Dictionary:
@@ -580,6 +581,8 @@ func complete_goals(mask: int, score: int) -> void:
 const DAILY_COIN_BONUS := 1.5
 const DAILY_TYPES := ["stampede", "coinrain", "goldrush", "findcow", "skyhop", "slide", "siege"]
 const DAILY_ATTEMPTS := 3
+# Rewarded ads can add this many more tries a day ("bonus" in the record).
+const DAILY_AD_TRIES := 2
 const MAX_ITEMS := 9
 const POWER_KINDS := ["magnet", "speed", "time"]
 
@@ -604,13 +607,25 @@ static func daily_power(date: String) -> String:
 
 func daily_record(date: String) -> Dictionary:
 	# The type follows daily_type, so a pinned test type also shows on a day already started.
-	if daily.get("date", "") == date: return daily.merged({"type":daily_type(date)}, true)
-	return {"date":date, "type":daily_type(date), "attempts":0, "best":0, "won":false}
+	if daily.get("date", "") == date: return daily.merged({"type":daily_type(date), "bonus":int(daily.get("bonus", 0))}, true)
+	return {"date":date, "type":daily_type(date), "attempts":0, "bonus":0, "best":0, "won":false}
 
 func daily_attempts_left(date: String) -> int:
 	# The in-game TEST MODE replays the daily without limit.
 	if test_mode: return DAILY_ATTEMPTS
-	return maxi(0, DAILY_ATTEMPTS - int(daily_record(date).attempts))
+	var record := daily_record(date)
+	return maxi(0, DAILY_ATTEMPTS + int(record.bonus) - int(record.attempts))
+
+# Another try for watching a rewarded ad, up to DAILY_AD_TRIES a day.
+func can_add_daily_try(date: String) -> bool:
+	return not test_mode and int(daily_record(date).bonus) < DAILY_AD_TRIES
+
+func add_daily_try(date: String) -> bool:
+	if not can_add_daily_try(date): return false
+	var record := daily_record(date).duplicate()
+	record.bonus = int(record.bonus) + 1
+	daily = record
+	return true
 
 # Spends one of today's tries; false when none are left.
 func use_daily_attempt(date: String) -> bool:
@@ -624,7 +639,7 @@ func use_daily_attempt(date: String) -> bool:
 func record_daily(date: String, score: int, won: bool) -> bool:
 	var record := daily_record(date)
 	var first_win: bool = won and not record.won
-	daily = {"date":date, "type":record.type, "attempts":record.attempts, "best":maxi(int(record.best), score), "won":record.won or won}
+	daily = {"date":date, "type":record.type, "attempts":record.attempts, "bonus":int(record.bonus), "best":maxi(int(record.best), score), "won":record.won or won}
 	if first_win:
 		var power := daily_power(date)
 		items[power] = mini(MAX_ITEMS, int(items[power]) + 1)

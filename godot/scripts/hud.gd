@@ -65,6 +65,8 @@ var retry_button: BaseButton
 var rival_growth := -1.0
 var daily_won := false
 var daily_left := 3
+# No tries left, but a rewarded ad can add one.
+var daily_ad := false
 # Days in a row with a finished daily round (0 once the streak has lapsed).
 var streak := 0
 var daily_title := ""
@@ -266,7 +268,7 @@ func sync() -> void:
 	retry_button.visible = retry_wanted()
 	retry_button.text = I18n.t("retry_stars")
 	# A daily result with no tries left only goes home.
-	play_button.visible = mode not in ["playing", "revive"] and not (mode == "result" and run_kind == "daily" and daily_left <= 0)
+	play_button.visible = mode not in ["playing", "revive"] and not (mode == "result" and run_kind == "daily" and daily_left <= 0 and not daily_ad)
 	revive_button.visible = mode == "revive"
 	give_up_button.visible = mode == "revive"
 	double_button.visible = can_double
@@ -282,7 +284,7 @@ func sync() -> void:
 	double_button.text = I18n.t("ad_double", reward)
 	var next_level: bool = mode == "result" and won and has_next
 	play_button.text = I18n.t("resume") if mode == "paused" else I18n.t("next_city") if next_level else I18n.t("replay") if mode == "result" else I18n.t("play")
-	if mode == "result" and run_kind == "daily": play_button.text = I18n.t("replay_left", daily_left)
+	if mode == "result" and run_kind == "daily": play_button.text = I18n.t("ad_daily_try") if daily_left <= 0 else I18n.t("replay_left", daily_left)
 	play_button.icon = UiStyle.icon("next" if next_level else "replay" if mode == "result" else "play")
 	if mode == "result" and (bonus_ready or run_kind == "runner"):
 		play_button.text = I18n.t("bonus_run") if bonus_ready else I18n.t("next_city")
@@ -292,8 +294,8 @@ func sync() -> void:
 	shop_button.text = I18n.t("upgrades")
 	styles_button.text = I18n.t("wardrobe")
 	album_button.text = I18n.t("album")
-	daily_button.text = I18n.t("daily") + (" ★" if daily_won else "") + " %d/3" % daily_left
-	daily_button.disabled = daily_left <= 0
+	daily_button.text = I18n.t("ad_daily_try") if daily_ad else I18n.t("daily") + (" ★" if daily_won else "") + " %d/3" % daily_left
+	daily_button.disabled = daily_left <= 0 and not daily_ad
 	endless_button.text = I18n.t("endless") + (" · %d" % endless_best if endless_best > 0 else "")
 	for button in [daily_button, endless_button, levels_button, styles_button, album_button, shop_button, help_button, language_button]:
 		button.visible = mode == "menu"

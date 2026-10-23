@@ -1915,7 +1915,21 @@ func start_daily() -> void:
 		clear_drag()
 		daily_picker.open()
 		return
+	# Out of tries: a rewarded ad buys one more, then the game starts.
+	if campaign.daily_attempts_left(Campaign.today()) <= 0 and can_ad_try():
+		watch_for_try()
+		return
 	launch_daily()
+
+func can_ad_try() -> bool:
+	return campaign.can_add_daily_try(Campaign.today()) and ads.rewarded_ready()
+
+func watch_for_try() -> void:
+	clear_drag()
+	ads.show_rewarded(func(granted: bool):
+		if not granted or not campaign.add_daily_try(Campaign.today()): return
+		persist()
+		launch_daily())
 
 # Test mode: play one mini-game from the list ("" is today's).
 func play_daily(type: String) -> void:
@@ -2112,6 +2126,7 @@ func update_hud() -> void:
 	hud.goal_labels = daily.goal_labels() if run_kind == "daily" else goal_list.map(func(goal): return Challenges.label(goal))
 	var today := campaign.daily_record(Campaign.today())
 	hud.daily_left = campaign.daily_attempts_left(today.date)
+	hud.daily_ad = hud.daily_left <= 0 and can_ad_try()
 	# A test-mode pick (pick_daily) shows on the menu in place of today's game.
 	var next_daily: String = daily_override if daily_override != "" else str(today.type)
 	hud.daily_title = DailyGames.title(daily_kind if run_kind == "daily" else next_daily)
@@ -2119,8 +2134,8 @@ func update_hud() -> void:
 	hud.daily_icon = DailyGames.ICON.get(daily_kind if run_kind == "daily" else next_daily, "daily")
 	hud.start_hint = I18n.t("hop_hint") if sky_hop() else I18n.t("slide_hint") if slide_puzzle() else I18n.t("siege_hint") if siege() else ""
 	hud.daily_count = daily.count
-	# The puzzle reads as stars out of three.
-	hud.daily_target = 3 if slide_puzzle() else daily.target()
+	# The puzzle's boards and the siege's stages read as stars out of three.
+	hud.daily_target = 3 if slide_puzzle() or siege() else daily.target()
 	hud.items = campaign.items
 	hud.goal_mask = goal_mask if mode == "result" else campaign.goals[campaign.selected] if run_kind == "campaign" else 0
 	hud.rival_growth = clampf(rival.radius*EAT_RATIO/boss_radius, 0, 1) if rival.active else -1.0

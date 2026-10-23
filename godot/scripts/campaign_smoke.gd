@@ -615,10 +615,14 @@ func check_daily_games(g) -> void:
 	g.remaining = 0.01
 	g.step(0.02, Vector2.ZERO)
 	check(g.mode == "result" and g.campaign.items[power] == 1, "a second win the same day pays no second power")
+	# With no rewarded ad on offer (check_ad_try covers the ad), the day is over.
+	var simulate: bool = g.ads.simulate
+	g.ads.simulate = false
 	g.on_play()
 	check(g.run_kind == "campaign" and g.mode == "menu", "with no tries left the daily goes home")
 	g.start_daily()
 	check(g.run_kind == "campaign" and g.mode == "menu", "the daily is locked after three tries")
+	g.ads.simulate = simulate
 	g.campaign.daily = {}
 	g.start_daily()
 	check(g.items.filter(func(item): return item.kind == "coin").size() == g.DailyGames.COINS, "coin rain keeps a pool of coins in the sky")
@@ -637,6 +641,7 @@ func check_daily_games(g) -> void:
 	check_sky_hop(g)
 	check_slide_puzzle(g)
 	check_siege(g)
+	check_ad_try(g)
 	g.daily_override = ""
 	var saved = Campaign.new()
 	saved.daily = {"date":date, "type":"coinrain", "attempts":9, "best":-4, "won":true}
@@ -717,19 +722,25 @@ func check_sky_hop(g) -> void:
 	g.update_view(0.02)
 	check(not hop.visible and g.camera.current, "home hands the view back to the city camera")
 
-# Slide puzzle (slide_puzzle.gd): today's board is seeded and solvable in par,
-# the clock waits for the first slide, undo and reset are free, and playing the
-# solver's path wins all three stars.
+# Slide puzzle (slide_puzzle.gd): today's three boards are seeded, get harder
+# and are solvable in par; the clock waits for the first slide, undo and reset
+# are free, and playing each board's solver path wins all three stars.
 func check_slide_puzzle(g) -> void:
 	g.campaign.daily = {}
 	g.daily_override = "slide"
 	g.start_daily()
 	var puzzle = g.daily.puzzle
+	var pars: Array = puzzle.boards.map(func(entry): return int(entry.get("par", 0)))
+	var ranged := true
+	for i in pars.size():
+		var bounds: Array = puzzle.BOARDS[i].par
+		ranged = ranged and pars[i] >= int(bounds[0]) and pars[i] <= int(bounds[1])
+	check(g.slide_puzzle() and pars.size() == 3 and ranged and pars[0] < pars[1] and pars[1] < pars[2], "today's three boards get harder, each par in its range %s" % [pars])
 	var path: Array = puzzle.solution()
-	check(g.slide_puzzle() and puzzle.par == path.size() and puzzle.par >= puzzle.PAR_MIN and puzzle.par <= puzzle.PAR_MAX, "today's slide board has a par in range (%d)" % puzzle.par)
+	check(puzzle.board == 0 and puzzle.par == path.size(), "the day opens on the easy board, solvable in par")
 	var twin = load("res://scripts/slide_puzzle.gd").new()
 	twin.generate(g.daily.seed_value)
-	check(twin.walls == puzzle.walls and twin.start == puzzle.start and twin.par == puzzle.par, "the same day builds the same board")
+	check(twin.walls == puzzle.walls and twin.start == puzzle.start and twin.par == puzzle.par and twin.boards.size() == 3, "the same day builds the same boards")
 	twin.free()
 	var before: float = g.remaining
 	for frame in 30: g.step(0.02, Vector2.ZERO)
@@ -744,11 +755,14 @@ func check_slide_puzzle(g) -> void:
 			blocked = not g.daily.puzzle.move(g, dir) and puzzle.moves == 0
 			break
 	check(blocked or puzzle.DIRS.all(func(dir): return puzzle.slide(puzzle.start, 0, dir)[0] != puzzle.start), "a slide that cannot move is not a move")
-	for dir in path: g.slide(dir)
-	for frame in 200:
-		if g.mode != "playing": break
-		g.step(0.02, Vector2.ZERO)
-	check(puzzle.solved and puzzle.moves == puzzle.par and g.mode == "result" and g.hud.won and g.hud.stars == 3 and g.reward > 0, "the solver's path swallows the landmark in par for three stars")
+	for i in puzzle.BOARDS.size():
+		check(puzzle.board == i and not puzzle.solved, "board %d comes up after the one before" % (i + 1))
+		for dir in puzzle.solution(): g.slide(dir)
+		check(puzzle.solved and puzzle.moves == puzzle.par and puzzle.cleared == i + 1, "the solver's path clears board %d in par" % (i + 1))
+		for frame in 200:
+			if g.mode != "playing" or puzzle.board != i: break
+			g.step(0.02, Vector2.ZERO)
+	check(g.mode == "result" and g.hud.won and g.hud.stars == 3 and puzzle.in_par == 3 and g.reward > 0, "three boards solved in par win three stars")
 	g.go_menu()
 	g.update_view(0.02)
 	check(not puzzle.visible and g.camera.current, "home hands the view back from the puzzle board")
@@ -790,12 +804,42 @@ func check_siege(g) -> void:
 		siege.grace = 0.0
 		siege.hit(g)
 	check(siege.lives == 0 and siege.done(), "three hits end the siege")
-	siege.count = g.daily.target()
+	siege.lives = 1
+	siege.stage_points = siege.stage_goal()
 	g.step(0.02, Vector2.ZERO)
-	check(g.mode == "result" and g.hud.won and g.reward > 0 and g.hud.stars >= 2, "a siege that reached the target pays out")
+	check(siege.stage == 1 and siege.lives == 2 and siege.stages_cleared() == 1, "a stage's goal opens the next stage and gives a life back")
+	siege.stage_points = siege.stage_goal()
+	g.step(0.02, Vector2.ZERO)
+	var blimps: Array = siege.foes.filter(func(foe): return foe.kind == "blimp")
+	check(siege.stage == 2 and siege.stage_goal() == 0 and blimps.size() == 1, "the last stage brings the command blimp")
+	siege.damage(g, blimps[0], 999)
+	check(siege.won() and siege.stages_cleared() == 3, "downing the blimp clears the last stage")
+	g.step(0.02, Vector2.ZERO)
+	check(g.mode == "result" and g.hud.won and g.reward > 0 and g.hud.stars == 3, "all three stages win three stars and pay out")
 	g.go_menu()
 	g.update_view(0.02)
 	check(not siege.visible, "home hides the siege's planes")
+
+# Out of daily tries, a rewarded ad (simulated in debug builds) buys one more,
+# up to Campaign.DAILY_AD_TRIES a day.
+func check_ad_try(g) -> void:
+	var date := Campaign.today()
+	g.campaign.daily = {}
+	g.daily_override = "stampede"
+	for i in Campaign.DAILY_ATTEMPTS: g.campaign.use_daily_attempt(date)
+	g.update_hud()
+	check(g.campaign.daily_attempts_left(date) == 0 and g.hud.daily_ad and not g.hud.daily_button.disabled, "with no tries left the daily button offers an ad")
+	g.start_daily()
+	check(g.run_kind == "daily" and g.mode == "playing" and int(g.campaign.daily.bonus) == 1 and g.campaign.daily_attempts_left(date) == 0, "the ad adds a try and starts the game")
+	g.go_menu()
+	g.campaign.add_daily_try(date)
+	check(not g.campaign.can_add_daily_try(date) and not g.campaign.add_daily_try(date), "ads add at most %d tries a day" % Campaign.DAILY_AD_TRIES)
+	var restored = Campaign.new()
+	restored.restore(JSON.parse_string(JSON.stringify(g.campaign.data())))
+	check(int(restored.daily.bonus) == Campaign.DAILY_AD_TRIES and restored.daily_attempts_left(date) == 1, "ad tries survive a save")
+	g.campaign.record_daily(date, 10, false)
+	check(int(g.campaign.daily.bonus) == Campaign.DAILY_AD_TRIES, "a finished run keeps the ad tries")
+	g.campaign.daily = {}
 
 # Where the test pilot aims: a little under the next gap's centre as it will
 # be when the craft gets there (swaying gaps move meanwhile).

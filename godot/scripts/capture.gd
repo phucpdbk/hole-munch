@@ -84,6 +84,17 @@ func run(game, campaign_mode: bool) -> void:
 		for frame in 12: g.step(0.02, Vector2.ZERO)
 		await frames(3)
 		await snapshot("siege-beam")
+		# A jet strafing left to right, to check it flies nose first.
+		siege.add_foe(g, "jet", g.hole_position)
+		var jet: Dictionary = siege.foes[-1]
+		jet.dir = Vector3.RIGHT
+		jet.pos = g.hole_position + Vector3(-4.0, 0, 2.0)
+		jet.warn = 0.0
+		jet.life = 1.0
+		siege.grace = 9.0
+		g.step(0.02, Vector2.ZERO)
+		await frames(3)
+		await snapshot("siege-jet")
 		g.get_tree().quit()
 		return
 	# The test-mode list of daily games (daily_picker.gd), the sky hop before the

@@ -247,27 +247,39 @@ its landmark to conquer it, while dodging independent military defenders.
   first tap and every try of a day flies the same seeded course. The course
   has its own camera, made current for the round and its result.
   `-- --capture --hop-capture` shoots the test-mode daily list, the start and mid-flight.
-  **Slide munch** (`slide_puzzle.gd`): a turn-based puzzle on a 7×7 block high
+  **Slide munch** (`slide_puzzle.gd`): a turn-based puzzle on a city block high
   above the city with its own tilted camera. A swipe (arrows/WASD) slides the
   hole until a building, the edge or something bigger than the hole stops it,
-  swallowing every snack that fits on the way. Snacks are size 1 (×5) and 2
-  (×3), the hole grows to size 2 at 3 points and 3 at 8, and the landmark
-  needs size 3. The day's seed lays out boards until a breadth-first solver
-  finds a shortest solution of 6–14 slides (par). Stars: solved, within par+3,
-  in par; 15 coins plus 15 a star. Undo (U) and reset (R) are free buttons
-  beside the board; the 150 s clock starts with the first slide. The HUD lays
-  the board out between its chips (`hud.gd puzzle_layout`) and the camera
-  fits the board to that frame. `-- --capture --slide-capture` shoots it.
+  swallowing every snack that fits on the way. Snacks are size 1 and 2, the
+  hole grows a size at each of the board's two growth points, and the landmark
+  needs size 3. Each day brings three boards in a row (`BOARDS`): easy 6×6
+  (par 4–6), medium 7×7 (par 7–10) and hard 7×7 with more walls and snacks
+  (par 11–16). Each board has its own seed; a breadth-first solver keeps a
+  layout whose shortest solution (par) falls in the board's range, or the
+  closest one. A star per board solved; 15 coins, 20 a board and 10 more for
+  each board solved in par. Undo (U) and reset (R) are free buttons beside the
+  board; the 240 s clock covers all three and starts with the first slide. The
+  HUD lays the board out between its chips (`hud.gd puzzle_layout`) and the
+  camera fits the biggest board to that frame. `-- --capture --slide-capture`
+  shoots it.
   **Sky siege** (`sky_siege.gd`): the air force attacks the saucer over today's
-  city for 60 s. The player only steers; the saucer fires at the nearest enemy
-  within 8 units. Helicopters circle and shoot, jets strafe along a lane that
-  glows red for 1 s first, flak guns drop warned blasts where the saucer is,
-  and a command blimp arrives at 40 s firing rings. Holding still beside a
-  helicopter for 0.6 s reels it into the beam: it counts as downed and flies as
-  an escort that fires for 8 s. Downed enemies score 1 (helicopter), 2 (jet,
-  flak) or 6 (blimp) and sometimes drop a spread or rapid-fire power (5 s).
-  Three hits end the run; 30 points is the target, 3 coins a point.
-  `-- --capture --siege-capture` shoots mid-round and the late waves.
+  city, 90 s on the clock. The player only steers; the saucer fires at the
+  nearest enemy within 8 units. Three stages (`STAGES`): helicopters (10
+  points), then jets join (14 points), then flak guns and the command blimp,
+  whose fall wins the run. Clearing a stage gives a life back and a 2.5 s
+  breather; each stage is a star. Helicopters circle and shoot, jets strafe
+  along a lane that glows red for 1 s first, flak guns drop warned blasts where
+  the saucer is, and the blimp fires rings. Holding still beside a helicopter
+  for 0.6 s reels it into the beam: it counts as downed and flies as an escort
+  that fires for 8 s. Downed enemies score 1 (helicopter), 2 (jet, flak) or 6
+  (blimp) and sometimes drop a spread or rapid-fire power (5 s). Three hits end
+  the run; 3 coins a point plus 15 a stage. The aircraft are Meshy models
+  (`assets/aircraft`, baked by `tools/bake_aircraft.gd`, nose turned to +z),
+  with block models as the fallback. `-- --capture --siege-capture` shoots
+  mid-round, the late stage, the beam and a strafing jet.
+- **Extra daily tries**: with no tries left, the daily button (and PLAY on a
+  daily result) offers a rewarded ad for one more try, up to
+  `Campaign.DAILY_AD_TRIES` (2) a day; the record keeps them as `bonus`.
 - **Daily streak**: a finished daily round keeps it; days 1–7 pay 20–120 coins
   and every seventh day adds a 300-coin bonus. Shown beside today's mini-game.
 - **Daily leaderboard** (`play_games.gd`): Android only, with the GodotPlayGameServices
@@ -515,6 +527,7 @@ Then bake (headless Godot, `--script res://tools/<tool>.gd [-- ids]`):
 | Guardians | `assets/mascots_src/<id>.glb` + `<id>@<clip>.glb` | `bake_mascots.gd` | `assets/mascots/<id>.scn` | primitive rig (`mascot_specs.gd`) |
 | Saucers | `assets/crafts_src/<index>.glb` (0–12, `fleet.gd` NAMES) | `bake_crafts.gd` | `assets/crafts/<index>.res` + `_albedo.res` | primitive craft (`fleet.gd`) |
 | Power-ups | `assets/pickups_src/<kind>.glb` (time, magnet, speed, freeze) | `bake_pickups.gd` | `assets/pickups/<kind>.res` + `_albedo.res` | the plain coloured orb (`mechanics.gd`) |
+| Siege aircraft | `assets/aircraft_src/<kind>.glb` (heli, jet, flak, blimp) | `bake_aircraft.gd` | `assets/aircraft/<kind>.res` + `_albedo.res` | block models (`sky_siege.gd`) |
 
 - **Facing**: models face +z (toward the camera). Fix a bad bake with that tool's
   `YAW` table; for a hand-made guardian GLB, use `CLIP_OVERRIDES` in `mascot_rig.gd`.

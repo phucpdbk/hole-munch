@@ -4,10 +4,13 @@ extends Node3D
 # the saucer over today's city. The saucer fires on its own at the nearest
 # enemy in RANGE; the player only steers. Holding still beside a helicopter
 # reels it up in the tractor beam (CAPTURE_TIME) and it flies as an escort
-# that fires too, for ESCORT_TIME. Waves bring helicopters (circle and shoot),
-# jets (a warned strafing line), flak guns (warned blasts on the ground) and,
-# late, a command blimp that fires rings. Three hits end the run. Every enemy
-# downed scores its value; some drop a spread or rapid-fire power.
+# that fires too, for ESCORT_TIME. Three stages (STAGES): helicopters (circle
+# and shoot), then jets join (a warned strafing line), then flak guns (warned
+# blasts on the ground) and the command blimp, which fires rings and ends the
+# run when it falls. A stage clears at its goal of enemy points, gives a life
+# back and a breather. Three hits end the run. Every enemy downed scores its
+# value; some drop a spread or rapid-fire power. Meshy models
+# (assets/aircraft, tools/bake_aircraft.gd) replace the block models when baked.
 const I18n = preload("res://scripts/i18n.gd")
 const LIVES := 3
 const HIT_GRACE := 1.2
@@ -36,9 +39,15 @@ const MAX_FOES := 8
 # Helicopters circle this far out, inside the screen.
 const HELI_ORBIT := 5.5
 const SPAWN_DISTANCE := 15.0
-# [from second, kinds, seconds between spawns].
-const WAVES := [[0.0, ["heli"], 1.6], [12.0, ["heli", "heli", "jet"], 1.7], [26.0, ["heli", "jet", "flak"], 1.5], [42.0, ["heli", "jet", "flak"], 1.3]]
-const BLIMP_AT := 40.0
+# goal: enemy points to clear the stage (0: down the blimp); gap: seconds
+# between spawns.
+const STAGES := [
+	{"goal":10, "kinds":["heli"], "gap":1.5},
+	{"goal":14, "kinds":["heli", "heli", "jet"], "gap":1.4},
+	{"goal":0, "kinds":["heli", "jet", "flak"], "gap":1.8, "boss":"blimp"},
+]
+const BREATHER := 2.5
+const MODEL_DIR := "res://assets/aircraft/"
 const FOES := {
 	"heli":{"hp":3, "value":1, "radius":0.8, "speed":4.0, "fire":2.2},
 	"jet":{"hp":3, "value":2, "radius":0.9, "speed":16.0, "warn":1.0},
@@ -66,7 +75,11 @@ var capture_progress := 0.0
 var capture_target := {}
 var power := ""
 var power_time := 0.0
-var blimp_sent := false
+var stage := 0
+var stage_points := 0
+var boss_down := false
+# Baked Meshy meshes per kind (null where there is none).
+var baked := {}
 var clock := 0.0
 var count := 0
 var downed := 0
@@ -92,10 +105,12 @@ func reset() -> void:
 	capture_target = {}
 	power = ""
 	power_time = 0.0
-	blimp_sent = false
 	clock = 0.0
 	count = 0
 	downed = 0
+	stage = 0
+	stage_points = 0
+	boss_down = false
 
 func clear() -> void:
 	for list in [foes, shots, foe_shots, blasts, pickups]:
@@ -156,10 +171,33 @@ func part(root: Node3D, size: Vector3, at: Vector3, color: Color) -> MeshInstanc
 	root.add_child(node)
 	return node
 
-# Simple block models, army green with the defence's red markings.
-func foe_model(kind: String) -> Node3D:
+# The baked Meshy model of a kind, textured like the saucers, or null.
+func baked_mesh(game, kind: String) -> ArrayMesh:
+	if baked.has(kind): return baked[kind]
+	var path := MODEL_DIR + kind + ".res"
+	var texture := MODEL_DIR + kind + "_albedo.res"
+	var mesh: ArrayMesh = null
+	if ResourceLoader.exists(path) and ResourceLoader.exists(texture):
+		mesh = load(path).duplicate()
+		var material: ShaderMaterial = game.models.landmark_material.duplicate()
+		material.set_shader_parameter("albedo_tex", load(texture))
+		mesh.surface_set_material(0, material)
+	baked[kind] = mesh
+	return mesh
+
+# The Meshy model at its baked size, else simple block models (army green
+# with the defence's red markings) drawn MODEL_SCALE up.
+func foe_model(game, kind: String) -> Node3D:
 	var root := Node3D.new()
 	add_child(root)
+	var mesh := baked_mesh(game, kind)
+	if mesh:
+		var body := MeshInstance3D.new()
+		body.mesh = mesh
+		root.add_child(body)
+		root.set_meta("scale", 1.0)
+		return root
+	root.set_meta("scale", MODEL_SCALE)
 	match kind:
 		"heli":
 			part(root, Vector3(0.9, 0.6, 1.4), Vector3.ZERO, Color("5b6b3a"))
@@ -197,6 +235,7 @@ func update(game, dt: float, player: Vector3, still: bool) -> void:
 	if power_time <= 0.0: power = ""
 	spawn(game, dt, player)
 	for foe in foes.duplicate(): move_foe(game, foe, dt, player)
+	if stage_goal() > 0 and stage_points >= stage_goal() and stage < STAGES.size() - 1: advance_stage(game, player)
 	fire(game, dt, player)
 	move_shots(game, dt, player)
 	update_blasts(game, dt, player)
@@ -204,22 +243,38 @@ func update(game, dt: float, player: Vector3, still: bool) -> void:
 	update_escort(game, dt, player)
 	update_pickups(game, dt, player)
 
-func wave() -> Array:
-	var current: Array = WAVES[0]
-	for entry in WAVES:
-		if clock >= entry[0]: current = entry
-	return current
+func stage_goal() -> int:
+	return int(STAGES[stage].goal)
+
+func won() -> bool:
+	return boss_down
+
+# Stages fully cleared (a star each).
+func stages_cleared() -> int:
+	return STAGES.size() if boss_down else stage
 
 func spawn(game, dt: float, player: Vector3) -> void:
-	if not blimp_sent and clock >= BLIMP_AT:
-		blimp_sent = true
-		add_foe(game, "blimp", player)
+	if boss_down: return
 	spawn_timer -= dt
 	if spawn_timer > 0.0 or foes.size() >= MAX_FOES: return
-	var current := wave()
-	spawn_timer = current[2]
-	var kinds: Array = current[1]
+	var current: Dictionary = STAGES[stage]
+	spawn_timer = float(current.gap)
+	var kinds: Array = current.kinds
 	add_foe(game, kinds[rng.randi_range(0, kinds.size() - 1)], player)
+
+# A stage's goal met: a life back, a breather and the next stage (whose boss,
+# if any, arrives at once).
+func advance_stage(game, player: Vector3) -> void:
+	stage += 1
+	stage_points = 0
+	lives = mini(LIVES, lives + 1)
+	spawn_timer = BREATHER
+	for shot in foe_shots.duplicate(): drop_shot(foe_shots, shot)
+	game.add_floater(game.hole_position, I18n.t("siege_stage", stage + 1), true)
+	game.fx.ripple(player, 3.0, POWERS.spread)
+	game.sfx.play("grow")
+	var boss: String = STAGES[stage].get("boss", "")
+	if boss != "": add_foe(game, boss, player)
 
 func edge_point(game, player: Vector3, distance: float) -> Vector3:
 	var angle := rng.randf_range(0, TAU)
@@ -254,7 +309,7 @@ func add_foe(game, kind: String, player: Vector3) -> void:
 			foe.pos = game.layout.clamp_point(player + Vector3(cos(angle), 0, sin(angle))*rng.randf_range(6.0, 9.0))
 		_:
 			foe.pos = edge_point(game, player, SPAWN_DISTANCE)
-	foe.node = foe_model(kind)
+	foe.node = foe_model(game, kind)
 	foes.append(foe)
 	place_foe(foe)
 
@@ -305,11 +360,12 @@ func place_foe(foe: Dictionary) -> void:
 	match foe.kind:
 		"jet": node.rotation.y = atan2(foe.dir.x, foe.dir.z)
 		"heli":
-			node.rotation.y = foe.angle + PI
+			# Nose along the orbit (+z for the Meshy model, -z for the blocks).
+			node.rotation.y = -foe.angle + (0.0 if node.get_meta("scale", MODEL_SCALE) == 1.0 else PI)
 			var rotor := node.get_node_or_null("Rotor")
 			if rotor: rotor.rotation.y = clock*18.0
 		"blimp": node.rotation.y = clock*0.2
-	node.scale = Vector3.ONE*MODEL_SCALE*(1.15 if foe.flash > 0.0 else 1.0)
+	node.scale = Vector3.ONE*float(node.get_meta("scale", MODEL_SCALE))*(1.15 if foe.flash > 0.0 else 1.0)
 
 func remove_foe(foe: Dictionary) -> void:
 	if foe.has("lane"): foe.lane.queue_free()
@@ -333,7 +389,9 @@ func damage(game, foe: Dictionary, amount: int) -> void:
 # An enemy downed (or captured) scores its value.
 func down(game, foe: Dictionary) -> void:
 	count += int(foe.value)
+	stage_points += int(foe.value)
 	downed += 1
+	if foe.kind == STAGES[stage].get("boss", ""): boss_down = true
 	game.score += int(foe.value)*10
 	game.add_floater(Vector3(foe.pos.x, 0, foe.pos.z), "+%d" % int(foe.value), true)
 
@@ -513,7 +571,7 @@ func update_pickups(game, dt: float, player: Vector3) -> void:
 # --- state -------------------------------------------------------------------------
 
 func done() -> bool:
-	return lives <= 0
+	return lives <= 0 or boss_down
 
 func flat_distance(a: Vector3, b: Vector3) -> float:
 	return Vector2(a.x - b.x, a.z - b.z).length()

@@ -3,23 +3,27 @@ extends Node3D
 # Daily mini-game "slide" (daily_games.gd): a turn-based puzzle on a small city
 # block high above the city. A swipe sends the hole sliding in a straight line
 # until a building, the edge or something too big stops it, swallowing every
-# snack small enough on the way. The hole grows a size at GROW_AT points eaten;
-# the landmark only fits a size-3 hole, so the order of the slides matters.
-# Every day's board comes from the date's seed and a breadth-first solver keeps
-# only boards with a known shortest solution (par). Stars: solved, within
-# PAR_SLACK of par, and par itself. The board has its own camera.
+# snack small enough on the way. The hole grows a size at each of the board's
+# "grow" points eaten; the landmark only fits a size-3 hole, so the order of
+# the slides matters. A day brings three boards in a row, easy to hard (BOARDS),
+# all from the date's seed; a breadth-first solver keeps only boards with a
+# known shortest solution (par) in the board's range. Each board solved is a
+# star, and one solved in par pays extra. The board has its own camera.
 const ALTITUDE := 800.0
-const SIZE := 7
 const CELL := 2.0
-const WALLS := 9
-# Snacks: [size, count]; the landmark comes on top and needs a size-3 hole.
-const SNACKS := [[1, 5], [2, 3]]
+# Snacks are [size, count]; the landmark comes on top and needs a size-3 hole.
+const BOARDS := [
+	{"size":6, "walls":6, "snacks":[[1, 4], [2, 2]], "grow":[3, 7], "par":[4, 6]},
+	{"size":7, "walls":9, "snacks":[[1, 5], [2, 3]], "grow":[3, 8], "par":[7, 10]},
+	{"size":7, "walls":11, "snacks":[[1, 5], [2, 4]], "grow":[3, 9], "par":[11, 16]},
+]
 const LANDMARK := 3
-const GROW_AT := [3, 8]
-const PAR_MIN := 6
-const PAR_MAX := 14
-const PAR_SLACK := 3
-const TRIES := 300
+# The camera frames the biggest board, so it never jumps between boards.
+const VIEW_SIZE := 7
+const TRIES := 400
+const BOARD_SEED_STEP := 977
+const BOARD_POINTS := 100
+const PAR_POINTS := 50
 const DIRS := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 const SLIDE_SPEED := 9.0
 const FINISH_TIME := 0.8
@@ -30,6 +34,13 @@ const WALL_COLORS := ["c98f6b", "6f8fb0", "d0a35a", "7f9a6a", "a07aa8"]
 const SNACK_COLORS := {1:"ffb34c", 2:"62b6ff", 3:"ffd84a"}
 
 var rng := RandomNumberGenerator.new()
+# The day's three boards: {walls, items, start, par}.
+var boards: Array[Dictionary] = []
+var board := 0
+var cleared := 0
+var in_par := 0
+var size := 7
+var grow_at: Array = []
 var walls := {}
 # [{cell, size, landmark}], the landmark last.
 var items: Array[Dictionary] = []
@@ -51,9 +62,9 @@ var hole_at := Vector3.ZERO
 
 # --- board -------------------------------------------------------------------------
 
-static func level_of(value: int) -> int:
+func level_of(value: int) -> int:
 	var level := 1
-	for need in GROW_AT:
+	for need in grow_at:
 		if value >= need: level += 1
 	return level
 
@@ -67,7 +78,7 @@ func landmark_bit() -> int:
 	return 1 << (items.size() - 1)
 
 func inside(at: Vector2i) -> bool:
-	return at.x >= 0 and at.y >= 0 and at.x < SIZE and at.y < SIZE
+	return at.x >= 0 and at.y >= 0 and at.x < size and at.y < size
 
 # One swipe from `from` with `eaten` swallowed: [stop cell, eaten after].
 func slide(from: Vector2i, eaten: int, dir: Vector2i) -> Array:
@@ -96,7 +107,7 @@ func solution() -> Array:
 	var parent := {key(start, 0):[-1, Vector2i.ZERO]}
 	var frontier: Array = [[start, 0]]
 	var depth := 0
-	while not frontier.is_empty() and depth < PAR_MAX + 4:
+	while not frontier.is_empty() and depth < int(BOARDS[board].par[1]) + 4:
 		depth += 1
 		var next_frontier: Array = []
 		for state in frontier:
@@ -120,40 +131,64 @@ func path_to(parent: Dictionary, k: int) -> Array:
 	return path
 
 func key(at: Vector2i, eaten: int) -> int:
-	return eaten*64 + at.y*SIZE + at.x
+	return eaten*64 + at.y*size + at.x
 
-# Seeded boards until one has a par in range (the last solvable one otherwise).
+# The day's three boards, each from its own seed.
 func generate(value: int) -> void:
-	rng.seed = value
-	var fallback := {}
+	boards.clear()
+	for index in BOARDS.size():
+		rng.seed = value + index*BOARD_SEED_STEP
+		boards.append(generate_board(index))
+	load_board(0)
+
+# Seeded layouts until one's par is in the board's range; otherwise the
+# solvable one whose par came closest.
+func generate_board(index: int) -> Dictionary:
+	board = index
+	var spec: Dictionary = BOARDS[index]
+	size = int(spec.size)
+	grow_at = spec.grow
+	var best := {}
+	var best_gap := 999
 	for attempt in TRIES:
-		lay_out()
+		lay_out(spec)
 		var shortest := solve()
 		if shortest < 0: continue
-		fallback = {"walls":walls.duplicate(), "items":items.duplicate(true), "start":start, "par":shortest}
-		if shortest >= PAR_MIN and shortest <= PAR_MAX: break
-	walls = fallback.get("walls", {})
-	items.assign(fallback.get("items", []))
-	start = fallback.get("start", Vector2i.ZERO)
-	par = int(fallback.get("par", 0))
+		var gap := maxi(0, maxi(int(spec.par[0]) - shortest, shortest - int(spec.par[1])))
+		if gap >= best_gap: continue
+		best_gap = gap
+		best = {"walls":walls.duplicate(), "items":items.duplicate(true), "start":start, "par":shortest}
+		if gap == 0: break
+	return best
+
+func load_board(index: int) -> void:
+	board = index
+	var spec: Dictionary = BOARDS[index]
+	size = int(spec.size)
+	grow_at = spec.grow
+	var chosen: Dictionary = boards[index]
+	walls = chosen.get("walls", {})
+	items.assign(chosen.get("items", []))
+	start = chosen.get("start", Vector2i.ZERO)
+	par = int(chosen.get("par", 0))
 	item_at.clear()
 	for i in items.size(): item_at[items[i].cell] = i
 
-func lay_out() -> void:
+func lay_out(spec: Dictionary) -> void:
 	walls.clear()
 	items.clear()
 	item_at.clear()
 	var free: Array[Vector2i] = []
-	for y in SIZE:
-		for x in SIZE: free.append(Vector2i(x, y))
+	for y in size:
+		for x in size: free.append(Vector2i(x, y))
 	for i in range(free.size() - 1, 0, -1):
 		var j := rng.randi_range(0, i)
 		var swap := free[i]
 		free[i] = free[j]
 		free[j] = swap
 	start = free.pop_back()
-	for i in WALLS: walls[free.pop_back()] = true
-	for snack in SNACKS:
+	for i in int(spec.walls): walls[free.pop_back()] = true
+	for snack in spec.snacks:
 		for i in snack[1]: items.append({"cell":free.pop_back(), "size":snack[0], "landmark":false})
 	items.append({"cell":free.pop_back(), "size":LANDMARK, "landmark":true})
 	for i in items.size(): item_at[items[i].cell] = i
@@ -163,11 +198,18 @@ func lay_out() -> void:
 func build(game, value: int) -> void:
 	generate(value)
 	if not is_instance_valid(camera): make_camera()
-	dress(game)
-	reset()
+	reset(game)
 	visible = false
 
-func reset() -> void:
+# Back to the first board of the day.
+func reset(game) -> void:
+	cleared = 0
+	in_par = 0
+	start_board(game, 0)
+
+func start_board(game, index: int) -> void:
+	load_board(index)
+	dress(game)
 	cell = start
 	mask = 0
 	moves = 0
@@ -191,6 +233,11 @@ func move(game, dir: Vector2i) -> bool:
 	game.sfx.play("pop5" if bites == 0 else "grow")
 	if mask & landmark_bit():
 		solved = true
+		cleared += 1
+		game.score += BOARD_POINTS
+		if moves <= par:
+			in_par += 1
+			game.score += PAR_POINTS
 		game.sfx.play("boss")
 	return true
 
@@ -222,23 +269,28 @@ func restart() -> void:
 func level() -> int:
 	return level_of(value_of(mask))
 
+# One star per board solved.
 func stars() -> int:
-	if not solved: return 0
-	return 3 if moves <= par else 2 if moves <= par + PAR_SLACK else 1
+	return cleared
 
-func update(dt: float) -> void:
+func last_board() -> bool:
+	return board >= BOARDS.size() - 1
+
+# A solved board rests a moment, then the next one comes up.
+func update(game, dt: float) -> void:
 	var target := world(cell)
 	hole_at = hole_at.move_toward(target, SLIDE_SPEED*CELL*dt)
 	if solved and hole_at == target: finish_clock += dt
+	if solved and finish_clock >= FINISH_TIME and not last_board(): start_board(game, board + 1)
 	place()
 
 func done() -> bool:
-	return solved and finish_clock >= FINISH_TIME
+	return solved and last_board() and finish_clock >= FINISH_TIME
 
 # --- view --------------------------------------------------------------------------
 
 func world(at: Vector2i) -> Vector3:
-	var half := (SIZE - 1)*CELL*0.5
+	var half := (size - 1)*CELL*0.5
 	return Vector3(at.x*CELL - half, 0, at.y*CELL - half)
 
 func make_camera() -> void:
@@ -257,10 +309,10 @@ func dress(game) -> void:
 	board_nodes.clear()
 	item_nodes.clear()
 	var palette: Array = game.palette
-	var span := SIZE*CELL
+	var span := size*CELL
 	board_nodes.append(box(Vector3(span + 1.2, 0.6, span + 1.2), Vector3(0, -0.4, 0), Color(palette[1]).darkened(0.2)))
-	for y in SIZE:
-		for x in SIZE:
+	for y in size:
+		for x in size:
 			var shade := Color(palette[3]) if (x + y)%2 == 0 else Color(palette[3]).darkened(0.08)
 			board_nodes.append(box(Vector3(CELL*0.96, 0.1, CELL*0.96), world(Vector2i(x, y)) + Vector3(0, -0.05, 0), shade))
 	var heights := RandomNumberGenerator.new()
@@ -372,7 +424,7 @@ func show_view(on: bool, frame := Rect2()) -> void:
 	if not on or not is_instance_valid(camera): return
 	var screen := get_viewport().get_visible_rect().size
 	if frame.size.x <= 0.0: frame = Rect2(Vector2.ZERO, screen)
-	var span := SIZE*CELL + BORDER
+	var span := VIEW_SIZE*CELL + BORDER
 	camera.size = maxf(span*TILT_SHARE*screen.y/frame.size.y, span*screen.y/frame.size.x)
 	var per_pixel := camera.size/screen.y
 	var centre := frame.get_center() - screen/2
