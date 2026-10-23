@@ -20,8 +20,8 @@ its landmark to conquer it, while dodging independent military defenders.
   `-- --capture --street-capture` (writes `test-output/street-XX.png`).
 - **Map size follows difficulty**: 3×3 blocks at the start, 5×3, then 5×5;
   continent finales use the next size up (5×7 from the fourth continent).
-  The boss size comes from the map's own food: the hole must eat 27% of it
-  at the start, rising to 46% (`campaign.gd` `share_at`), landmarks 3.0–6.6,
+  The boss size comes from the map's own food: the hole must eat 30% of it
+  at the start, rising to 49% (`campaign.gd` `share_at`), landmarks 3.0–6.6,
   finales up to 7.2 (still under the hole's 8.5 cap).
   Blocks around the plaza are 24/31/38 units street to street
   (`map_layout.gd`) and sparsely built: about a quarter of shop lots stay
@@ -49,7 +49,7 @@ its landmark to conquer it, while dodging independent military defenders.
   the journey map (a pink side trip), opens when that city is beaten, never
   blocks the route, and plays at that city's difficulty rank with its own
   landmark, guardian, weather, colours (Mid-Autumn and Halloween at dusk), water
-  and shape (Verona's Adige, Hội An's Thu Bồn) and +3% food share. Trees,
+  and shape (Verona's Adige, Hội An's Thu Bồn) and the same food share. Trees,
   benches and opening cones become the holiday's trees, stands and snacks at
   the same size, so food totals match. NEXT after the opening city goes to the
   festival while it is unbeaten. Festival guardians: a banh chung (Tết), a lion
@@ -258,7 +258,7 @@ its landmark to conquer it, while dodging independent military defenders.
 - **Endless** (VÔ TẬN): 60 s clock, every bite adds a little time (plus combo
   time and +5 s pickups), each landmark adds 30 s and leads to a random harder
   city; best score and cities are saved.
-- **Upgrades** (NÂNG CẤP): coins buy start size (+0.04 × 6), speed (+4% × 8),
+- **Upgrades** (NÂNG CẤP): coins buy start size (+0.04 × 6), speed (+3% × 8),
   time (+2 s × 5), magnet (× 5) and coin bonus (+8% × 8); base prices
   160/140/200/300/240, ×1.75 per level. A maxed size upgrade still cannot eat
   a shop at the start (checked in `--campaign-smoke`). Map food pays 1 coin per

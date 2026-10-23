@@ -63,8 +63,8 @@ const COMBO_WINDOW := 1.0
 const COMBO_TIME = [[8, 2.0], [16, 3.0], [30, 5.0]]
 const COMBO_REPEAT := 15
 const COMBO_REPEAT_SECONDS := 3.0
-const HIT_SECONDS := 2.0
-const HIT_SHRINK := 0.94
+const HIT_SECONDS := 3.0
+const HIT_SHRINK := 0.9
 # A hit shoves the hole (world units per second, fading) and rocks the saucer.
 const HIT_KNOCK := 7.0
 const WOBBLE_FADE := 1.6

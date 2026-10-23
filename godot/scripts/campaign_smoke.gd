@@ -184,7 +184,7 @@ func check_festivals() -> void:
 	restored.restore(JSON.parse_string(JSON.stringify(fest.data())))
 	check(restored.medals[tet] == 3 and restored.total_stars() == fest.total_stars(), "festival stars survive a save")
 	var info := Campaign.level_info(tet)
-	check(info.holiday == "tet" and info.index == 4 and info.slot == -1 and info.share > Campaign.share_at(4.0/47.0), "a festival plays at its rank with a bigger meal")
+	check(info.holiday == "tet" and info.index == 4 and info.slot == -1 and is_equal_approx(info.share, Campaign.share_at(4.0/47.0) + Campaign.HOLIDAY_SHARE), "a festival plays at its rank and meal")
 	var tester = Campaign.new()
 	tester.unlock_all_for_testing = true
 	tester.selected = tet
@@ -400,7 +400,7 @@ func check_challenge_systems(g) -> void:
 	g.target_radius = 3.0
 	var before: float = g.remaining
 	g.take_hit()
-	check(g.target_radius < 3.0 and g.remaining == before-2.0, "a hit shrinks the hole and costs time")
+	check(g.target_radius < 3.0 and g.remaining == before-g.HIT_SECONDS, "a hit shrinks the hole and costs time")
 	g.load_level(10)
 	g.on_play()
 	g.started = true

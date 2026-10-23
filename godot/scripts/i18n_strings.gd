@@ -504,7 +504,7 @@ const S := {
 	"up_size": ["KÍCH THƯỚC", "SIZE", "TAMAÑO", "TAMANHO", "TAILLE", "UKURAN"],
 	"up_size_d": ["+0,04 bán kính khởi đầu", "+0.04 starting radius", "+0,04 de radio inicial", "+0,04 de raio inicial", "+0,04 de rayon initial", "+0,04 radius awal"],
 	"up_speed": ["TỐC ĐỘ", "SPEED", "VELOCIDAD", "VELOCIDADE", "VITESSE", "KECEPATAN"],
-	"up_speed_d": ["+4% tốc độ di chuyển", "+4% move speed", "+4% de velocidad", "+4% de velocidade", "+4% de vitesse", "+4% kecepatan"],
+	"up_speed_d": ["+3% tốc độ di chuyển", "+3% move speed", "+3% de velocidad", "+3% de velocidade", "+3% de vitesse", "+3% kecepatan"],
 	"up_time": ["THỜI GIAN", "TIME", "TIEMPO", "TEMPO", "TEMPS", "WAKTU"],
 	"up_time_d": ["+2 giây mỗi màn", "+2 s per round", "+2 s por ronda", "+2 s por rodada", "+2 s par manche", "+2 dtk per ronde"],
 	"up_magnet": ["LỰC HÚT", "MAGNET", "IMÁN", "ÍMÃ", "AIMANT", "MAGNET"],
