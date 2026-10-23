@@ -1,6 +1,7 @@
 extends RefCounted
 # Campaign checks: `--headless --path . -- --campaign-smoke`. Never writes the save.
 const Campaign = preload("res://scripts/campaign.gd")
+const I18n = preload("res://scripts/i18n.gd")
 var failures := 0
 
 func check(value: bool, message: String) -> void:
@@ -624,16 +625,20 @@ func check_daily_games(g) -> void:
 	check(g.mechanics.powers.magnet > 0 and g.mechanics.powers.speed > 0 and g.campaign.items.magnet == 0, "carry-in powers start the next campaign round")
 	g.go_menu()
 
-# Find the cow (cow_hunt.gd): a herd where only today's cow matches every clue;
-# a wrong bite costs time, a chew and opens a clue; the right one wins.
+# Find the cow (cow_hunt.gd): a herd on countryside farmland (countryside.gd)
+# where only today's cow matches every clue; the hole never grows; a wrong bite
+# costs time, a chew and opens a clue; the right one wins.
 func check_cow_hunt(g) -> void:
 	g.campaign.daily = {}
 	g.daily_override = "findcow"
 	g.start_daily()
 	var hunt = g.daily.hunt
 	var herd: Array = g.items.filter(func(item): return item.kind == "huntcow")
-	var twins: Array = herd.filter(func(cow): return cow != hunt.star and cow.bell == hunt.star.bell and cow.coat == hunt.star.coat and hunt.quarter(cow.origin) == hunt.quarter(hunt.star.origin))
+	var twins: Array = herd.filter(func(cow): return cow != hunt.star and cow.bell == hunt.star.bell and cow.coat == hunt.star.coat and hunt.zone_of.call(cow.origin) == hunt.zone_of.call(hunt.star.origin))
 	var reachable := herd.all(func(cow): return absf(cow.origin.x) <= g.layout.move_x - 1.0 and absf(cow.origin.z) <= g.layout.move_z - 1.0)
+	var city: Array = g.items.filter(func(item): return item.kind in ["car", "person", "house", "soldier", "police", "patrol_car"])
+	var zones: Array = g.countryside.cells.values() if g.countryside else []
+	check(g.countryside != null and city.is_empty() and zones.has("forest") and zones.has("farm") and hunt.note().contains(I18n.t("cow_bell_" + str(hunt.star.bell))), "the hunt is farmland in named zones, no city")
 	check(reachable and herd.size() == hunt.COWS and twins.is_empty() and hunt.note().contains(hunt.star_name) and g.daily.dots().is_empty(), "the herd has one cow that fits all clues, and no minimap help")
 	g.started = true
 	g.defense.grace = INF
@@ -644,6 +649,7 @@ func check_cow_hunt(g) -> void:
 		if decoy.fall < 0 and not decoy.eaten: g.hole_position = Vector3(decoy.position.x, 0, decoy.position.z)
 		g.step(0.02, Vector2.ZERO)
 	check(hunt.wrong == 1 and hunt.clues == 2 and g.remaining < before - 2.0 and g.daily.speed_scale() < 1.0, "a wrong cow costs time, a chew, and opens the next clue")
+	check(is_equal_approx(g.target_radius, g.START_RADIUS), "the hunt's hole keeps its small size")
 	for frame in 60:
 		if g.mode != "playing": break
 		if hunt.star.fall < 0: g.hole_position = Vector3(hunt.star.position.x, 0, hunt.star.position.z)

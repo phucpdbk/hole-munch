@@ -39,6 +39,7 @@ const Army = preload("res://scripts/army.gd")
 const ArmyForces = preload("res://scripts/army_forces.gd")
 const ArmySoldiers = preload("res://scripts/army_soldiers.gd")
 const Runner = preload("res://scripts/runner.gd")
+const Countryside = preload("res://scripts/countryside.gd")
 # Seconds a carry-in power from the daily mini-game lasts (time adds seconds).
 const CARRY_SECONDS := 12.0
 const CARRY_TIME := 10.0
@@ -101,6 +102,8 @@ var layout = MapLayout.make(3, 3)
 var city_blocks = CityBlocks.new()
 # Gold districts, roadblocks, shortcuts and danger zones (scripts/map_features.gd).
 var features = MapFeatures.new()
+# The find-the-cow daily's farmland (countryside.gd); null in every other round.
+var countryside = null
 var stats: Dictionary = campaign.stats()
 var palette: Array = level.palette
 var weather: Node3D
@@ -391,6 +394,7 @@ func load_level(index: int) -> void:
 	if run:
 		level.rival = false
 		level.weather = "clear"
+	countryside = Countryside.new() if run_kind == "daily" and daily_kind == "findcow" else null
 	goal_list = [] if run else Challenges.goals(level)
 	layout = MapLayout.make(Runner.COLS, Runner.ROWS) if run else MapLayout.make(level.cols, level.rows)
 	if not run: layout.vary_districts(campaign.selected)
@@ -399,7 +403,7 @@ func load_level(index: int) -> void:
 	if run_kind in ["campaign", "endless"]: MapShapes.apply(layout, MapShapes.for_level(level))
 	models.snow_material.set_shader_parameter("snow_amount",0.95 if level.weather == "snow" else 0.0)
 	stats = campaign.stats()
-	palette = level.palette
+	palette = Countryside.PALETTE if countryside else level.palette
 	items.clear()
 	minions.clear()
 	batches.clear()
@@ -416,6 +420,9 @@ func load_level(index: int) -> void:
 	models.army_look = ArmyForces.look(level)
 	models.city_profile = CityProfiles.profile(level.boss)
 	if run: features = MapFeatures.new()
+	elif countryside:
+		features = MapFeatures.new()
+		countryside.plan(layout)
 	else:
 		city_blocks.plan(layout, models.city_profile, has_farms(), 4819 + campaign.selected*137 + 1)
 		features.plan(layout, city_blocks.districts, int(level.index), 4819 + campaign.selected*137 + 11, SPAWN)
@@ -424,7 +431,8 @@ func load_level(index: int) -> void:
 	if run: runner.build(self, 5303 + campaign.selected*71)
 	else:
 		runner.clear()
-		make_city()
+		if countryside: make_countryside()
+		else: make_city()
 	if run_kind == "daily": daily.build(self, daily_kind, 7177 + campaign.selected*53)
 	make_batches()
 	weather.configure(level.weather, sky_environment, sunlight, Color(palette[5]))
@@ -525,6 +533,10 @@ func make_ground() -> void:
 		var block: Vector2 = layout.block_size(cell.x, cell.y)
 		parts.append(models.piece("box", Vector3(cell.x, 0.075, cell.y), Vector3(block.x, 0.1, block.y), Color(palette[2])))
 		parts.append(models.piece("box", Vector3(cell.x, 0.13, cell.y), Vector3(block.x-2.1, 0.06, block.y-2.1), inner_ground(cell.x, cell.y)))
+	if countryside:
+		# Dirt tracks: no lane dashes or crossings.
+		finish_ground(parts)
+		return
 	# Lane dashes only where the street is there (not under a bay or a lake).
 	for street in layout.streets_x:
 		for i in range(int(-layout.half_z)+2, int(layout.half_z)-1, 3):
@@ -542,6 +554,9 @@ func make_ground() -> void:
 		for lane in [1, -1]:
 			parts.append(models.piece("box", Vector3(spot.x - lane*(Traffic.BOX-0.72), 0.045, spot.y+lane*0.85), Vector3(0.14, 0.015, 1.45), Color("eef0e6")))
 			parts.append(models.piece("box", Vector3(spot.x-lane*0.85, 0.045, spot.y - lane*(Traffic.BOX-0.72)), Vector3(1.45, 0.015, 0.14), Color("eef0e6")))
+	finish_ground(parts)
+
+func finish_ground(parts: Array) -> void:
 	var ground := MeshInstance3D.new()
 	ground.mesh = models.bake(parts, ground_material)
 	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -588,6 +603,7 @@ func water_parts() -> Array:
 func inner_ground(x: float, z: float) -> Color:
 	if run_kind == "runner": return Color(palette[3])
 	var snow: bool = level.weather == "snow"
+	if countryside: return countryside.ground(x, z).lerp(Color.WHITE, 0.55 if snow else 0.0)
 	match features.zone(x, z):
 		"gold": return MapFeatures.GOLD_TINT.lerp(Color.WHITE, 0.35 if snow else 0.0)
 		"danger": return MapFeatures.DANGER_TINT.lerp(Color.WHITE, 0.35 if snow else 0.0)
@@ -644,6 +660,15 @@ func make_city() -> void:
 	events.build(self)
 	make_boss()
 	mechanics.setup(self, is_landmark() and int(level.index) >= Mechanics.GUARDIAN_FROM, 4819 + campaign.selected*137 + 7)
+
+# The find-the-cow farmland: fields, forest and a farmyard, no city, army or
+# guardian. The boss is still made (hidden by the daily) so its index stays valid.
+func make_countryside() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4819 + campaign.selected*137
+	countryside.build(self, rng)
+	make_boss()
+	mechanics.setup(self, false, 4819 + campaign.selected*137 + 7)
 
 # Accessible snacks connect the opening street to trees and cars, so the first
 # bite lands at once and a bench pays the first growth within seconds. The shape
@@ -970,7 +995,9 @@ func pick_spawn() -> void:
 
 # The menu city is already fresh, so starting from the menu keeps traffic flowing.
 func reset_stats() -> void:
-	radius = float(stats.start_radius)
+	# The cow hunt keeps a small hole all round (no size upgrades, no growth):
+	# picking the right cow is the game, not eating the farm.
+	radius = START_RADIUS if countryside else float(stats.start_radius)
 	target_radius = radius
 	hole_position = spawn
 	remaining = float(level.seconds) + float(stats.bonus_time)
@@ -1486,6 +1513,7 @@ func swallow(item: Dictionary) -> void:
 	grow(bite_size(item))
 
 func grow(bite_radius: float) -> void:
+	if countryside: return
 	target_radius = minf(MAX_RADIUS, sqrt(target_radius*target_radius + bite_radius*bite_radius*GROWTH))
 	var new_tier := int((target_radius-START_RADIUS)/GROWTH_TIER)
 	if new_tier > tier:

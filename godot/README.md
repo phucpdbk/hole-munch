@@ -102,8 +102,8 @@ its landmark to conquer it, while dodging independent military defenders.
   `GUARDIAN_FROM`): it is only eat, grow and swallow the landmark; the guardian
   and its intro card join from city 2. Hà Nội (Chùa Một Cột), Agra, Paris, New
   York (Liberty), Sydney and all six festival cities have Meshy guardians (`assets/mascots/<id>.scn`, auto-rigged,
-  clips idle/walk/run/attack = Charged Spell Cast/hit/leap = Jump Attack via
-  `tools/meshy/meshy.mjs mascots rig --actions idle=0,attack=125,hit=178,leap=86`,
+  clips idle/walk/run/attack = Charged Spell Cast/hit = Hit Reaction/leap = Jump Attack, fixed in
+  `KINDS.mascots.actions` of `tools/meshy/meshy.mjs` (idle=0,attack=125,hit=178,leap=86),
   baked by `tools/bake_mascots.gd`, scaled to the toy rig's two-unit height);
   the rest keep the toy rig. `--mascot-capture --levels=0,4` shoots chosen cities
   (idle, windup, attack and mid-beam frames). Meshy prompts must not ask for
@@ -223,10 +223,15 @@ its landmark to conquer it, while dodging independent military defenders.
 - **Daily challenge** (THỬ THÁCH NGÀY): one city per date for everyone, with a
   rival and one continent tougher defence; the first win of the day pays ×1.5.
   Mini-games by date: duck stampede, coin rain, gold rush and **find the cow**
-  (`cow_hunt.gd`): 80 named cows, one of them today's; clues open one by one
-  (bell colour, then coat, then part of town, every 15 s and after each wrong
-  bite), a wrong cow costs 3 s and a 1.2 s chew, five wrong ones end the round,
-  a cow's name shows when the hole is close, and the minimap gives no help.
+  (`cow_hunt.gd`): 80 named cows, one of them today's, on countryside farmland
+  instead of a city (`countryside.gd`: forest north, cornfield east, farmyard
+  south, wheat west, meadow in the middle, each zone signposted; cows stand on
+  tracks, aisles and clearings). Clues open one by one (bell colour, then coat,
+  then zone, every 15 s and after each wrong bite; the clue line counts down to
+  the next), a wrong cow costs 3 s and a 1.2 s chew, five wrong ones end the
+  round. The hole keeps its starting size (no upgrades, no growth). The nearest
+  cow's name shows, green when it fits every open clue; the minimap gives no
+  help. `-- --capture --cow-capture` shoots the farm and a clue-complete moment.
 - **Daily streak**: a finished daily round keeps it; days 1–7 pay 20–120 coins
   and every seventh day adds a 300-coin bonus. Shown beside today's mini-game.
 - **Daily leaderboard** (`play_games.gd`): Android only, with the GodotPlayGameServices
@@ -284,10 +289,15 @@ its landmark to conquer it, while dodging independent military defenders.
 
 **Test mode** (debug builds only): tap the HOLE MUNCH title on the menu seven
 times to switch it on or off (a red TEST MODE label shows). It opens all 48
-cities, refills coins to 999999 after every purchase and plays on its own save
+cities, refills coins to 999999 after every purchase, never runs out of daily
+tries, and plays on its own save
 (`user://test_save.json`), so the real progress is never touched. All levels can
 also be opened for every build with
 `application_custom/testing/unlock_all_levels=true` in `project.godot`.
+`application_custom/testing/daily_type` pins the daily mini-game in debug builds
+(`stampede`, `coinrain`, `goldrush` or `findcow`; empty rotates by date). 
+`testing/daily_type_android` sets `findcow` for the debug APK; release builds
+ignore both.
 
 The launcher icon is the classic app's duck: `node tools/make-godot-icons.mjs`
 (from the repo root) crops `assets/hole-munch-cover.png` into `assets/app_icon`.
@@ -411,10 +421,20 @@ task ids; `status` shows each item's account. An account that runs out before an
 item starts hands it to the next one; one that runs out mid-chain stops that
 item until it is topped up or the item is redone with `--redo`.
 
+`images --google` draws the image with Google's Nano Banana Pro
+(`gemini-3-pro-image`, key in the git-ignored `tools/meshy/gemini.local.json` as
+`{"key": "..."}`, or `GEMINI_API_KEY`) instead of Meshy. It sends the kind's approved
+images (`refs` in `KINDS`, or `--refs id,id`) as style references, which keeps new
+items in the same look, then cuts the white background away. It spends no Meshy
+credits; `models` uploads the PNG and picks the Meshy account at that point. Ask for
+the base explicitly in landmark prompts: "on a green hill" alone grows the hill past
+the frame.
+
 ```powershell
 $env:MESHY_API_KEY = "msy_..."
 node tools/meshy/meshy.mjs landmarks images --only namsan,watarun
 node tools/meshy/meshy.mjs landmarks models --only namsan,watarun
+node tools/meshy/meshy.mjs mascots images --google --only fuji  # Google image, review, then "all"
 node tools/meshy/meshy.mjs mascots all --only onepillar      # images, models, rig
 node tools/meshy/meshy.mjs mascots library                   # animation ids, if a clip is wrong
 node tools/meshy/meshy.mjs crafts all

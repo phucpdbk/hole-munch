@@ -25,10 +25,16 @@
 //   node tools/meshy/meshy.mjs landmarks status
 //   node tools/meshy/meshy.mjs mascots images --only fuji --redo        # regenerate one image
 //   node tools/meshy/meshy.mjs mascots library                          # list animation ids
+//
+// "images --google" draws the image with Google's Nano Banana Pro instead (see gemini.mjs),
+// passing the kind's approved items (refs below, or --refs id,id) as style references.
+// It costs no Meshy credits; "models" then sends the PNG itself to image-to-3d.
+//   node tools/meshy/meshy.mjs landmarks images --google --only namsan
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { geminiKey, generateImage, cutWhiteBackground } from "./gemini.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ASSETS = join(HERE, "..", "..", "assets");
@@ -40,7 +46,7 @@ const TASK_TIMEOUT_MS = 15 * 60 * 1000;
 
 const KINDS = {
 	landmarks: {
-		out: "landmarks_src", polycount: 8000,
+		out: "landmarks_src", polycount: 8000, refs: ["eiffel", "taj", "sydney"],
 		style: "stylized miniature toy diorama, chunky simplified shapes, bright soft colors, " +
 			"standing on a small square stone plaza base, whole object fully visible and centered, " +
 			"three-quarter view from front-right slightly above, plain white background, no text overlay, game asset",
@@ -49,7 +55,10 @@ const KINDS = {
 	// The game draws fire, water and lightning itself (mascot_attacks.gd); an effect
 	// in the image gets baked into the mesh and sticks to the mouth or hands forever.
 	mascots: {
-		out: "mascots_src", polycount: 10000, rig: true,
+		out: "mascots_src", polycount: 10000, rig: true, refs: ["onepillar", "eiffel", "sydney"],
+		// The approved guardian clips. Name matching picked "BeHit FlyUp" for hit, which
+		// throws the guardian flat on the ground every time the hole bites it.
+		actions: { idle: 0, attack: 125, hit: 178, leap: 86 },
 		style: "chibi toy mascot character, standing upright on two legs in a T-pose with arms spread out to the sides " +
 			"and legs slightly apart, clearly separated arms and legs, mouth closed, empty open hands, " +
 			"no props, no weapons, no water, fire, smoke, sparks or other effects, chunky simplified shapes, bright soft colors, " +
@@ -60,7 +69,7 @@ const KINDS = {
 	// Clips are fixed library ids (see "library"): idle and alert stances, three
 	// shooting candidates and a panic wave for when the hole closes in.
 	soldiers: {
-		out: "soldiers_src", polycount: 3000, rig: true,
+		out: "soldiers_src", polycount: 3000, rig: true, refs: ["vn_soldier", "vn_police"],
 		actions: { idle: 0, alert: 2, shoot: 98, quickdraw: 232, aim: 585, raise: 334, panic: 291 },
 		style: "chibi toy soldier figure, standing upright on two legs in a T-pose with arms spread out to the sides " +
 			"and legs slightly apart, clearly separated arms and legs, empty open hands, no weapons, no props, no backpack, " +
@@ -69,13 +78,13 @@ const KINDS = {
 	},
 	// Power-ups dropping on the map (mechanics.gd PICKUPS): small, read at a glance.
 	pickups: {
-		out: "pickups_src", polycount: 3000,
+		out: "pickups_src", polycount: 3000, refs: ["time", "magnet", "speed"],
 		style: "stylized toy game power-up icon, chunky simplified shapes, bright saturated colors, glossy, " +
 			"whole object fully visible and centered, three-quarter view from slightly above, floating with no base or stand, " +
 			"plain white background, no text, no letters, no numbers, game asset",
 	},
 	crafts: {
-		out: "crafts_src", polycount: 5000,
+		out: "crafts_src", polycount: 5000, refs: ["0", "1", "2"],
 		style: "stylized toy spaceship, chunky simplified shapes, bright soft colors, whole object fully visible and centered, " +
 			"three-quarter view from slightly above, floating with no base or stand, plain white background, no text overlay, game asset",
 	},
@@ -99,6 +108,7 @@ const option = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i 
 const commands = ["images", "models", "all", "status", "balance", ...(kind?.rig ? ["rig", "library"] : [])];
 if (!kind || !commands.includes(command)) {
 	console.error("Usage: meshy.mjs landmarks|mascots|crafts|soldiers|pickups images|models|all|status|balance [--only id,id] [--redo]");
+	console.error("       meshy.mjs <kind> images --google [--refs id,id] [--only id,id] [--redo]");
 	console.error("       meshy.mjs mascots rig|library [--only id,id] [--redo] [--actions idle=N,attack=N,hit=N,leap=N]");
 	process.exit(1);
 }
@@ -178,7 +188,7 @@ async function refreshBalances() {
 const balances = () => accounts.map((account) => `${account.label}=${account.available}`).join(" ");
 const clipNames = () => Object.keys(kind.actions ?? CLIP_PATTERNS);
 const rigCost = () => COSTS.rig + COSTS.clip * clipNames().length;
-const chainCost = () => COSTS.image + COSTS.model + (kind.rig ? rigCost() : 0);
+const chainCost = (withImage = true) => (withImage ? COSTS.image : 0) + COSTS.model + (kind.rig ? rigCost() : 0);
 // Credits held back this run for items that started a chain on their account.
 const reserved = {};
 
@@ -191,8 +201,8 @@ function pinnedAccount(id, entry) {
 }
 
 // A new chain takes the first account with credits for all of it and reserves them.
-function startChain(id, skip = []) {
-	const need = chainCost();
+function startChain(id, skip = [], withImage = true) {
+	const need = chainCost(withImage);
 	const account = accounts.find((candidate) => !skip.includes(candidate) && candidate.available >= need);
 	if (!account) throw new Error(`${id}: no account has ${need} credits left (${balances()})`);
 	account.available -= need;
@@ -238,9 +248,34 @@ async function download(url, file) {
 
 const credit = (entry, task) => { entry.credits = (entry.credits ?? 0) + (task.consumed_credits ?? 0); };
 
+const hasImage = (entry) => Boolean(entry?.imageTask || entry?.imageSource === "google");
+
+// Approved items of this kind (with an image on disk) that steer Google's style.
+function styleRefs(id) {
+	const chosen = option("--refs")?.split(",").map((ref) => ref.trim()).filter(Boolean) ?? kind.refs ?? [];
+	return chosen.filter((ref) => ref !== id && existsSync(join(OUT, `${ref}.png`))).map((ref) => join(OUT, `${ref}.png`));
+}
+
+let googleKey;
+async function makeGoogleImage(id) {
+	const entry = (manifest[id] ??= {});
+	const prompt = `${prompts[id]}. ${kind.style}`;
+	googleKey ??= await geminiKey();
+	if (!googleKey) throw new Error("add a key to tools/meshy/gemini.local.json or set GEMINI_API_KEY");
+	const refs = styleRefs(id);
+	const bytes = await generateImage(googleKey, prompt, refs);
+	await writeFile(join(OUT, `${id}.png`), await cutWhiteBackground(bytes));
+	// No Meshy credits spent yet: the account is picked when the model starts.
+	Object.assign(entry, { imageSource: "google", account: undefined, imageTask: undefined, prompt,
+		modelTask: undefined, glb: undefined, rigTask: undefined, clips: undefined });
+	await saveManifest();
+	console.log(`✓ image ${id} (google, ${refs.length} refs)`);
+}
+
 async function makeImage(id) {
 	const entry = (manifest[id] ??= {});
-	if (entry.imageTask && !flag("--redo")) return;
+	if (hasImage(entry) && !flag("--redo")) return;
+	if (flag("--google")) return makeGoogleImage(id);
 	const prompt = `${prompts[id]}. ${kind.style}`;
 	// The image starts the chain: an account that turns out empty hands it to the next.
 	const tried = [];
@@ -258,7 +293,7 @@ async function makeImage(id) {
 			tried.push(account);
 		}
 	}
-	Object.assign(entry, { account: account.label, imageTask: result, prompt, modelTask: undefined, glb: undefined, rigTask: undefined, clips: undefined });
+	Object.assign(entry, { account: account.label, imageTask: result, imageSource: undefined, prompt, modelTask: undefined, glb: undefined, rigTask: undefined, clips: undefined });
 	await saveManifest();
 	const task = await waitFor(account, "text-to-image", result, id);
 	await download(task.image_urls[0], join(OUT, `${id}.png`));
@@ -269,11 +304,17 @@ async function makeImage(id) {
 
 async function makeModel(id) {
 	const entry = manifest[id];
-	if (!entry?.imageTask) throw new Error(`${id}: run "images" first`);
+	if (!hasImage(entry)) throw new Error(`${id}: run "images" first`);
 	if (entry.glb && !flag("--redo")) return;
-	const account = continueChain(id, entry, COSTS.model);
+	// A Google image has no Meshy task: its chain starts here and the PNG goes up as a data URI.
+	const google = entry.imageSource === "google";
+	const account = google && !entry.account ? startChain(id, [], false) : continueChain(id, entry, COSTS.model);
+	if (google) entry.account = account.label;
+	const input = google
+		? { image_url: `data:image/png;base64,${(await readFile(join(OUT, `${id}.png`))).toString("base64")}` }
+		: { input_task_id: entry.imageTask };
 	const { result } = await api(account, "POST", "/image-to-3d", {
-		input_task_id: entry.imageTask,
+		...input,
 		ai_model: "latest",
 		should_remesh: true,
 		topology: "triangle",
@@ -371,8 +412,10 @@ if (command === "status") {
 	for (const id of ids) {
 		const entry = manifest[id] ?? {};
 		const rigged = kind.rig ? ` clips:${entry.clips?.join("+") ?? "-"}` : "";
-		const account = entry.imageTask ? ` account:${entry.account ?? accounts[0].label}` : "";
-		console.log(`${id.padEnd(16)} image:${entry.imageTask ? "yes" : "-"} glb:${entry.glb ? "yes" : "-"}${rigged} credits:${entry.credits ?? 0}${account}`);
+		const label = entry.imageTask ? entry.account ?? accounts[0].label : entry.account;
+		const account = label ? ` account:${label}` : "";
+		const image = entry.imageSource === "google" ? "google" : entry.imageTask ? "yes" : "-";
+		console.log(`${id.padEnd(16)} image:${image} glb:${entry.glb ? "yes" : "-"}${rigged} credits:${entry.credits ?? 0}${account}`);
 	}
 	process.exit(0);
 }

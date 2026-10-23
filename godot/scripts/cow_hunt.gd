@@ -1,15 +1,17 @@
 extends RefCounted
 
 # Daily mini-game "findcow" (daily_games.gd): a herd of cows spread over the
-# city and one of them, today's named cow, is the one to swallow. Clues open one
-# by one: its bell colour from the start, then its coat, then the part of town
-# it grazes in (one more every CLUE_EVERY seconds, and one after each wrong
-# bite). Wrong bites cost time and a chewing pause, so swallowing the whole herd
+# farmland (countryside.gd) and one of them, today's named cow, is the one to
+# swallow. Clues open one by one: its bell colour from the start, then its coat,
+# then the zone it grazes in (one more every CLUE_EVERY seconds, and one after
+# each wrong bite). A name tag over the nearest cow turns green when the cow fits
+# every open clue. Wrong bites cost time and a chewing pause, so swallowing the whole herd
 # never pays; MAX_WRONG of them ends the round. Close to a cow, its name shows.
 const I18n = preload("res://scripts/i18n.gd")
 const Traffic = preload("res://scripts/traffic.gd")
 const COWS := 80
-const COW_SIZE := 0.55
+# Under the small hole's reach (0.81), which never grows in the hunt.
+const COW_SIZE := 0.7
 const SPACING := 3.2
 const BELLS := ["e63946", "3a7bd5", "ffd23f", "2fa86b"]
 const COATS := [["f4f1ea", "2b2b30"], ["a0623a", "e8d2b4"]]
@@ -31,6 +33,8 @@ var found := false
 var chew := 0.0
 var clock := 0.0
 var label: Label3D
+# The zone a spot belongs to: Countryside.zone ("forest"...) or quarter ("north"...).
+var zone_of: Callable = func(at: Vector3) -> String: return quarter(at)
 
 # --- setup -----------------------------------------------------------------------
 
@@ -69,16 +73,16 @@ func build(game, rng: RandomNumberGenerator, spot: Callable) -> void:
 	for cow in cows:
 		if cow == star: continue
 		if cow.cow_name == star_name: cow.cow_name = NAMES[(NAMES.find(star_name) + 1) % NAMES.size()]
-		if cow.bell == star.bell and cow.coat == star.coat and quarter(cow.origin) == quarter(star.origin):
+		if cow.bell == star.bell and cow.coat == star.coat and zone_of.call(cow.origin) == zone_of.call(star.origin):
 			cow.bell = (cow.bell + 1) % BELLS.size()
 			cow.variant = cow.coat*BELLS.size() + cow.bell
 			cow.batch = "huntcow" + str(cow.variant)
 	if not is_instance_valid(label):
 		label = Label3D.new()
 		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		label.font_size = 64
-		label.outline_size = 16
-		label.pixel_size = 0.01
+		label.font_size = 96
+		label.outline_size = 24
+		label.pixel_size = 0.012
 		label.no_depth_test = true
 	if label.get_parent() != game.world: game.world.add_child(label)
 	label.visible = false
@@ -115,6 +119,13 @@ func update(game, dt: float) -> void:
 	if label.visible:
 		label.text = nearest.cow_name
 		label.position = nearest.position + Vector3(0, 1.6, 0)
+		label.modulate = Color("7dff9a") if fits(nearest) else Color("f2f2f2")
+
+# Whether a cow matches every clue open so far.
+func fits(cow: Dictionary) -> bool:
+	if cow.bell != star.bell: return false
+	if clues >= 2 and cow.coat != star.coat: return false
+	return clues < 3 or zone_of.call(cow.origin) == zone_of.call(star.origin)
 
 func caught(game, item: Dictionary) -> void:
 	if item.kind != "huntcow": return
@@ -140,7 +151,8 @@ func done() -> bool:
 func note() -> String:
 	var parts: Array = [I18n.t("cow_bell_" + str(star.bell))]
 	if clues >= 2: parts.append(I18n.t("cow_coat_" + str(star.coat)))
-	if clues >= 3: parts.append(I18n.t("cow_" + quarter(star.origin)))
+	if clues >= 3: parts.append(I18n.t("cow_" + zone_of.call(star.origin)))
+	else: parts.append(I18n.t("cow_next", ceili(CLUE_EVERY*clues - clock)))
 	return I18n.t("cow_clues", [star_name, " · ".join(parts)])
 
 func stars() -> int:

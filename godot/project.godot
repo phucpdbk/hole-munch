@@ -23,6 +23,8 @@ config/icon="res://icon.svg"
 
 prototype/version="0.1"
 testing/unlock_all_levels=false
+testing/daily_type=""
+testing/daily_type_android="findcow"
 build_code=12
 
 [display]

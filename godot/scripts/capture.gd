@@ -46,6 +46,41 @@ func run(game, campaign_mode: bool) -> void:
 			await snapshot("skin-%d" % skin)
 		g.get_tree().quit()
 		return
+	# The cow hunt's farmland from above, then the hole beside today's cow with
+	# every clue open (test-output/cow-overview.png, cow-play.png).
+	if "--cow-capture" in OS.get_cmdline_user_args():
+		g.campaign.daily = {}
+		g.daily_override = "findcow"
+		g.start_daily()
+		g.started = true
+		g.overview_size = maxf(g.layout.half_x, g.layout.half_z)*2.3
+		g.camera.far = 600
+		await frames(90)
+		await snapshot("cow-overview")
+		g.overview_size = 0.0
+		g.camera.far = 200
+		g.daily.hunt.clock = 31.0
+		var star: Dictionary = g.daily.hunt.star
+		g.hole_position = star.position + Vector3(1.8, 0, 1.2)
+		g.hole_position.y = 0
+		await frames(60)
+		await snapshot("cow-play")
+		g.get_tree().quit()
+		return
+	# A grown hole parked on the map edge: shaft and rim stop at the slab (test-output/edge-*.png).
+	if "--edge-capture" in OS.get_cmdline_user_args():
+		g.load_level(1)
+		g.on_play()
+		g.started = true
+		g.defense.grace = INF
+		for side in [["east", Vector3(1, 0, 0)], ["south", Vector3(0, 0, 1)]]:
+			g.target_radius = 2.6; g.radius = 2.6
+			g.hole_position = Vector3(side[1].x*g.layout.move_x, 0, side[1].z*g.layout.move_z)
+			for i in 30: g.step(0.02, Vector2.ZERO)
+			await frames(30)
+			await snapshot("edge-" + side[0])
+		g.get_tree().quit()
+		return
 	# Bonus run: the start, a gate pair coming up, the landmark ahead, the result.
 	if "--run-capture" in OS.get_cmdline_user_args():
 		g.load_level(4)

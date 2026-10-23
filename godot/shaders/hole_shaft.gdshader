@@ -5,12 +5,20 @@ render_mode unshaded, cull_disabled;
 uniform vec4 glow : source_color = vec4(0.68, 0.6, 0.93, 1.0);
 uniform float clock = 0.0;
 varying vec3 local_position;
+varying vec3 local_camera;
 varying float is_floor;
 void vertex() {
 	local_position = VERTEX;
+	local_camera = (inverse(MODEL_MATRIX) * vec4(CAMERA_POSITION_WORLD, 1.0)).xyz;
 	is_floor = step(0.5, -NORMAL.y);
 }
 void fragment() {
+	// Only what is seen through the mouth (local y 0.9, radius 1) is drawn: near
+	// the map edge the shaft reaches below the thin ground slab and would show
+	// its dark outside from the side.
+	vec3 ray = local_position - local_camera;
+	vec2 mouth = local_camera.xz + ray.xz * (0.9 - local_camera.y) / ray.y;
+	if (ray.y >= 0.0 || length(mouth) > 1.0) discard;
 	float angle = atan(local_position.z, local_position.x);
 	float r = length(local_position.xz);
 	vec3 void_colour = vec3(0.015, 0.02, 0.05);

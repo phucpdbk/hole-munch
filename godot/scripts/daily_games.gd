@@ -108,7 +108,14 @@ func build(game, type: String, value: int) -> void:
 					treasure.value = entry[2]
 					treasure.gold = true
 					prey.append(treasure)
-		"findcow": hunt.build(game, rng, func(): return road_spot(game, 6.0))
+		"findcow":
+			var farm = game.countryside
+			if farm:
+				hunt.zone_of = farm.zone
+				hunt.build(game, rng, func(): return farm.spot(game, rng, 6.0))
+			else:
+				hunt.zone_of = func(at: Vector3) -> String: return CowHunt.quarter(at)
+				hunt.build(game, rng, func(): return road_spot(game, 6.0))
 	for item in prey + sky: item.optional = true
 
 # A spot on a road, away from the spawn point.

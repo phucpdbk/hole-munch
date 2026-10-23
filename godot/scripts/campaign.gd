@@ -561,6 +561,12 @@ static func daily_level(date: String) -> int:
 	return absi(hash("hole-munch-" + date)) % level_count()
 
 static func daily_type(date: String) -> String:
+	# Debug builds can pin one mini-game for play-testing (testing/daily_type, and
+	# testing/daily_type_android for the debug APK); release builds always rotate.
+	# A ".android" feature override is not applied to these custom settings.
+	var pinned := str(ProjectSettings.get_setting("application_custom/testing/daily_type", ""))
+	if OS.has_feature("android"): pinned = str(ProjectSettings.get_setting("application_custom/testing/daily_type_android", pinned))
+	if OS.is_debug_build() and pinned in DAILY_TYPES: return pinned
 	return DAILY_TYPES[absi(hash("type-" + date)) % DAILY_TYPES.size()]
 
 # The power a first daily win hands out, also fixed per day.
@@ -568,10 +574,13 @@ static func daily_power(date: String) -> String:
 	return POWER_KINDS[absi(hash("power-" + date)) % POWER_KINDS.size()]
 
 func daily_record(date: String) -> Dictionary:
-	if daily.get("date", "") == date: return daily
+	# The type follows daily_type, so a pinned test type also shows on a day already started.
+	if daily.get("date", "") == date: return daily.merged({"type":daily_type(date)}, true)
 	return {"date":date, "type":daily_type(date), "attempts":0, "best":0, "won":false}
 
 func daily_attempts_left(date: String) -> int:
+	# The in-game TEST MODE replays the daily without limit.
+	if test_mode: return DAILY_ATTEMPTS
 	return maxi(0, DAILY_ATTEMPTS - int(daily_record(date).attempts))
 
 # Spends one of today's tries; false when none are left.
