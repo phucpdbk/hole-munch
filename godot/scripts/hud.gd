@@ -119,6 +119,9 @@ var stick_delta := Vector2.ZERO
 # Saucer skill button (skills.gd): kind ("" hides it), bar fill and the share
 # of a running skill still left.
 var skill_kind := ""
+# The slide puzzle's undo and restart buttons, bottom centre.
+var puzzle_buttons := false
+const PUZZLE_RADIUS := 38.0
 var skill_energy := 0.0
 var skill_active := 0.0
 const SKILL_RADIUS := 50.0
@@ -416,7 +419,7 @@ func draw_progress_chip() -> void:
 	var daily_round := run_kind == "daily"
 	var share := round_share()
 	var value := "%d/%d" % [daily_count, daily_target] if daily_round else "%d%%" % int(share*100)
-	var hearts := guardian_max if not daily_round else 0
+	var hearts := guardian_max
 	var width := 76.0 + UiStyle.text_width(value, 20, title_font) + hearts*24.0
 	panel(Rect2(24, 112, width, 44), Color("1b3048ed"), 20)
 	UiStyle.draw_icon(self, daily_icon if daily_round else "flag", Vector2(48, 134), 26)
@@ -472,19 +475,55 @@ func draw_playing() -> void:
 	if combo >= 2: draw_combo()
 	draw_floaters()
 	draw_progress_chip()
-	var run_label := run_title()
+	# The puzzle's moves, par and size take the title line above its board.
+	var run_label := note if puzzle_buttons else run_title()
 	if run_label != "": text_at(run_label, Vector2(w/2-44, 126), 15, UiStyle.MINT, true, 4)
-	if waiting:
+	if puzzle_buttons:
+		if waiting: text_at(start_hint, puzzle_layout().hint, 17, LIGHT, true, 6)
+	elif waiting:
 		panel(Rect2(w/2-176, h/2+88, 352, 48), Color("1b3048df"), 20)
 		text_at(start_hint if start_hint != "" else I18n.t("drag_to_start"), Vector2(w/2, h/2+119), 19, LIGHT, true)
 		if run_kind == "runner": text_at(note, Vector2(w/2, 186), 20, LIGHT, true, 6)
 	elif note != "":
 		text_at(note, Vector2(w/2, 186), 20, LIGHT, true, 6)
 	if skill_kind != "": draw_skill()
+	if puzzle_buttons: draw_puzzle_buttons()
 	if stick_active:
 		draw_circle(stick_origin, 54, Color(1,1,1,0.13))
 		draw_arc(stick_origin, 54, 0, TAU, 32, Color(1,1,1,0.65), 2, true)
 		draw_circle(stick_origin+stick_delta.limit_length(54), 22, Color("fff9edb0"))
+
+# Where the puzzle board sits on screen (its camera fits the board to it) and
+# its buttons and hint around it: beside the board in landscape, under it in
+# portrait, always clear of the score, timer and goal chips.
+func puzzle_layout() -> Dictionary:
+	var w := size.x
+	var h := size.y
+	if w > h:
+		var side := h - 170.0
+		var board := Rect2(w/2 - side/2, 140, side, side)
+		var mid := board.get_center().y
+		return {"board":board, "undo":Vector2(board.position.x - 70, mid), "restart":Vector2(board.end.x + 70, mid), "hint":Vector2(board.position.x/2, mid - 80)}
+	var portrait := Rect2(20, 170, w - 40, w - 40)
+	return {"board":portrait, "undo":Vector2(w/2 - 70, portrait.end.y + 60), "restart":Vector2(w/2 + 70, portrait.end.y + 60), "hint":Vector2(w/2, portrait.end.y + 140)}
+
+func puzzle_button_center(kind: String) -> Vector2:
+	return puzzle_layout()[kind]
+
+# "undo", "restart" or "" for a press at point.
+func puzzle_button_at(point: Vector2) -> String:
+	if not puzzle_buttons: return ""
+	for kind in ["undo", "restart"]:
+		if point.distance_to(puzzle_button_center(kind)) <= PUZZLE_RADIUS + 8: return kind
+	return ""
+
+func draw_puzzle_buttons() -> void:
+	for kind in ["undo", "restart"]:
+		var center := puzzle_button_center(kind)
+		draw_circle(center, PUZZLE_RADIUS, Color("1b3048ed"))
+		draw_arc(center, PUZZLE_RADIUS - 2, 0, TAU, 40, Color("b7a2f1"), 3, true)
+		UiStyle.draw_icon(self, "left" if kind == "undo" else "replay", center - Vector2(0, 6), 30)
+		text_at(I18n.t("slide_" + kind), center + Vector2(0, 26), 11, MUTED, true, 3)
 
 # Bottom right, clear of the stick that starts wherever the player touches.
 func skill_center() -> Vector2:

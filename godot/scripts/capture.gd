@@ -46,6 +46,46 @@ func run(game, campaign_mode: bool) -> void:
 			await snapshot("skin-%d" % skin)
 		g.get_tree().quit()
 		return
+	# The slide puzzle at the start and halfway along the solver's path
+	# (test-output/slide-start.png, slide-play.png).
+	if "--slide-capture" in OS.get_cmdline_user_args():
+		g.campaign.daily = {}
+		g.campaign.test_mode = true
+		g.play_daily("slide")
+		await frames(30)
+		await snapshot("slide-start")
+		var path: Array = g.daily.puzzle.solution()
+		for i in path.size()/2: g.slide(path[i])
+		await frames(60)
+		await snapshot("slide-play")
+		g.get_tree().quit()
+		return
+	# The siege a few seconds in, then with a helicopter in the tractor beam
+	# (test-output/siege-play.png, siege-beam.png).
+	if "--siege-capture" in OS.get_cmdline_user_args():
+		g.campaign.daily = {}
+		g.campaign.test_mode = true
+		g.play_daily("siege")
+		var siege = g.daily.siege
+		g.started = true
+		for frame in 1000:
+			g.step(0.02, Vector2(0.4, 0.2) if frame%120 < 60 else Vector2(-0.4, -0.1))
+			siege.grace = 1.0
+		await frames(5)
+		await snapshot("siege-play")
+		for frame in 1250:
+			g.step(0.02, Vector2(0.3, -0.3) if frame%160 < 80 else Vector2(-0.3, 0.3))
+			siege.grace = 1.0
+		await frames(5)
+		await snapshot("siege-late")
+		siege.add_foe(g, "heli", g.hole_position)
+		siege.foes[-1].pos = g.hole_position + Vector3(2.0, 0, 0)
+		siege.foes[-1].hp = 99
+		for frame in 12: g.step(0.02, Vector2.ZERO)
+		await frames(3)
+		await snapshot("siege-beam")
+		g.get_tree().quit()
+		return
 	# The test-mode list of daily games (daily_picker.gd), the sky hop before the
 	# first tap, then mid-flight past a few gaps (test-output/hop-menu.png,
 	# hop-start.png, hop-play.png).

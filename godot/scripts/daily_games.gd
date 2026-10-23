@@ -6,6 +6,8 @@ extends Node3D
 #   goldrush - only golden treasure scores, raced by the rival hole.
 #   findcow  - find today's named cow in a herd from opening clues (cow_hunt.gd).
 #   skyhop   - one-tap flight through gaps high above the city (sky_hop.gd).
+#   slide    - a turn-based sliding puzzle on a block above the city (slide_puzzle.gd).
+#   siege    - the saucer shoots down the army's air force (sky_siege.gd).
 # The landmark, its guardian and the defence squads sit the round out. game.gd
 # owns the items; this node adds the game's own items when the city is built,
 # moves them, counts catches and draws the shadows of falling coins.
@@ -13,11 +15,16 @@ const Traffic = preload("res://scripts/traffic.gd")
 const I18n = preload("res://scripts/i18n.gd")
 const CowHunt = preload("res://scripts/cow_hunt.gd")
 const SkyHop = preload("res://scripts/sky_hop.gd")
-const SECONDS := {"stampede":45.0, "coinrain":45.0, "goldrush":60.0, "findcow":75.0, "skyhop":120.0}
-const TARGET := {"stampede":15, "coinrain":24, "goldrush":30, "findcow":1, "skyhop":20}
-# Coins paid per catch (gold pays per value point, the sky hop per gap).
-const COIN_RATE := {"stampede":6, "coinrain":4, "goldrush":4, "findcow":1, "skyhop":5}
-const ICON := {"stampede":"target", "coinrain":"coin", "goldrush":"chest", "findcow":"target", "skyhop":"star"}
+const SlidePuzzle = preload("res://scripts/slide_puzzle.gd")
+const SkySiege = preload("res://scripts/sky_siege.gd")
+const SECONDS := {"stampede":45.0, "coinrain":45.0, "goldrush":60.0, "findcow":75.0, "skyhop":120.0, "slide":150.0, "siege":60.0}
+# The slide puzzle counts its stars, so its target is solving it at all.
+const TARGET := {"stampede":15, "coinrain":24, "goldrush":30, "findcow":1, "skyhop":20, "slide":1, "siege":30}
+# Coins paid per catch (gold pays per value point, the sky hop per gap, the
+# siege per enemy point); the slide puzzle pays a base plus this per star.
+const COIN_RATE := {"stampede":6, "coinrain":4, "goldrush":4, "findcow":1, "skyhop":5, "slide":15, "siege":3}
+const SLIDE_BASE_COINS := 15
+const ICON := {"stampede":"target", "coinrain":"coin", "goldrush":"chest", "findcow":"target", "skyhop":"star", "slide":"gem", "siege":"fire"}
 const STAR_SHARES := [0.5, 1.0, 1.5]
 # Ducks rest, then sprint away from a nearby hole; a sprint is faster than the
 # hole but short, so cornering a duck pays off.
@@ -52,6 +59,8 @@ var next_bomb := 0.0
 var markers: Array[MeshInstance3D] = []
 var hunt := CowHunt.new()
 var hop := SkyHop.new()
+var puzzle := SlidePuzzle.new()
+var siege := SkySiege.new()
 
 func _ready() -> void:
 	var shadow := StandardMaterial3D.new()
@@ -73,12 +82,15 @@ func _ready() -> void:
 		markers.append(marker)
 	add_child(hop)
 	hop.visible = false
+	add_child(puzzle)
+	puzzle.visible = false
+	add_child(siege)
 
 static func title(type: String) -> String:
 	return I18n.t("dg_" + type)
 
 static func goal_line(type: String) -> String:
-	if type == "findcow": return I18n.t("dgoal_findcow")
+	if type in ["findcow", "slide"]: return I18n.t("dgoal_" + type)
 	return I18n.t("dgoal_" + type, TARGET[type])
 
 func target() -> int:
@@ -123,6 +135,10 @@ func build(game, type: String, value: int) -> void:
 				hunt.build(game, rng, func(): return road_spot(game, 6.0))
 		"skyhop":
 			hop.build(game, value)
+		"slide":
+			puzzle.build(game, value)
+		"siege":
+			siege.build(value)
 	for item in prey + sky: item.optional = true
 
 # A spot on a road, away from the spawn point.
@@ -160,6 +176,10 @@ func reset(game) -> void:
 	for marker in markers: marker.visible = false
 	if kind == "findcow": hunt.reset()
 	if kind == "skyhop": hop.reset()
+	if kind == "slide": puzzle.reset()
+	# The siege's planes and shots are its own nodes: clear them in other games.
+	if kind == "siege": siege.reset()
+	else: siege.clear()
 
 func park(game, drop: Dictionary) -> void:
 	drop.hidden = true
@@ -180,6 +200,12 @@ func update(game, dt: float) -> void:
 	elif kind == "skyhop":
 		hop.update(game, dt)
 		count = hop.passed
+	elif kind == "slide":
+		puzzle.update(dt)
+		count = puzzle.stars()
+	elif kind == "siege":
+		siege.update(game, dt, game.hole_position, game.move_direction().length() < 0.1)
+		count = siege.count
 
 func move_duck(game, duck: Dictionary, dt: float) -> void:
 	if not Traffic.is_active(duck): return
@@ -285,6 +311,8 @@ func caught(game, item: Dictionary) -> void:
 func done() -> bool:
 	if kind == "findcow": return hunt.done()
 	if kind == "skyhop": return hop.done()
+	if kind == "slide": return puzzle.done()
+	if kind == "siege": return siege.done()
 	return kind == "stampede" and prey.all(func(duck): return not Traffic.is_active(duck))
 
 func reached() -> bool:
@@ -292,6 +320,7 @@ func reached() -> bool:
 
 func stars() -> int:
 	if kind == "findcow": return hunt.stars()
+	if kind == "slide": return puzzle.stars()
 	var total := 0
 	for share in STAR_SHARES:
 		if count >= ceili(target()*share): total += 1
@@ -299,24 +328,28 @@ func stars() -> int:
 
 func goal_labels() -> Array:
 	if kind == "findcow": return hunt.goal_labels()
+	if kind == "slide": return [I18n.t("slide_g1"), I18n.t("slide_g2", puzzle.par + SlidePuzzle.PAR_SLACK), I18n.t("slide_g3", puzzle.par)]
 	return STAR_SHARES.map(func(share): return I18n.t("dg_count_" + kind, ceili(target()*share)))
 
 func reward(coin_mul: float) -> int:
 	if kind == "findcow": return hunt.reward(coin_mul)
+	if kind == "slide": return roundi((SLIDE_BASE_COINS + puzzle.stars()*COIN_RATE.slide)*coin_mul) if puzzle.solved else 0
 	return roundi(count*COIN_RATE.get(kind, 1)*coin_mul)
 
 # Minimap dots for what still scores.
 func dots() -> Array:
 	var list: Array = []
 	# No minimap help in the cow hunt: the clues are the whole game.
-	if kind == "findcow": return list
+	if kind == "findcow" or kind == "slide": return list
+	if kind == "siege": return siege.dots()
 	for item in prey + sky:
 		if item.get("prey", false) and Traffic.is_active(item) and item.get("falling", 0.0) <= 0:
 			list.append(Vector2(item.position.x, item.position.z))
 	return list
 
-# The HUD's note line: the cow hunt's open clues, nothing for the others.
+# The HUD's note line: the cow hunt's open clues, the puzzle's moves and size.
 func note() -> String:
+	if kind == "slide": return I18n.t("slide_note", [puzzle.moves, puzzle.par, puzzle.level()])
 	return hunt.note() if kind == "findcow" else ""
 
 # Movement scale: a wrong cow is chewed slowly.

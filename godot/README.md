@@ -222,7 +222,7 @@ its landmark to conquer it, while dodging independent military defenders.
   about 70–90% of the timer).
 - **Daily challenge** (THỬ THÁCH NGÀY): one city per date for everyone, with a
   rival and one continent tougher defence; the first win of the day pays ×1.5.
-  Mini-games by date: duck stampede, coin rain, gold rush and **find the cow**
+  Mini-games by date (seven, `Campaign.DAILY_TYPES`): duck stampede, coin rain, gold rush, **find the cow**
   (`cow_hunt.gd`): 80 named cows, one of them today's, on countryside farmland
   instead of a city (`countryside.gd`: forest north, cornfield east, farmyard
   south, wheat west, meadow in the middle, each zone signposted; cows stand on
@@ -241,6 +241,27 @@ its landmark to conquer it, while dodging independent military defenders.
   first tap and every try of a day flies the same seeded course. The course
   has its own camera, made current for the round and its result.
   `-- --capture --hop-capture` shoots the test-mode daily list, the start and mid-flight.
+  **Slide munch** (`slide_puzzle.gd`): a turn-based puzzle on a 7×7 block high
+  above the city with its own tilted camera. A swipe (arrows/WASD) slides the
+  hole until a building, the edge or something bigger than the hole stops it,
+  swallowing every snack that fits on the way. Snacks are size 1 (×5) and 2
+  (×3), the hole grows to size 2 at 3 points and 3 at 8, and the landmark
+  needs size 3. The day's seed lays out boards until a breadth-first solver
+  finds a shortest solution of 6–14 slides (par). Stars: solved, within par+3,
+  in par; 15 coins plus 15 a star. Undo (U) and reset (R) are free buttons
+  beside the board; the 150 s clock starts with the first slide. The HUD lays
+  the board out between its chips (`hud.gd puzzle_layout`) and the camera
+  fits the board to that frame. `-- --capture --slide-capture` shoots it.
+  **Sky siege** (`sky_siege.gd`): the air force attacks the saucer over today's
+  city for 60 s. The player only steers; the saucer fires at the nearest enemy
+  within 8 units. Helicopters circle and shoot, jets strafe along a lane that
+  glows red for 1 s first, flak guns drop warned blasts where the saucer is,
+  and a command blimp arrives at 40 s firing rings. Holding still beside a
+  helicopter for 0.6 s reels it into the beam: it counts as downed and flies as
+  an escort that fires for 8 s. Downed enemies score 1 (helicopter), 2 (jet,
+  flak) or 6 (blimp) and sometimes drop a spread or rapid-fire power (5 s).
+  Three hits end the run; 30 points is the target, 3 coins a point.
+  `-- --capture --siege-capture` shoots mid-round and the late waves.
 - **Daily streak**: a finished daily round keeps it; days 1–7 pay 20–120 coins
   and every seventh day adds a 300-coin bonus. Shown beside today's mini-game.
 - **Daily leaderboard** (`play_games.gd`): Android only, with the GodotPlayGameServices
@@ -332,7 +353,7 @@ replays it. All levels can
 also be opened for every build with
 `application_custom/testing/unlock_all_levels=true` in `project.godot`.
 `application_custom/testing/daily_type` pins the daily mini-game in debug builds
-(`stampede`, `coinrain`, `goldrush`, `findcow` or `skyhop`; empty rotates by date). 
+(`stampede`, `coinrain`, `goldrush`, `findcow`, `skyhop`, `slide` or `siege`; empty rotates by date). 
 `testing/daily_type_android` sets `findcow` for the debug APK; release builds
 ignore both.
 

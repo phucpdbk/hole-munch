@@ -144,6 +144,12 @@ var endless_advance := false
 # Today's daily mini-game (scripts/daily_games.gd); tests may force a type.
 var daily: Node3D
 var daily_kind := "stampede"
+# The slide puzzle's swipe: where the touch began, and whether it still counts.
+var swipe_from := Vector2.ZERO
+var swiping := false
+const SWIPE_MIN := 36.0
+# The siege saucer's flying speed (it never grows there).
+const SIEGE_SPEED := 7.5
 var daily_override := ""
 # Test mode's list of every daily mini-game (daily_picker.gd).
 var daily_picker: Control
@@ -399,8 +405,9 @@ func load_level(index: int) -> void:
 	if run_kind == "daily":
 		level.rival = daily_kind == "goldrush"
 		level.seconds = DailyGames.SECONDS[daily_kind]
-		# The sky hop flies above the weather; a fog veil would hide the course.
-		if daily_kind == "skyhop": level.weather = "clear"
+		# The sky hop and the puzzle sit above the weather, and fog would hide the
+		# siege's planes, so all three play in clear skies.
+		if daily_kind in ["skyhop", "slide", "siege"]: level.weather = "clear"
 	var run := run_kind == "runner"
 	if run:
 		level.rival = false
@@ -1196,6 +1203,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if sky_hop():
 		if DailyGames.SkyHop.is_tap(event): daily.hop.flap(self)
 		return
+	if slide_puzzle():
+		slide_input(event)
+		return
 	var tapped: bool = (event is InputEventScreenTouch or event is InputEventMouseButton) and event.pressed
 	# The skill button takes its presses (and the mouse copy of a touch) before the stick.
 	if tapped and hud.skill_hit(event.position):
@@ -1270,6 +1280,12 @@ func step(dt: float, input: Vector2) -> void:
 	if sky_hop():
 		hop_step(dt)
 		return
+	if slide_puzzle():
+		slide_step(dt)
+		return
+	if siege():
+		siege_step(dt, input)
+		return
 	if input.length() > 0.05: started = true
 	animate_world(dt)
 	if not started: return
@@ -1293,12 +1309,7 @@ func step(dt: float, input: Vector2) -> void:
 	if remaining <= 10 and remaining > 0 and int(ceil(remaining)) != last_tick:
 		last_tick = int(ceil(remaining))
 		sfx.play("tick")
-	var right := camera.global_basis.x
-	var down := camera.global_basis.z
-	right.y = 0
-	down.y = 0
-	var movement := (right.normalized()*input.x + down.normalized()*input.y).limit_length()
-	var wanted: Vector3 = movement*(5.8+minf(radius,4.0)*0.45)*float(stats.speed)*defense.speed_multiplier()*mechanics.speed_multiplier()*skills.speed_multiplier()*(daily.speed_scale() if run_kind == "daily" else 1.0)
+	var wanted: Vector3 = screen_move(input)*(5.8+minf(radius,4.0)*0.45)*float(stats.speed)*defense.speed_multiplier()*mechanics.speed_multiplier()*skills.speed_multiplier()*(daily.speed_scale() if run_kind == "daily" else 1.0)
 	hole_velocity = mechanics.steer(wanted, dt, elapsed)
 	hole_position += hole_velocity*dt
 	hole_position = layout.clamp_point(hole_position)
@@ -1353,6 +1364,79 @@ func eat_reachable() -> void:
 # the city and its defence stay still, and the clock starts with the first tap.
 func sky_hop() -> bool:
 	return run_kind == "daily" and daily_kind == "skyhop"
+
+# The stick in world terms: screen right and down along the ground.
+func screen_move(input: Vector2) -> Vector3:
+	var right := camera.global_basis.x
+	var down := camera.global_basis.z
+	right.y = 0
+	down.y = 0
+	return (right.normalized()*input.x + down.normalized()*input.y).limit_length()
+
+# The slide puzzle daily (slide_puzzle.gd) is turn based on its own board above
+# the city; the clock starts with the first slide.
+func slide_puzzle() -> bool:
+	return run_kind == "daily" and daily_kind == "slide"
+
+func slide_step(dt: float) -> void:
+	daily.update(self, dt)
+	started = daily.puzzle.moves > 0 or started
+	if started and not daily.puzzle.solved: remaining = maxf(0, remaining-dt)
+	if playing and (remaining <= 0 or daily.done()): finish(daily.reached())
+
+# Swipes, arrow keys or WASD slide the hole; the HUD's two buttons (or U and R)
+# undo the last slide and start the board over.
+func slide_input(event: InputEvent) -> void:
+	var puzzle = daily.puzzle
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_RIGHT, KEY_D: slide(Vector2i(1, 0))
+			KEY_LEFT, KEY_A: slide(Vector2i(-1, 0))
+			KEY_DOWN, KEY_S: slide(Vector2i(0, 1))
+			KEY_UP, KEY_W: slide(Vector2i(0, -1))
+			KEY_U, KEY_BACKSPACE: puzzle.undo()
+			KEY_R: puzzle.restart()
+		return
+	# Touches arrive twice (the emulated mouse copy is skipped).
+	if event is InputEventMouse and event.device == InputEvent.DEVICE_ID_EMULATION: return
+	var press: bool = (event is InputEventScreenTouch or event is InputEventMouseButton) and event.pressed
+	if press:
+		match hud.puzzle_button_at(event.position):
+			"undo":
+				puzzle.undo()
+				return
+			"restart":
+				puzzle.restart()
+				return
+		swipe_from = event.position
+		swiping = true
+	elif event is InputEventScreenTouch or event is InputEventMouseButton:
+		swiping = false
+	elif swiping and (event is InputEventScreenDrag or event is InputEventMouseMotion):
+		var delta: Vector2 = event.position - swipe_from
+		if delta.length() < SWIPE_MIN: return
+		swiping = false
+		if absf(delta.x) > absf(delta.y): slide(Vector2i(signi(int(delta.x)), 0))
+		else: slide(Vector2i(0, signi(int(delta.y))))
+
+func slide(dir: Vector2i) -> void:
+	if daily.puzzle.move(self, dir): started = true
+
+# The siege daily (sky_siege.gd): the saucer flies over the city without eating
+# while the air force attacks; the clock starts with the first move.
+func siege() -> bool:
+	return run_kind == "daily" and daily_kind == "siege"
+
+func siege_step(dt: float, input: Vector2) -> void:
+	if input.length() > 0.05: started = true
+	animate_world(dt)
+	if not started: return
+	remaining = maxf(0, remaining-dt)
+	hole_velocity = screen_move(input)*SIEGE_SPEED*float(stats.speed)
+	hole_position = layout.clamp_point(hole_position + hole_velocity*dt)
+	daily.update(self, dt)
+	update_floaters(dt)
+	if playing and (remaining <= 0 or daily.done()): finish(daily.reached())
 
 func hop_step(dt: float) -> void:
 	daily.update(self, dt)
@@ -1909,7 +1993,10 @@ func update_view(dt: float) -> void:
 	# The sky hop's side view has its own camera for the round and its result.
 	var hop_view := sky_hop() and mode != "menu"
 	daily.hop.show_view(hop_view)
-	if not hop_view and not camera.current: camera.make_current()
+	var board_view := slide_puzzle() and mode != "menu"
+	daily.puzzle.show_view(board_view, hud.puzzle_layout().board)
+	daily.siege.visible = siege() and mode != "menu"
+	if not hop_view and not board_view and not camera.current: camera.make_current()
 	hole.position = hole_position
 	hole.scale = Vector3(radius,1,radius)
 	hole_style.sync(hole_position, radius, elapsed, hole_velocity, dt)
@@ -1978,7 +2065,11 @@ func update_hud() -> void:
 	hud.guardian_max = mechanics.mascot.HP if guarding else 0
 	hud.guardian_hp = mechanics.mascot.hp if guarding else 0
 	# Fog hides the map: only the patch around the saucer shows where to go.
-	hud.minimap = {} if level.weather == "fog" or run_kind == "runner" or sky_hop() else minimap_data()
+	hud.minimap = {} if level.weather == "fog" or run_kind == "runner" or sky_hop() or slide_puzzle() else minimap_data()
+	if siege():
+		hud.guardian_max = DailyGames.SkySiege.LIVES
+		hud.guardian_hp = daily.siege.lives
+	hud.puzzle_buttons = slide_puzzle() and mode == "playing"
 	hud.revive_left = revive_left
 	hud.revive_seconds = int(Ads.REVIVE_SECONDS)
 	hud.can_double = can_double()
@@ -2026,9 +2117,10 @@ func update_hud() -> void:
 	hud.daily_title = DailyGames.title(daily_kind if run_kind == "daily" else next_daily)
 	hud.daily_goal = DailyGames.goal_line(daily_kind) if run_kind == "daily" else ""
 	hud.daily_icon = DailyGames.ICON.get(daily_kind if run_kind == "daily" else next_daily, "daily")
-	hud.start_hint = I18n.t("hop_hint") if sky_hop() else ""
+	hud.start_hint = I18n.t("hop_hint") if sky_hop() else I18n.t("slide_hint") if slide_puzzle() else I18n.t("siege_hint") if siege() else ""
 	hud.daily_count = daily.count
-	hud.daily_target = daily.target()
+	# The puzzle reads as stars out of three.
+	hud.daily_target = 3 if slide_puzzle() else daily.target()
 	hud.items = campaign.items
 	hud.goal_mask = goal_mask if mode == "result" else campaign.goals[campaign.selected] if run_kind == "campaign" else 0
 	hud.rival_growth = clampf(rival.radius*EAT_RATIO/boss_radius, 0, 1) if rival.active else -1.0

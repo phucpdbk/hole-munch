@@ -14,7 +14,7 @@ const FEATURE_FROM := {"pickup":1, "hunger":3, "counter":4, "gold":2, "roadblock
 const FEATURE_ICON := {"pickup":"magnet", "hunger":"food", "counter":"megaphone",
 	"rival":"skull", "finale":"crown", "region":"globe",
 	"guardian":"shield", "gold":"gem", "roadblock":"lock", "shortcut":"map", "danger":"shield", "water":"map", "festival":"star",
-	"daily_stampede":"target", "daily_coinrain":"coin", "daily_goldrush":"chest", "daily_findcow":"target", "daily_skyhop":"star"}
+	"daily_stampede":"target", "daily_coinrain":"coin", "daily_goldrush":"chest", "daily_findcow":"target", "daily_skyhop":"star", "daily_slide":"gem", "daily_siege":"fire"}
 const WEATHER_TIPS := ["rain", "snow", "fog", "wind", "storm"]
 const MAX_TIPS := 1
 const CARD_DIR := "res://assets/landmark_cards/"

@@ -635,6 +635,8 @@ func check_daily_games(g) -> void:
 	g.go_menu()
 	check_cow_hunt(g)
 	check_sky_hop(g)
+	check_slide_puzzle(g)
+	check_siege(g)
 	g.daily_override = ""
 	var saved = Campaign.new()
 	saved.daily = {"date":date, "type":"coinrain", "attempts":9, "best":-4, "won":true}
@@ -711,6 +713,86 @@ func check_sky_hop(g) -> void:
 	g.go_menu()
 	g.update_view(0.02)
 	check(not hop.visible and g.camera.current, "home hands the view back to the city camera")
+
+# Slide puzzle (slide_puzzle.gd): today's board is seeded and solvable in par,
+# the clock waits for the first slide, undo and reset are free, and playing the
+# solver's path wins all three stars.
+func check_slide_puzzle(g) -> void:
+	g.campaign.daily = {}
+	g.daily_override = "slide"
+	g.start_daily()
+	var puzzle = g.daily.puzzle
+	var path: Array = puzzle.solution()
+	check(g.slide_puzzle() and puzzle.par == path.size() and puzzle.par >= puzzle.PAR_MIN and puzzle.par <= puzzle.PAR_MAX, "today's slide board has a par in range (%d)" % puzzle.par)
+	var twin = load("res://scripts/slide_puzzle.gd").new()
+	twin.generate(g.daily.seed_value)
+	check(twin.walls == puzzle.walls and twin.start == puzzle.start and twin.par == puzzle.par, "the same day builds the same board")
+	twin.free()
+	var before: float = g.remaining
+	for frame in 30: g.step(0.02, Vector2.ZERO)
+	check(g.remaining == before and puzzle.moves == 0, "the puzzle clock waits for the first slide")
+	g.slide(path[0])
+	check(puzzle.moves == 1 and puzzle.cell != puzzle.start, "a swipe slides the hole")
+	puzzle.undo()
+	check(puzzle.moves == 0 and puzzle.cell == puzzle.start and puzzle.mask == 0, "undo gives the slide back")
+	var blocked := false
+	for dir in puzzle.DIRS:
+		if puzzle.slide(puzzle.cell, puzzle.mask, dir)[0] == puzzle.cell:
+			blocked = not g.daily.puzzle.move(g, dir) and puzzle.moves == 0
+			break
+	check(blocked or puzzle.DIRS.all(func(dir): return puzzle.slide(puzzle.start, 0, dir)[0] != puzzle.start), "a slide that cannot move is not a move")
+	for dir in path: g.slide(dir)
+	for frame in 200:
+		if g.mode != "playing": break
+		g.step(0.02, Vector2.ZERO)
+	check(puzzle.solved and puzzle.moves == puzzle.par and g.mode == "result" and g.hud.won and g.hud.stars == 3 and g.reward > 0, "the solver's path swallows the landmark in par for three stars")
+	g.go_menu()
+	g.update_view(0.02)
+	check(not puzzle.visible and g.camera.current, "home hands the view back from the puzzle board")
+
+# Sky siege (sky_siege.gd): the saucer fires on its own, the beam turns a
+# helicopter into an escort, and three hits end the run.
+func check_siege(g) -> void:
+	g.campaign.daily = {}
+	g.daily_override = "siege"
+	g.start_daily()
+	var siege = g.daily.siege
+	check(g.siege() and siege.lives == siege.LIVES and siege.foes.is_empty(), "the siege starts with full lives and an empty sky")
+	var before: float = g.remaining
+	for frame in 30: g.step(0.02, Vector2.ZERO)
+	check(g.remaining == before and siege.foes.is_empty(), "the siege waits for the first move")
+	g.started = true
+	var player: Vector3 = g.hole_position
+	siege.spawn_timer = 99.0
+	siege.add_foe(g, "heli", player)
+	var heli: Dictionary = siege.foes[0]
+	heli.pos = player + Vector3(5, 0, 0)
+	heli.timer = 99.0
+	for frame in 100:
+		if siege.foes.is_empty(): break
+		heli.timer = 99.0
+		g.step(0.02, Vector2.ZERO)
+	check(siege.downed == 1 and siege.count == 1 and g.score > 0, "auto-fire downs a helicopter in range")
+	siege.add_foe(g, "heli", player)
+	var prey: Dictionary = siege.foes[0]
+	prey.pos = g.hole_position + Vector3(2.0, 0, 0)
+	prey.timer = 99.0
+	prey.hp = 99
+	for frame in 60:
+		if not siege.escort.is_empty(): break
+		prey.timer = 99.0
+		g.step(0.02, Vector2.ZERO)
+	check(not siege.escort.is_empty() and siege.count == 2 and siege.foes.is_empty(), "holding still beside a helicopter captures it as an escort")
+	for i in 3:
+		siege.grace = 0.0
+		siege.hit(g)
+	check(siege.lives == 0 and siege.done(), "three hits end the siege")
+	siege.count = g.daily.target()
+	g.step(0.02, Vector2.ZERO)
+	check(g.mode == "result" and g.hud.won and g.reward > 0 and g.hud.stars >= 2, "a siege that reached the target pays out")
+	g.go_menu()
+	g.update_view(0.02)
+	check(not siege.visible, "home hides the siege's planes")
 
 # Tuning aid (`-- --campaign-smoke --rival-bench`): seconds an unopposed rival
 # needs to swallow each landmark, next to the level timer.
