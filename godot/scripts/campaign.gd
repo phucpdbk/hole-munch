@@ -352,10 +352,16 @@ func buy(id: String) -> bool:
 	return true
 
 # --- Cosmetic shop (cosmetics.gd) --------------------------------------------
+# A city counts as taken once its landmark has been swallowed (a met first
+# goal), or once the route has moved past it in an older save.
+func is_conquered(index: int) -> bool:
+	if index < 0 or index >= goals.size(): return false
+	return goals[index] != 0 or (index < unlocked and not is_holiday(index))
+
 func cities_taken() -> int:
 	var total := 0
 	for i in goals.size():
-		if i < unlocked or goals[i] != 0: total += 1
+		if is_conquered(i): total += 1
 	return total
 
 func reward_progress(track: String) -> int:

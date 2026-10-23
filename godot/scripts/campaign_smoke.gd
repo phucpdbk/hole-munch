@@ -39,6 +39,8 @@ func run(g) -> void:
 	check_special_runs(g)
 	check_runner(g)
 	check_panels(g)
+	check_album(g)
+	check_daily_picker(g)
 	check_language_and_intro(g)
 	print("CAMPAIGN CHECKS: ", failures, " failures")
 	g.set_process(false)
@@ -761,3 +763,104 @@ func check_panels(g) -> void:
 		g.apply_style()
 		check(g.rim_shader.get_shader_parameter("style") == skin, "skin %d equips" % skin)
 	check(g.fx.get_child_count() == 20, "cosmetic changes reuse fixed particle pools and the ground trail")
+
+# Conquest album: counts follow the save, locked cities stay silhouettes until
+# test mode reveals them, every landmark has its render, and the cards fit the
+# screen in portrait and landscape.
+func check_album(g) -> void:
+	var Album = preload("res://scripts/album.gd")
+	var campaign = g.campaign
+	var saved := {"goals":campaign.goals.duplicate(), "medals":campaign.medals.duplicate(), "unlocked":campaign.unlocked,
+		"unlock":campaign.unlock_all_for_testing}
+	campaign.goals.fill(0)
+	campaign.medals.fill(0)
+	campaign.unlocked = 2
+	campaign.unlock_all_for_testing = false
+	campaign.goals[0] = 7
+	campaign.goals[1] = 1
+	var tet := Campaign.regular_count()
+	campaign.goals[tet] = 3
+	check(campaign.is_conquered(0) and campaign.is_conquered(1) and campaign.is_conquered(tet) and not campaign.is_conquered(2) and not campaign.is_conquered(8),
+		"album counts a city conquered once its landmark falls (festival cities too)")
+	check(Album.region_count(campaign, 0) == Vector2i(3, Campaign.route(0).size()) and Album.region_count(campaign, 1) == Vector2i(0, Campaign.route(1).size()),
+		"album counts conquered stops per continent, festival cities included")
+	var missing: Array = []
+	for i in Campaign.level_count():
+		var boss: String = Campaign.level_info(i).boss
+		if not ResourceLoader.exists(Album.THUMB % boss): missing.append(boss)
+	check(missing.is_empty(), "every landmark has an album render (tools/bake_landmark_thumbs.gd) %s" % [missing])
+	g.go_menu()
+	g.hud.album_requested.emit()
+	var album = g.wardrobe.album
+	check(g.wardrobe.visible and album.visible and g.wardrobe.tab == "album" and not g.hud.visible, "menu album button opens the album over the menu")
+	check(album.cards.size() == Campaign.route(album.region).size(), "album page lists every stop of the continent")
+	check(not Album.revealed(campaign, 2) and Album.revealed(campaign, 0), "a city not yet taken shows as a locked silhouette")
+	album.pick(5)
+	check(album.region == 5 and album.cards.size() == Campaign.route(5).size() and album.tabs[5].text.ends_with("0/%d" % Campaign.route(5).size()),
+		"album tabs switch continent and show its progress")
+	album.pick(0)
+	album.tap_card(2)
+	check(not g.intro.visible, "a locked card opens nothing")
+	album.tap_card(0)
+	check(g.intro.visible and g.intro.pages[0].has("picture"), "a conquered card opens its landmark card with the render")
+	g.intro.close()
+	campaign.unlock_all_for_testing = true
+	check(Album.revealed(campaign, 47) and Album.region_count(campaign, 5).x == 0, "test mode reveals every card but keeps the real count")
+	for screen in [Vector2(960, 2058), Vector2(960, 1600), Vector2(960, 540), Vector2(1158, 540)]:
+		g.wardrobe.size = screen
+		album.layout()
+		var shown: Vector2 = album.size*album.scale
+		check(shown.is_equal_approx(screen) and (screen.x > screen.y or album.size.x == album.PORTRAIT_WIDTH), "album covers a %dx%d screen (portrait laid out %d wide)" % [screen.x, screen.y, album.size.x])
+		var fits := true
+		for region in Campaign.REGIONS.size():
+			album.region = region
+			album.layout()
+			var tabs_end: float = album.tab_rect(Campaign.REGIONS.size()-1).end.y
+			for card in album.cards:
+				fits = fits and Rect2(Vector2.ZERO, album.size).encloses(card.rect) and card.rect.position.y > tabs_end and card.rect.size.y >= 120
+		check(fits, "album cards fit a %dx%d screen below the tabs" % [screen.x, screen.y])
+	g.wardrobe.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	g.close_panel()
+	check(not album.visible and not g.get_viewport().disable_3d and g.mode == "menu", "closing the album returns to the menu")
+	campaign.goals = saved.goals
+	campaign.medals = saved.medals
+	campaign.unlocked = saved.unlocked
+	campaign.unlock_all_for_testing = saved.unlock
+
+# Test mode: the daily button opens the list of every mini-game, and each row
+# starts that game (AUTO plays today's); outside test mode it starts at once.
+func check_daily_picker(g) -> void:
+	var Picker = preload("res://scripts/daily_picker.gd")
+	var saved := {"daily":g.campaign.daily.duplicate(), "coins":g.campaign.coins}
+	g.campaign.test_mode = true
+	g.go_menu()
+	g.hud.daily_requested.emit()
+	var picker = g.daily_picker
+	check(picker.visible and g.mode == "menu" and picker.rows.size() == Campaign.DAILY_TYPES.size() + 1, "test-mode daily button lists AUTO and every mini-game")
+	var fits := true
+	for screen in [Vector2(960, 540), Vector2(1158, 540), Vector2(960, 2058)]:
+		picker.size = screen
+		picker.layout()
+		for i in picker.rows.size():
+			fits = fits and Rect2(Vector2.ZERO, screen).encloses(picker.row_rect(i).grow_individual(0, 0, 0, Picker.GOAL_H))
+	picker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	check(fits, "the daily list fits landscape and portrait screens")
+	var started := true
+	for type in Picker.choices():
+		g.go_menu()
+		g.hud.daily_requested.emit()
+		picker.rows[Picker.choices().find(type)].pressed.emit()
+		var expected: String = type if type != "" else Campaign.daily_type(Campaign.today())
+		started = started and not picker.visible and g.run_kind == "daily" and g.daily_kind == expected and g.mode == "playing"
+	check(started, "each row of the daily list starts its mini-game")
+	g.go_menu()
+	g.daily_picker.hide()
+	g.campaign.test_mode = false
+	g.daily_override = ""
+	# Test-mode plays still count tries, so start the real check on a fresh day.
+	g.campaign.daily = {}
+	g.hud.daily_requested.emit()
+	check(not picker.visible and g.run_kind == "daily" and g.mode == "playing", "outside test mode the daily button starts today's game at once")
+	g.go_menu()
+	g.campaign.daily = saved.daily
+	g.campaign.coins = saved.coins

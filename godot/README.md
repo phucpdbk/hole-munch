@@ -240,7 +240,7 @@ its landmark to conquer it, while dodging independent military defenders.
   (10/20/30 for the stars, 5 coins a gap). The clock (120 s) starts with the
   first tap and every try of a day flies the same seeded course. The course
   has its own camera, made current for the round and its result.
-  `-- --capture --hop-capture` shoots the test pick, the start and mid-flight.
+  `-- --capture --hop-capture` shoots the test-mode daily list, the start and mid-flight.
 - **Daily streak**: a finished daily round keeps it; days 1–7 pay 20–120 coins
   and every seventh day adds a 300-coin bonus. Shown beside today's mini-game.
 - **Daily leaderboard** (`play_games.gd`): Android only, with the GodotPlayGameServices
@@ -271,6 +271,18 @@ its landmark to conquer it, while dodging independent military defenders.
   turns gold once conquered. The player's craft hovers over the selected city;
   the side card shows weather, timer, map size, rival and goals and starts it.
   Swipe or use the arrows to change continent.
+- **Conquest album** (SƯU TẬP / ALBUM, `album.gd`, a `wardrobe.gd` tab): the
+  menu button (right side in landscape, under PRIVACY in portrait) opens one page
+  per continent with every stop on its route, festival cities included. A
+  conquered city (its landmark swallowed, `campaign.is_conquered`) shows its
+  landmark render, city, landmark name and the star of each goal; a gold edge
+  marks all three. Cities not yet taken are dark silhouettes with a lock. The
+  header counts cities and stars over the whole journey, each continent tab its
+  own stops. Tapping a conquered card opens its fun-fact landmark card. Portrait
+  lays out at 540 wide and scales up so cards stay readable. Test mode reveals
+  every card (the counts and stars still come from the test save).
+  `-- --capture --album-capture [--lang=en]` writes `test-output/album-*.png`
+  (landscape and portrait).
 - **Languages** (`i18n.gd`, table in `i18n_strings.gd`): Tiếng Việt, English,
   Español, Português, Français, Bahasa Indonesia. First launch follows the phone
   language; the speech-bubble button on the menu switches it (saved).
@@ -300,9 +312,10 @@ its landmark to conquer it, while dodging independent military defenders.
 times to switch it on or off (a red TEST MODE label shows). It opens all 48
 cities, refills coins to 999999 after every purchase, never runs out of daily
 tries, and plays on its own save
-(`user://test_save.json`), so the real progress is never touched. A purple
-TEST button above the daily button picks the mini-game the daily starts: each
-tap steps through every type, then back to AUTO (today's). All levels can
+(`user://test_save.json`), so the real progress is never touched. The daily
+button opens a TEST · DAILY list (`daily_picker.gd`) of every mini-game with its
+goal, plus AUTO (today's); a row starts that game and PLAY AGAIN on its result
+replays it. All levels can
 also be opened for every build with
 `application_custom/testing/unlock_all_levels=true` in `project.godot`.
 `application_custom/testing/daily_type` pins the daily mini-game in debug builds
@@ -363,6 +376,7 @@ Godot_v4.7.1-stable_win64_console.exe --path . -- --capture
 Godot_v4.7.1-stable_win64_console.exe --path . -- --campaign-capture
 Godot_v4.7.1-stable_win64_console.exe --path . -- --capture --challenge-capture
 Godot_v4.7.1-stable_win64_console.exe --path . -- --capture --ui-capture --lang=en
+Godot_v4.7.1-stable_win64_console.exe --path . -- --capture --album-capture --lang=en
 Godot_v4.7.1-stable_win64_console.exe --headless --path . -- --campaign-smoke --rival-bench
 ```
 
@@ -475,6 +489,10 @@ Then bake (headless Godot, `--script res://tools/<tool>.gd [-- ids]`):
   squashes and jumps the whole body.
 - **Collection thumbnails**: after new saucers, render `assets/thumbs` with
   `Godot --path . --script res://tools/bake_craft_thumbs.gd` (not headless).
+  After new or changed landmarks, render the album pictures
+  (`assets/thumbs/landmark_<id>.png`, also used by landmark cards without
+  concept art) with `Godot --path . --script res://tools/bake_landmark_thumbs.gd
+  [-- id,id]`; `--campaign-smoke` fails while one is missing.
 - **Check**: `-- --capture --guardian-capture` shoots every attack style with the
   baked guardians and saucer, and `-- --capture --landmark-gallery` shows every landmark.
 

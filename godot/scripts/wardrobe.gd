@@ -1,16 +1,19 @@
 extends Control
 
 # Full-screen panels opened from the menu: the invasion journey (a 3D map per
-# continent, journey_map.gd), the upgrade shop, the hole's wardrobe and the
-# settings panel (language and sound).
+# continent, journey_map.gd), the conquest album (album.gd), the upgrade shop,
+# the hole's wardrobe and the settings panel (language and sound).
 const Campaign = preload("res://scripts/campaign.gd")
 const UiStyle = preload("res://scripts/ui_style.gd")
 const UiButton = preload("res://scripts/ui_button.gd")
 const I18n = preload("res://scripts/i18n.gd")
 const JourneyMap = preload("res://scripts/journey_map.gd")
+const Album = preload("res://scripts/album.gd")
 const Cosmetics = preload("res://scripts/cosmetics.gd")
 const LookCard = preload("res://scripts/look_card.gd")
 const WARDROBE_TABS := ["crafts", "skins", "effects", "trails"]
+# Panels that cover the whole screen (no 3D preview of the hole beside them).
+const FULL_TABS := ["levels", "album", "shop", "language"]
 const CARD_H := 130.0
 const GAP := 10.0
 const UPGRADE_ICONS := {"size":"gem", "speed":"bolt", "time":"clock", "magnet":"magnet", "greed":"coin"}
@@ -23,6 +26,7 @@ var body_font: Font = UiStyle.body_font(700)
 var page := 0
 var look_page := 0
 var journey: Control
+var album: Control
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -30,6 +34,9 @@ func _ready() -> void:
 	journey = JourneyMap.new()
 	journey.game = game
 	add_child(journey)
+	album = Album.new()
+	album.game = game
+	add_child(album)
 	hide()
 	resized.connect(func(): if visible: rebuild())
 	visibility_changed.connect(on_visibility)
@@ -44,10 +51,15 @@ func open(value: String) -> void:
 		journey.open(game.campaign.selected)
 		# The map covers the whole screen, so the city behind it need not render.
 		get_viewport().disable_3d = true
+	elif tab == "album":
+		album.game = game
+		album.open(page)
+		get_viewport().disable_3d = true
 
 func on_visibility() -> void:
 	if visible: return
 	journey.close()
+	album.hide()
 	get_viewport().disable_3d = false
 
 func button(label: String, rect: Rect2, action: Callable, selected := false, disabled := false, icon_kind := "") -> BaseButton:
@@ -72,6 +84,7 @@ func rebuild() -> void:
 	var h := size.y
 	button("", Rect2(w-78, 18, 58, 56), game.close_panel, false, false, "close")
 	if tab == "levels": journey.layout()
+	elif tab == "album": album.layout()
 	elif tab == "shop": build_shop(w, h)
 	elif tab == "language": build_language(w, h)
 	else: build_wardrobe(w, h)
@@ -211,7 +224,7 @@ func equip(index: int) -> void:
 	rebuild()
 
 func _process(dt: float) -> void:
-	if not visible or tab in ["levels", "shop", "language"]: return
+	if not visible or tab in FULL_TABS: return
 	preview_time += dt
 	# Preview the chosen particles in place without starting a round.
 	if preview_time > 1.1:
@@ -227,9 +240,9 @@ func title_at(value: String, pos: Vector2) -> void:
 	UiStyle.text(self, value, pos, 30, UiStyle.LIGHT, false, 5, UiStyle.font(800))
 
 func _draw() -> void:
-	var full := tab in ["levels", "shop", "language"]
+	var full := tab in FULL_TABS
 	draw_rect(Rect2(Vector2.ZERO,size), Color("11233aF2") if full else Color("162a4050"))
-	if tab == "levels": return
+	if tab in ["levels", "album"]: return
 	if not full: draw_rect(Rect2(size.x*0.44,0,size.x*0.56,size.y) if size.x>size.y else Rect2(0,size.y-390,size.x,390),Color("142840f2"))
 	if tab == "shop": draw_shop()
 	elif tab == "language": draw_language()

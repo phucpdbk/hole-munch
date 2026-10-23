@@ -287,6 +287,11 @@ const S := {
 	"tab_effects": ["KHI NUỐT", "BITE FX", "EFECTO", "EFEITO", "EFFET", "EFEK"],
 	"tab_trails": ["VỆT ĐI", "TRAIL", "ESTELA", "RASTRO", "TRAÎNÉE", "JEJAK"],
 	"collection": ["BỘ SƯU TẬP", "COLLECTION", "COLECCIÓN", "COLEÇÃO", "COLLECTION", "KOLEKSI"],
+	# --- Conquest album (album.gd) ---
+	"album": ["SƯU TẬP", "ALBUM", "ÁLBUM", "ÁLBUM", "ALBUM", "ALBUM"],
+	"album_title": ["THÀNH PHỐ ĐÃ CHIẾM", "CONQUERED CITIES", "CIUDADES CONQUISTADAS", "CIDADES CONQUISTADAS", "VILLES CONQUISES", "KOTA TAKLUKAN"],
+	"album_count": ["%d/%d thành phố", "%d/%d cities", "%d/%d ciudades", "%d/%d cidades", "%d/%d villes", "%d/%d kota"],
+	"album_tip": ["Nuốt landmark của một thành phố để thêm nó vào bộ sưu tập.", "Swallow a city's landmark to add it to your album.", "Traga el monumento de una ciudad para añadirla a tu álbum.", "Engula o monumento de uma cidade para colocá-la no álbum.", "Avale le monument d'une ville pour l'ajouter à ton album.", "Telan landmark sebuah kota untuk menambahkannya ke album."],
 	"tap_equip": ["Chạm để trang bị", "Tap to equip", "Toca para equipar", "Toque para equipar", "Touche pour équiper", "Ketuk untuk memakai"],
 	"looks_tip": ["Mua mẫu mới bằng xu kiếm được khi chơi", "Buy new looks with coins you earn", "Compra estilos con las monedas que ganas", "Compre visuais com as moedas que ganhar", "Achète des styles avec tes pièces", "Beli gaya baru dengan koin yang kamu dapat"],
 	"equip": ["Trang bị", "Equip", "Equipar", "Equipar", "Équiper", "Pakai"],

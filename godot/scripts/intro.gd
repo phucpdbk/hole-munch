@@ -18,6 +18,7 @@ const FEATURE_ICON := {"pickup":"magnet", "hunger":"food", "counter":"megaphone"
 const WEATHER_TIPS := ["rain", "snow", "fog", "wind", "storm"]
 const MAX_TIPS := 1
 const CARD_DIR := "res://assets/landmark_cards/"
+const THUMB_DIR := "res://assets/thumbs/landmark_%s.png"
 
 var pages: Array = []
 var pictures := {}
@@ -91,9 +92,10 @@ static func tip_page(id: String) -> Dictionary:
 		for festival in Campaign.HOLIDAYS:
 			if festival.boss == boss: city = festival.city
 		var page := {"tag":Campaign.city_name(boss, city), "icon":"flag", "title":Campaign.boss_name(boss), "body":I18n.t("lmfun_" + boss)}
-		# Meshy concept art (tools/make-landmark-cards.mjs); the flag icon stands in until it exists.
-		var picture := CARD_DIR + boss + ".png"
-		if ResourceLoader.exists(picture): page.picture = picture
+		# Meshy concept art (tools/make-landmark-cards.mjs), else the album's render of the
+		# landmark (tools/bake_landmark_thumbs.gd); the flag icon stands in until either exists.
+		for picture in [CARD_DIR + boss + ".png", THUMB_DIR % boss]:
+			if ResourceLoader.exists(picture) and not page.has("picture"): page.picture = picture
 		return page
 	var page := {"tag":I18n.t("new_tag")}
 	if id.begins_with("weather_"):

@@ -46,16 +46,17 @@ func run(game, campaign_mode: bool) -> void:
 			await snapshot("skin-%d" % skin)
 		g.get_tree().quit()
 		return
-	# The test-mode daily pick on the menu, the sky hop before the first tap,
-	# then mid-flight past a few gaps (test-output/hop-menu.png, hop-start.png, hop-play.png).
+	# The test-mode list of daily games (daily_picker.gd), the sky hop before the
+	# first tap, then mid-flight past a few gaps (test-output/hop-menu.png,
+	# hop-start.png, hop-play.png).
 	if "--hop-capture" in OS.get_cmdline_user_args():
 		g.campaign.daily = {}
 		g.campaign.test_mode = true
 		g.campaign.unlock_all_for_testing = true
-		for i in 5: g.pick_daily()
+		g.hud.daily_requested.emit()
 		await frames(10)
 		await snapshot("hop-menu")
-		g.start_daily()
+		g.play_daily("skyhop")
 		await frames(30)
 		await snapshot("hop-start")
 		var hop = g.daily.hop
@@ -172,6 +173,13 @@ func run(game, campaign_mode: bool) -> void:
 			g.go_menu()
 			await frames(20)
 			await snapshot("landmark-%02d-%s" % [index+1, g.level.boss])
+		g.get_tree().quit()
+		return
+	# Conquest album: the menu button, a few continents with mixed progress, a
+	# landmark card, test mode, then the same in portrait (test-output/album-*.png,
+	# add --lang=en etc.).
+	if "--album-capture" in OS.get_cmdline_user_args():
+		await album_preview()
 		g.get_tree().quit()
 		return
 	# Menus, journey maps, intro/tip cards and panels (add --lang=en etc.).
@@ -505,6 +513,39 @@ func ui_preview() -> void:
 	g.finish(true)
 	await frames(6)
 	await snapshot("ui-%s-result" % lang)
+
+func album_preview() -> void:
+	var lang: String = g.I18n.lang
+	var campaign = g.campaign
+	# Captures never save, so this made-up progress is harmless.
+	campaign.unlock_all_for_testing = false
+	campaign.unlocked = 11
+	for i in 11: campaign.goals[i] = [7, 3, 1, 7, 5, 3, 7, 1, 3, 7, 1][i]
+	campaign.goals[g.Campaign.regular_count()] = 7
+	for i in campaign.goals.size(): campaign.medals[i] = g.Challenges.count(campaign.goals[i])
+	for shape in ["landscape", "portrait"]:
+		if shape == "portrait":
+			g.get_window().size = Vector2i(450, 966)
+			await frames(20)
+		g.go_menu()
+		await frames(30)
+		await snapshot("album-%s-%s-menu" % [lang, shape])
+		g.hud.album_requested.emit()
+		for region in [0, 1, 5]:
+			g.wardrobe.album.pick(region)
+			await frames(6)
+			await snapshot("album-%s-%s-%d" % [lang, shape, region+1])
+		g.wardrobe.album.pick(0)
+		g.wardrobe.album.tap_card(4)
+		await frames(20)
+		await snapshot("album-%s-%s-card" % [lang, shape])
+		g.intro.close()
+		campaign.unlock_all_for_testing = true
+		g.wardrobe.album.pick(3)
+		await frames(6)
+		await snapshot("album-%s-%s-test" % [lang, shape])
+		campaign.unlock_all_for_testing = false
+		g.close_panel()
 
 func guardian_preview() -> void:
 	var specs: Dictionary = g.Mechanics.MascotSpecs.MASCOTS

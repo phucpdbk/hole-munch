@@ -144,6 +144,8 @@ var endless_advance := false
 var daily: Node3D
 var daily_kind := "stampede"
 var daily_override := ""
+# Test mode's list of every daily mini-game (daily_picker.gd).
+var daily_picker: Control
 var runner: Node3D
 # A first win on every Runner.BONUS_EVERY-th city opens the bonus run.
 var bonus_pending := false
@@ -290,9 +292,9 @@ func _ready() -> void:
 	hud.levels_requested.connect(func(): open_panel("levels"))
 	hud.shop_requested.connect(func(): open_panel("shop"))
 	hud.daily_requested.connect(start_daily)
-	hud.daily_pick_requested.connect(pick_daily)
 	hud.endless_requested.connect(start_endless)
 	hud.styles_requested.connect(func(): open_panel("crafts"))
+	hud.album_requested.connect(func(): open_panel("album"))
 	hud.help_requested.connect(show_story)
 	hud.language_requested.connect(func(): open_panel("language"))
 	wardrobe = Wardrobe.new()
@@ -320,6 +322,9 @@ func _ready() -> void:
 	notify = Notify.new()
 	add_child(notify)
 	hud.reminder_requested.connect(toggle_reminders)
+	daily_picker = preload("res://scripts/daily_picker.gd").new()
+	daily_picker.game = self
+	layer.add_child(daily_picker)
 	intro = Intro.new()
 	layer.add_child(intro)
 	apply_style()
@@ -1156,14 +1161,15 @@ func _notification(what: int) -> void:
 	if what in [NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_WM_CLOSE_REQUEST] and is_instance_valid(notify):
 		notify.reschedule(campaign.reminders, campaign.streak_days(Campaign.today()))
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
-		if is_instance_valid(wardrobe) and wardrobe.visible: close_panel()
+		if is_instance_valid(daily_picker) and daily_picker.visible: daily_picker.hide()
+		elif is_instance_valid(wardrobe) and wardrobe.visible: close_panel()
 		elif mode == "playing": toggle_pause()
 		elif mode == "revive": decline_revive()
 		elif mode in ["paused", "result"]: go_menu()
 		else: get_tree().quit()
 
 func _input(event: InputEvent) -> void:
-	if mode != "menu" or not OS.is_debug_build() or wardrobe.visible: return
+	if mode != "menu" or not OS.is_debug_build() or wardrobe.visible or daily_picker.visible: return
 	var tap: bool = (event is InputEventScreenTouch or event is InputEventMouseButton) and event.pressed
 	if not tap or not hud.title_rect().has_point(event.position): return
 	title_taps = title_taps + 1 if elapsed - last_title_tap < TEST_TAP_GAP else 1
@@ -1179,7 +1185,8 @@ func toggle_test_mode() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
-		if wardrobe.visible: close_panel()
+		if daily_picker.visible: daily_picker.hide()
+		elif wardrobe.visible: close_panel()
 		else: toggle_pause()
 	if mode != "playing": return
 	if sky_hop():
@@ -1780,9 +1787,25 @@ func start_run() -> void:
 	bonus_pending = false
 	begin_special("runner", campaign.selected)
 
-# Three tries a day; a mini-game's first try opens its tip card.
+# Three tries a day; a mini-game's first try opens its tip card. In test mode
+# the daily button opens the list of every mini-game first (daily_picker.gd);
+# a replay from the result keeps the picked one.
 func start_daily() -> void:
 	if mode not in ["menu", "result"] or intro.visible: return
+	if campaign.test_mode and mode == "menu":
+		clear_drag()
+		daily_picker.open()
+		return
+	launch_daily()
+
+# Test mode: play one mini-game from the list ("" is today's).
+func play_daily(type: String) -> void:
+	if not campaign.test_mode or mode != "menu": return
+	daily_override = type
+	daily_picker.hide()
+	launch_daily()
+
+func launch_daily() -> void:
 	var date := Campaign.today()
 	if campaign.daily_attempts_left(date) <= 0:
 		if mode == "result": go_menu()
@@ -1795,12 +1818,6 @@ func start_daily() -> void:
 		intro.open([Intro.tip_page(tip)], begin_daily)
 		return
 	begin_daily()
-
-# Test mode: the pick button steps through every mini-game, then back to today's.
-func pick_daily() -> void:
-	if not campaign.test_mode or mode != "menu": return
-	var order: Array = [""] + Campaign.DAILY_TYPES
-	daily_override = order[(order.find(daily_override) + 1) % order.size()]
 
 func begin_daily() -> void:
 	var date := Campaign.today()
@@ -1972,7 +1989,6 @@ func update_hud() -> void:
 	hud.daily_goal = DailyGames.goal_line(daily_kind) if run_kind == "daily" else ""
 	hud.daily_icon = DailyGames.ICON.get(daily_kind if run_kind == "daily" else next_daily, "daily")
 	hud.start_hint = I18n.t("hop_hint") if sky_hop() else ""
-	hud.daily_pick = DailyGames.title(daily_override) if daily_override != "" else "AUTO (" + DailyGames.title(str(today.type)) + ")"
 	hud.daily_count = daily.count
 	hud.daily_target = daily.target()
 	hud.items = campaign.items

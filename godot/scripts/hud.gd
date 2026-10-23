@@ -6,9 +6,9 @@ signal pause_requested
 signal menu_requested
 signal levels_requested
 signal styles_requested
+signal album_requested
 signal shop_requested
 signal daily_requested
-signal daily_pick_requested
 signal endless_requested
 signal help_requested
 signal language_requested
@@ -27,14 +27,13 @@ const Minimap = preload("res://scripts/minimap.gd")
 const Campaign = preload("res://scripts/campaign.gd")
 var minimap := {}
 var daily_button: BaseButton
-# Test mode only: cycles the mini-game the daily button starts.
-var daily_pick_button: BaseButton
-var daily_pick := ""
 # Replaces "drag to start" for rounds that start another way (the sky hop's tap).
 var start_hint := ""
 var endless_button: BaseButton
 var help_button: BaseButton
 var privacy_button: BaseButton
+# Opens the conquest album (album.gd).
+var album_button: BaseButton
 var language_button: BaseButton
 var revive_button: BaseButton
 var give_up_button: BaseButton
@@ -157,14 +156,14 @@ func _ready() -> void:
 	styles_button.pressed.connect(func(): styles_requested.emit())
 	daily_button = make_button("daily", Color("a8474f"))
 	daily_button.pressed.connect(func(): daily_requested.emit())
-	daily_pick_button = make_button("next", Color("8a3a8f"))
-	daily_pick_button.pressed.connect(func(): daily_pick_requested.emit())
 	endless_button = make_button("endless", Color("2f7a68"))
 	endless_button.pressed.connect(func(): endless_requested.emit())
 	help_button = make_button("help", Color("35546d"))
 	help_button.pressed.connect(func(): help_requested.emit())
 	privacy_button = make_button("lock", Color("35546d"))
 	privacy_button.pressed.connect(func(): privacy_requested.emit())
+	album_button = make_button("city", Color("b07a2a"))
+	album_button.pressed.connect(func(): album_requested.emit())
 	language_button = make_button("settings", Color("35546d"))
 	language_button.pressed.connect(func(): language_requested.emit())
 	revive_button = make_button("clock", Color("f6cb70"), true)
@@ -201,6 +200,8 @@ func layout() -> void:
 	var w := size.x
 	var h := size.y
 	place(privacy_button, Rect2(w-230, h-146, 202, 48) if w > h else Rect2(18, 12, 150, 44), 14)
+	# Landscape: above the privacy button on the right; portrait: under it, top left.
+	place(album_button, Rect2(w-230, h-210, 202, 52) if w > h else Rect2(18, 64, 150, 46), 15)
 	place(pause_button, Rect2(w - 84, 36, 58, 58))
 	place(help_button, Rect2(w - 296, 26, 50, 50))
 	place(language_button, Rect2(w - 238, 26, 50, 50))
@@ -230,7 +231,6 @@ func layout() -> void:
 			place([levels_button, shop_button, styles_button][i], Rect2(36+i*124, h-94, 116, 56), 15)
 		for i in 2:
 			place([daily_button, endless_button][i], Rect2(36+i*186, h-232, 178, 52), 16)
-		place(daily_pick_button, Rect2(36, h-292, 364, 40), 13)
 		return
 	place(play_button, Rect2(44, h - 172, w - 88, 66), 26)
 	place(retry_button, Rect2(44, h - 246, w - 88, 56), 18)
@@ -240,7 +240,6 @@ func layout() -> void:
 		place([levels_button, shop_button, styles_button][i], Rect2(44 + i*(third+8), h-94, third, 56), 14)
 	for i in 2:
 		place([daily_button, endless_button][i], Rect2(44 + i*((w-88)/2+4), h-340, (w-88)/2-4, 52), 15)
-	place(daily_pick_button, Rect2(44, h-400, w-88, 40), 13)
 
 # A won campaign city with a star still missing offers a replay of that city.
 func retry_wanted() -> bool:
@@ -281,13 +280,12 @@ func sync() -> void:
 	levels_button.text = I18n.t("map")
 	shop_button.text = I18n.t("upgrades")
 	styles_button.text = I18n.t("wardrobe")
+	album_button.text = I18n.t("album")
 	daily_button.text = I18n.t("daily") + (" ★" if daily_won else "") + " %d/3" % daily_left
 	daily_button.disabled = daily_left <= 0
 	endless_button.text = I18n.t("endless") + (" · %d" % endless_best if endless_best > 0 else "")
-	for button in [daily_button, endless_button, levels_button, styles_button, shop_button, help_button, language_button]:
+	for button in [daily_button, endless_button, levels_button, styles_button, album_button, shop_button, help_button, language_button]:
 		button.visible = mode == "menu"
-	daily_pick_button.visible = playtest and mode == "menu"
-	daily_pick_button.text = "TEST · " + daily_pick
 	menu_button.visible = mode in ["paused", "result"]
 	pause_button.visible = mode == "playing"
 	queue_redraw()
