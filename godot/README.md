@@ -232,6 +232,15 @@ its landmark to conquer it, while dodging independent military defenders.
   round. The hole keeps its starting size (no upgrades, no growth). The nearest
   cow's name shows, green when it fits every open clue; the minimap gives no
   help. `-- --capture --cow-capture` shoots the farm and a clue-complete moment.
+  **Sky hop** (`sky_hop.gd`): a one-tap side view high above the city with the
+  player's own craft. It flies right on its own, gravity pulls it down and each
+  tap (or Space) hops it up; gaps open between towers and storm clouds, 5.4
+  high narrowing to 4.0 by gap 25, some drifting up and down from gap 12. One
+  touch of a tower, a cloud or the street ends the run; 20 gaps is the target
+  (10/20/30 for the stars, 5 coins a gap). The clock (120 s) starts with the
+  first tap and every try of a day flies the same seeded course. The course
+  has its own camera, made current for the round and its result.
+  `-- --capture --hop-capture` shoots the test pick, the start and mid-flight.
 - **Daily streak**: a finished daily round keeps it; days 1–7 pay 20–120 coins
   and every seventh day adds a 300-coin bonus. Shown beside today's mini-game.
 - **Daily leaderboard** (`play_games.gd`): Android only, with the GodotPlayGameServices
@@ -291,11 +300,13 @@ its landmark to conquer it, while dodging independent military defenders.
 times to switch it on or off (a red TEST MODE label shows). It opens all 48
 cities, refills coins to 999999 after every purchase, never runs out of daily
 tries, and plays on its own save
-(`user://test_save.json`), so the real progress is never touched. All levels can
+(`user://test_save.json`), so the real progress is never touched. A purple
+TEST button above the daily button picks the mini-game the daily starts: each
+tap steps through every type, then back to AUTO (today's). All levels can
 also be opened for every build with
 `application_custom/testing/unlock_all_levels=true` in `project.godot`.
 `application_custom/testing/daily_type` pins the daily mini-game in debug builds
-(`stampede`, `coinrain`, `goldrush` or `findcow`; empty rotates by date). 
+(`stampede`, `coinrain`, `goldrush`, `findcow` or `skyhop`; empty rotates by date). 
 `testing/daily_type_android` sets `findcow` for the debug APK; release builds
 ignore both.
 

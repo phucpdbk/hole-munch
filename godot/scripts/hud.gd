@@ -8,6 +8,7 @@ signal levels_requested
 signal styles_requested
 signal shop_requested
 signal daily_requested
+signal daily_pick_requested
 signal endless_requested
 signal help_requested
 signal language_requested
@@ -26,6 +27,11 @@ const Minimap = preload("res://scripts/minimap.gd")
 const Campaign = preload("res://scripts/campaign.gd")
 var minimap := {}
 var daily_button: BaseButton
+# Test mode only: cycles the mini-game the daily button starts.
+var daily_pick_button: BaseButton
+var daily_pick := ""
+# Replaces "drag to start" for rounds that start another way (the sky hop's tap).
+var start_hint := ""
 var endless_button: BaseButton
 var help_button: BaseButton
 var privacy_button: BaseButton
@@ -151,6 +157,8 @@ func _ready() -> void:
 	styles_button.pressed.connect(func(): styles_requested.emit())
 	daily_button = make_button("daily", Color("a8474f"))
 	daily_button.pressed.connect(func(): daily_requested.emit())
+	daily_pick_button = make_button("next", Color("8a3a8f"))
+	daily_pick_button.pressed.connect(func(): daily_pick_requested.emit())
 	endless_button = make_button("endless", Color("2f7a68"))
 	endless_button.pressed.connect(func(): endless_requested.emit())
 	help_button = make_button("help", Color("35546d"))
@@ -222,6 +230,7 @@ func layout() -> void:
 			place([levels_button, shop_button, styles_button][i], Rect2(36+i*124, h-94, 116, 56), 15)
 		for i in 2:
 			place([daily_button, endless_button][i], Rect2(36+i*186, h-232, 178, 52), 16)
+		place(daily_pick_button, Rect2(36, h-292, 364, 40), 13)
 		return
 	place(play_button, Rect2(44, h - 172, w - 88, 66), 26)
 	place(retry_button, Rect2(44, h - 246, w - 88, 56), 18)
@@ -231,6 +240,7 @@ func layout() -> void:
 		place([levels_button, shop_button, styles_button][i], Rect2(44 + i*(third+8), h-94, third, 56), 14)
 	for i in 2:
 		place([daily_button, endless_button][i], Rect2(44 + i*((w-88)/2+4), h-340, (w-88)/2-4, 52), 15)
+	place(daily_pick_button, Rect2(44, h-400, w-88, 40), 13)
 
 # A won campaign city with a star still missing offers a replay of that city.
 func retry_wanted() -> bool:
@@ -276,6 +286,8 @@ func sync() -> void:
 	endless_button.text = I18n.t("endless") + (" · %d" % endless_best if endless_best > 0 else "")
 	for button in [daily_button, endless_button, levels_button, styles_button, shop_button, help_button, language_button]:
 		button.visible = mode == "menu"
+	daily_pick_button.visible = playtest and mode == "menu"
+	daily_pick_button.text = "TEST · " + daily_pick
 	menu_button.visible = mode in ["paused", "result"]
 	pause_button.visible = mode == "playing"
 	queue_redraw()
@@ -458,7 +470,7 @@ func draw_playing() -> void:
 	if run_label != "": text_at(run_label, Vector2(w/2-44, 126), 15, UiStyle.MINT, true, 4)
 	if waiting:
 		panel(Rect2(w/2-176, h/2+88, 352, 48), Color("1b3048df"), 20)
-		text_at(I18n.t("drag_to_start"), Vector2(w/2, h/2+119), 19, LIGHT, true)
+		text_at(start_hint if start_hint != "" else I18n.t("drag_to_start"), Vector2(w/2, h/2+119), 19, LIGHT, true)
 		if run_kind == "runner": text_at(note, Vector2(w/2, 186), 20, LIGHT, true, 6)
 	elif note != "":
 		text_at(note, Vector2(w/2, 186), 20, LIGHT, true, 6)

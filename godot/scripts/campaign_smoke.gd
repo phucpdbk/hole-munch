@@ -613,6 +613,7 @@ func check_daily_games(g) -> void:
 	check(g.items.filter(func(item): return item.kind == "coin" and not item.hidden and item.eaten).is_empty(), "caught coins go back to the sky pool")
 	g.go_menu()
 	check_cow_hunt(g)
+	check_sky_hop(g)
 	g.daily_override = ""
 	var saved = Campaign.new()
 	saved.daily = {"date":date, "type":"coinrain", "attempts":9, "best":-4, "won":true}
@@ -656,6 +657,32 @@ func check_cow_hunt(g) -> void:
 		g.step(0.02, Vector2.ZERO)
 	check(g.mode == "result" and g.hud.won and g.hud.stars == 3 and g.reward > 0, "swallowing today's cow wins the hunt")
 	g.go_menu()
+
+# Sky hop (sky_hop.gd): the clock waits for the first tap, a pilot that hops
+# under each gap's middle clears the target, and one that never taps crashes
+# into the street, which ends the round.
+func check_sky_hop(g) -> void:
+	g.campaign.daily = {}
+	g.daily_override = "skyhop"
+	g.start_daily()
+	var hop = g.daily.hop
+	var before: float = g.remaining
+	for frame in 50: g.step(0.02, Vector2.ZERO)
+	check(not hop.running and g.remaining == before, "the sky hop waits for the first tap")
+	var target: int = g.daily.target()
+	for frame in 6000:
+		if g.mode != "playing" or hop.passed >= target: break
+		var gap: Dictionary = hop.gap_at(hop.passed)
+		if hop.y < hop.centre(gap) - 0.6 and hop.vy < 1.0: hop.flap(g)
+		g.step(0.02, Vector2.ZERO)
+	check(hop.passed >= target and not hop.crashed and g.daily.count == hop.passed and g.remaining < before, "a steady pilot flies through the target's gaps")
+	for frame in 200:
+		if g.mode != "playing": break
+		g.step(0.02, Vector2.ZERO)
+	check(hop.crashed and g.mode == "result" and g.hud.won and g.hud.stars >= 2 and g.reward > 0, "falling into the street ends the run and pays the gaps")
+	g.go_menu()
+	g.update_view(0.02)
+	check(not hop.visible and g.camera.current, "home hands the view back to the city camera")
 
 # Tuning aid (`-- --campaign-smoke --rival-bench`): seconds an unopposed rival
 # needs to swallow each landmark, next to the level timer.

@@ -5,17 +5,19 @@ extends Node3D
 #   coinrain - coins rain down near the hole, with a few bombs mixed in.
 #   goldrush - only golden treasure scores, raced by the rival hole.
 #   findcow  - find today's named cow in a herd from opening clues (cow_hunt.gd).
+#   skyhop   - one-tap flight through gaps high above the city (sky_hop.gd).
 # The landmark, its guardian and the defence squads sit the round out. game.gd
 # owns the items; this node adds the game's own items when the city is built,
 # moves them, counts catches and draws the shadows of falling coins.
 const Traffic = preload("res://scripts/traffic.gd")
 const I18n = preload("res://scripts/i18n.gd")
 const CowHunt = preload("res://scripts/cow_hunt.gd")
-const SECONDS := {"stampede":45.0, "coinrain":45.0, "goldrush":60.0, "findcow":75.0}
-const TARGET := {"stampede":15, "coinrain":24, "goldrush":30, "findcow":1}
-# Coins paid per catch (gold pays per value point).
-const COIN_RATE := {"stampede":6, "coinrain":4, "goldrush":4, "findcow":1}
-const ICON := {"stampede":"target", "coinrain":"coin", "goldrush":"chest", "findcow":"target"}
+const SkyHop = preload("res://scripts/sky_hop.gd")
+const SECONDS := {"stampede":45.0, "coinrain":45.0, "goldrush":60.0, "findcow":75.0, "skyhop":120.0}
+const TARGET := {"stampede":15, "coinrain":24, "goldrush":30, "findcow":1, "skyhop":20}
+# Coins paid per catch (gold pays per value point, the sky hop per gap).
+const COIN_RATE := {"stampede":6, "coinrain":4, "goldrush":4, "findcow":1, "skyhop":5}
+const ICON := {"stampede":"target", "coinrain":"coin", "goldrush":"chest", "findcow":"target", "skyhop":"star"}
 const STAR_SHARES := [0.5, 1.0, 1.5]
 # Ducks rest, then sprint away from a nearby hole; a sprint is faster than the
 # hole but short, so cornering a duck pays off.
@@ -49,6 +51,7 @@ var next_coin := 0.0
 var next_bomb := 0.0
 var markers: Array[MeshInstance3D] = []
 var hunt := CowHunt.new()
+var hop := SkyHop.new()
 
 func _ready() -> void:
 	var shadow := StandardMaterial3D.new()
@@ -68,6 +71,8 @@ func _ready() -> void:
 		marker.visible = false
 		add_child(marker)
 		markers.append(marker)
+	add_child(hop)
+	hop.visible = false
 
 static func title(type: String) -> String:
 	return I18n.t("dg_" + type)
@@ -116,6 +121,8 @@ func build(game, type: String, value: int) -> void:
 			else:
 				hunt.zone_of = func(at: Vector3) -> String: return CowHunt.quarter(at)
 				hunt.build(game, rng, func(): return road_spot(game, 6.0))
+		"skyhop":
+			hop.build(game, value)
 	for item in prey + sky: item.optional = true
 
 # A spot on a road, away from the spawn point.
@@ -152,6 +159,7 @@ func reset(game) -> void:
 	for drop in sky: park(game, drop)
 	for marker in markers: marker.visible = false
 	if kind == "findcow": hunt.reset()
+	if kind == "skyhop": hop.reset()
 
 func park(game, drop: Dictionary) -> void:
 	drop.hidden = true
@@ -169,6 +177,9 @@ func update(game, dt: float) -> void:
 		update_rain(game, dt)
 	elif kind == "findcow":
 		hunt.update(game, dt)
+	elif kind == "skyhop":
+		hop.update(game, dt)
+		count = hop.passed
 
 func move_duck(game, duck: Dictionary, dt: float) -> void:
 	if not Traffic.is_active(duck): return
@@ -273,6 +284,7 @@ func caught(game, item: Dictionary) -> void:
 
 func done() -> bool:
 	if kind == "findcow": return hunt.done()
+	if kind == "skyhop": return hop.done()
 	return kind == "stampede" and prey.all(func(duck): return not Traffic.is_active(duck))
 
 func reached() -> bool:

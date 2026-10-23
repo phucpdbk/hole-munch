@@ -46,6 +46,27 @@ func run(game, campaign_mode: bool) -> void:
 			await snapshot("skin-%d" % skin)
 		g.get_tree().quit()
 		return
+	# The test-mode daily pick on the menu, the sky hop before the first tap,
+	# then mid-flight past a few gaps (test-output/hop-menu.png, hop-start.png, hop-play.png).
+	if "--hop-capture" in OS.get_cmdline_user_args():
+		g.campaign.daily = {}
+		g.campaign.test_mode = true
+		g.campaign.unlock_all_for_testing = true
+		for i in 5: g.pick_daily()
+		await frames(10)
+		await snapshot("hop-menu")
+		g.start_daily()
+		await frames(30)
+		await snapshot("hop-start")
+		var hop = g.daily.hop
+		for frame in 900:
+			if hop.passed >= 6: break
+			if hop.y < hop.centre(hop.gap_at(hop.passed)) - 0.6 and hop.vy < 1.0: hop.flap(g)
+			g.step(0.02, Vector2.ZERO)
+		await frames(10)
+		await snapshot("hop-play")
+		g.get_tree().quit()
+		return
 	# The cow hunt's farmland from above, then the hole beside today's cow with
 	# every clue open (test-output/cow-overview.png, cow-play.png).
 	if "--cow-capture" in OS.get_cmdline_user_args():

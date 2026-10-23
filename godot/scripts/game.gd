@@ -290,6 +290,7 @@ func _ready() -> void:
 	hud.levels_requested.connect(func(): open_panel("levels"))
 	hud.shop_requested.connect(func(): open_panel("shop"))
 	hud.daily_requested.connect(start_daily)
+	hud.daily_pick_requested.connect(pick_daily)
 	hud.endless_requested.connect(start_endless)
 	hud.styles_requested.connect(func(): open_panel("crafts"))
 	hud.help_requested.connect(show_story)
@@ -390,6 +391,8 @@ func load_level(index: int) -> void:
 	if run_kind == "daily":
 		level.rival = daily_kind == "goldrush"
 		level.seconds = DailyGames.SECONDS[daily_kind]
+		# The sky hop flies above the weather; a fog veil would hide the course.
+		if daily_kind == "skyhop": level.weather = "clear"
 	var run := run_kind == "runner"
 	if run:
 		level.rival = false
@@ -1179,6 +1182,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if wardrobe.visible: close_panel()
 		else: toggle_pause()
 	if mode != "playing": return
+	if sky_hop():
+		if DailyGames.SkyHop.is_tap(event): daily.hop.flap(self)
+		return
 	var tapped: bool = (event is InputEventScreenTouch or event is InputEventMouseButton) and event.pressed
 	if tapped or (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE): tap_guardian()
 	if event is InputEventScreenTouch:
@@ -1245,6 +1251,9 @@ func _process(delta: float) -> void:
 	update_hud()
 
 func step(dt: float, input: Vector2) -> void:
+	if sky_hop():
+		hop_step(dt)
+		return
 	if input.length() > 0.05: started = true
 	animate_world(dt)
 	if not started: return
@@ -1322,6 +1331,17 @@ func eat_reachable() -> void:
 		if Vector2(item.position.x-hole_position.x,item.position.z-hole_position.z).length() < reach:
 			# The guardian takes several bites; the earlier ones knock it away.
 			if mechanics.guardian_yields(self, item): swallow(item)
+
+# The sky hop daily (sky_hop.gd) flies its own course above the city: the hole,
+# the city and its defence stay still, and the clock starts with the first tap.
+func sky_hop() -> bool:
+	return run_kind == "daily" and daily_kind == "skyhop"
+
+func hop_step(dt: float) -> void:
+	daily.update(self, dt)
+	started = daily.hop.running
+	if started and not daily.hop.crashed: remaining = maxf(0, remaining-dt)
+	if playing and (remaining <= 0 or daily.done()): finish(daily.reached())
 
 # The bonus run (runner.gd): no clock, defence or hunger; the course drives the
 # hole and ends at the landmark, swallowed or too big to fit.
@@ -1776,6 +1796,12 @@ func start_daily() -> void:
 		return
 	begin_daily()
 
+# Test mode: the pick button steps through every mini-game, then back to today's.
+func pick_daily() -> void:
+	if not campaign.test_mode or mode != "menu": return
+	var order: Array = [""] + Campaign.DAILY_TYPES
+	daily_override = order[(order.find(daily_override) + 1) % order.size()]
+
 func begin_daily() -> void:
 	var date := Campaign.today()
 	if mode not in ["menu", "result"] or not campaign.use_daily_attempt(date): return
@@ -1828,6 +1854,10 @@ func update_view(dt: float) -> void:
 	camera.h_offset = lerpf(camera.h_offset, preview_offset, 1.0-exp(-dt*6.0))
 	# Keep shadows covering the view as the camera zooms out for big holes.
 	sunlight.directional_shadow_max_distance = 16.0 + camera.size
+	# The sky hop's side view has its own camera for the round and its result.
+	var hop_view := sky_hop() and mode != "menu"
+	daily.hop.show_view(hop_view)
+	if not hop_view and not camera.current: camera.make_current()
 	hole.position = hole_position
 	hole.scale = Vector3(radius,1,radius)
 	hole_style.sync(hole_position, radius, elapsed, hole_velocity, dt)
@@ -1896,7 +1926,7 @@ func update_hud() -> void:
 	hud.guardian_max = mechanics.mascot.HP if guarding else 0
 	hud.guardian_hp = mechanics.mascot.hp if guarding else 0
 	# Fog hides the map: only the patch around the saucer shows where to go.
-	hud.minimap = {} if level.weather == "fog" or run_kind == "runner" else minimap_data()
+	hud.minimap = {} if level.weather == "fog" or run_kind == "runner" or sky_hop() else minimap_data()
 	hud.revive_left = revive_left
 	hud.revive_seconds = int(Ads.REVIVE_SECONDS)
 	hud.can_double = can_double()
@@ -1936,9 +1966,13 @@ func update_hud() -> void:
 	hud.goal_labels = daily.goal_labels() if run_kind == "daily" else goal_list.map(func(goal): return Challenges.label(goal))
 	var today := campaign.daily_record(Campaign.today())
 	hud.daily_left = campaign.daily_attempts_left(today.date)
-	hud.daily_title = DailyGames.title(daily_kind if run_kind == "daily" else str(today.type))
+	# A test-mode pick (pick_daily) shows on the menu in place of today's game.
+	var next_daily: String = daily_override if daily_override != "" else str(today.type)
+	hud.daily_title = DailyGames.title(daily_kind if run_kind == "daily" else next_daily)
 	hud.daily_goal = DailyGames.goal_line(daily_kind) if run_kind == "daily" else ""
-	hud.daily_icon = DailyGames.ICON.get(daily_kind if run_kind == "daily" else str(today.type), "daily")
+	hud.daily_icon = DailyGames.ICON.get(daily_kind if run_kind == "daily" else next_daily, "daily")
+	hud.start_hint = I18n.t("hop_hint") if sky_hop() else ""
+	hud.daily_pick = DailyGames.title(daily_override) if daily_override != "" else "AUTO (" + DailyGames.title(str(today.type)) + ")"
 	hud.daily_count = daily.count
 	hud.daily_target = daily.target()
 	hud.items = campaign.items
