@@ -228,39 +228,62 @@ its landmark to conquer it, while dodging independent military defenders.
   about 70–90% of the timer).
 - **Daily challenge** (THỬ THÁCH NGÀY): one city per date for everyone, with a
   rival and one continent tougher defence; the first win of the day pays ×1.5.
-  Mini-games by date (seven, `Campaign.DAILY_TYPES`): duck stampede, coin rain, gold rush, **find the cow**
-  (`cow_hunt.gd`): 80 named cows, one of them today's, on countryside farmland
-  instead of a city (`countryside.gd`: forest north, cornfield east, farmyard
-  south, wheat west, meadow in the middle, each zone signposted; cows stand on
-  tracks, aisles and clearings). Clues open one by one (bell colour, then coat,
-  then zone, every 15 s and after each wrong bite; the clue line counts down to
-  the next), a wrong cow costs 3 s and a 1.2 s chew, five wrong ones end the
-  round. The hole keeps its starting size (no upgrades, no growth). The nearest
-  cow's name shows, green when it fits every open clue; the minimap gives no
-  help. `-- --capture --cow-capture` shoots the farm and a clue-complete moment.
+  Mini-games by date (seven, `Campaign.DAILY_TYPES`).
+  **Checkpoints**: the ladder games keep their furthest point for good
+  (`Campaign.checkpoints`, `reach_checkpoint`): the slide puzzle's board, the
+  siege's stage, the sky hop every 10 gaps and the cow hunt's level. A run
+  starts there; finishing a whole ladder starts a new lap (new boards, a new
+  course) from the beginning. Those ladders are the same for everyone (seeded
+  by lap, not by day).
+  **Duck families** (stampede): four mother ducks wander with lines of five
+  ducklings. Ducklings eaten from the tail of an unbroken line chain 1–5
+  points; a mother eaten after all her ducklings pays 5 ("whole family"), one
+  eaten first pays 2 and scatters her line into fleeing ducklings worth 1.
+  Target 30 points, 3 coins a point.
+  **Gold rush**: swallowed gold is carried (each point slows the hole 4%, down
+  to half speed) and only counts once banked in the glowing ring on the plaza;
+  the rival hole touching the player takes everything carried. Target 30.
+  **Find the cow** (`cow_hunt.gd`): a herd on countryside farmland instead of a
+  city (`countryside.gd`: forest north, cornfield east, farmyard south, wheat
+  west, meadow in the middle, each zone signposted; cows graze outside the
+  forest), each cow with a coat, a hat and a bell (27 looks). A card shows the
+  named cow's look before the first move (and again for a moment after a wrong
+  bite); then a warm/cold bar under the clock and a bell that rings faster
+  near it guide the search. A wrong cow costs 3 s and a short chew, five end
+  the round. Each find adds 10 s and raises the level: 8 cows on show plus 4 a
+  level, and a named cow that shares more of its look with the others. The
+  round runs until time or wrong bites run out; stars at 1, 2 and 4 finds.
+  The hole keeps its starting size and the minimap gives no help.
+  `-- --capture --cow-capture` shoots the card and the radar.
   **Sky hop** (`sky_hop.gd`): a one-tap side view high above the city with the
-  player's own craft. It flies right on its own, gravity pulls it down and each
+  default saucer. It flies right on its own, gravity pulls it down and each
   tap (or Space) hops it up; gaps open between towers and storm clouds, 5.4
-  high narrowing to 4.0 by gap 25, some drifting up and down from gap 12. One
-  touch of a tower, a cloud or the street ends the run; 20 gaps is the target
-  (10/20/30 for the stars, 5 coins a gap). The clock (120 s) starts with the
-  first tap and every try of a day flies the same seeded course. The course
-  has its own camera, made current for the round and its result.
-  `-- --capture --hop-capture` shoots the test-mode daily list, the start and mid-flight.
+  high narrowing to 4.0 by gap 25, some drifting up and down from gap 12. The
+  course runs through five maps of 20 gaps, each with its colours and, on
+  every other gap from its third, a hazard: rooftops (none), desert canyon
+  (sand gusts push up or down between the gates), snow peaks (an icicle drops
+  1.2 into the gap ahead), neon night (searchlights swing from the tower
+  roofs) and harbour (gulls bob between the gates). One touch of a tower, a
+  cloud, a hazard or the street ends the run; stars at 10/20/30 gaps in the
+  run, 5 coins a gap. The course has its own camera, made current for the
+  round and its result. `-- --capture --hop-capture` shoots the test-mode
+  daily list, the start and mid-flight; `--hopmaps-capture` each map.
+  `--duckgold-capture` shoots the duck lines and the gold bank.
   **Slide munch** (`slide_puzzle.gd`): a turn-based puzzle on a city block high
   above the city with its own tilted camera. A swipe (arrows/WASD) slides the
   hole until a building, the edge or something bigger than the hole stops it,
   swallowing every snack that fits on the way. Snacks are size 1 and 2, the
   hole grows a size at each of the board's two growth points, and the landmark
-  needs size 3. Each day is a ladder of 30 boards, five from each of six
+  needs size 3. The puzzle is a ladder of 30 boards, five from each of six
   tiers (`TIERS`): 5×5 with par 3–5 up to 7×7 with more walls and snacks and
   par 12–17. Each board has its own seed and is made when it comes up (all 30
   take about a quarter of a second); a breadth-first solver keeps a layout
   whose shortest solution (par) falls in the tier's range, or the closest one.
   Every board has its own clock, 15 s plus 3 s a par slide, started by the
   first slide; running out costs one of three lives and starts that board
-  over, and the last life ends the run. Stars at 5, 15 and 30 boards; 15
-  coins, 6 a board and 4 more for each board solved in par. Undo (U) and reset
+  over, and the last life ends the run. A run starts at the kept board; stars
+  at 1, 3 and 5 boards solved in the run; 15 coins, 6 a board and 4 more for
+  each board solved in par. Undo (U) and reset
   (R) are free buttons beside the board. The HUD lays the board out between
   its chips (`hud.gd puzzle_layout`) and the camera fits the biggest board to
   that frame. `-- --capture --slide-capture` shoots it.
@@ -269,7 +292,7 @@ its landmark to conquer it, while dodging independent military defenders.
   nearest enemy within 8 units. Three stages (`STAGES`): helicopters (10
   points), then jets join (14 points), then flak guns and the command blimp,
   whose fall wins the run. Clearing a stage gives a life back and a 2.5 s
-  breather; each stage is a star. Helicopters circle with their nose on the
+  breather and is kept as the checkpoint; each stage cleared so far is a star. Helicopters circle with their nose on the
   saucer and shoot (escorts turn to what they shoot), jets strafe
   along a lane that glows red for 1 s first, flak guns drop warned blasts where
   the saucer is, and the blimp fires rings. Holding still beside a helicopter

@@ -8,7 +8,10 @@ extends Node3D
 # and shoot), then jets join (a warned strafing line), then flak guns (warned
 # blasts on the ground) and the command blimp, which fires rings and ends the
 # run when it falls. A stage clears at its goal of enemy points, gives a life
-# back and a breather. Three hits end the run. Every enemy downed scores its
+# back and a breather. A run starts at the player's checkpoint stage
+# (Campaign.checkpoint "siege"), which each cleared stage moves on; downing the
+# blimp finishes the lap and the next run starts at stage 1 again. Three hits
+# end the run. Every enemy downed scores its
 # value; some drop a spread or rapid-fire power. Meshy models
 # (assets/aircraft, tools/bake_aircraft.gd) replace the block models when baked.
 const I18n = preload("res://scripts/i18n.gd")
@@ -80,6 +83,9 @@ var power_time := 0.0
 var stage := 0
 var stage_points := 0
 var boss_down := false
+# The stage this run began on (the checkpoint), and whether its boss is due.
+var first_stage := 0
+var boss_due := false
 # Baked Meshy meshes per kind (null where there is none).
 var baked := {}
 var clock := 0.0
@@ -94,9 +100,8 @@ var materials := {}
 func build(value: int) -> void:
 	seed_value = value
 	if meshes.is_empty(): make_meshes()
-	reset()
 
-func reset() -> void:
+func reset(start := 0) -> void:
 	clear()
 	rng.seed = seed_value
 	lives = LIVES
@@ -110,9 +115,11 @@ func reset() -> void:
 	clock = 0.0
 	count = 0
 	downed = 0
-	stage = 0
+	first_stage = clampi(start, 0, STAGES.size() - 1)
+	stage = first_stage
 	stage_points = 0
 	boss_down = false
+	boss_due = STAGES[stage].has("boss")
 
 func clear() -> void:
 	for list in [foes, shots, foe_shots, blasts, pickups]:
@@ -244,9 +251,9 @@ func update(game, dt: float, player: Vector3, still: bool) -> void:
 	grace = maxf(0.0, grace - dt)
 	power_time = maxf(0.0, power_time - dt)
 	if power_time <= 0.0: power = ""
+	if stage_goal() > 0 and stage_points >= stage_goal() and stage < STAGES.size() - 1: advance_stage(game, player)
 	spawn(game, dt, player)
 	for foe in foes.duplicate(): move_foe(game, foe, dt, player)
-	if stage_goal() > 0 and stage_points >= stage_goal() and stage < STAGES.size() - 1: advance_stage(game, player)
 	fire(game, dt, player)
 	move_shots(game, dt, player)
 	update_blasts(game, dt, player)
@@ -260,12 +267,19 @@ func stage_goal() -> int:
 func won() -> bool:
 	return boss_down
 
-# Stages fully cleared (a star each).
+# Stages fully cleared so far, across runs (a star each).
 func stages_cleared() -> int:
 	return STAGES.size() if boss_down else stage
 
+# Stages cleared in this run alone.
+func run_cleared() -> int:
+	return stages_cleared() - first_stage
+
 func spawn(game, dt: float, player: Vector3) -> void:
 	if boss_down: return
+	if boss_due:
+		boss_due = false
+		add_foe(game, STAGES[stage].boss, player)
 	spawn_timer -= dt
 	if spawn_timer > 0.0 or foes.size() >= MAX_FOES: return
 	var current: Dictionary = STAGES[stage]
@@ -278,14 +292,15 @@ func spawn(game, dt: float, player: Vector3) -> void:
 func advance_stage(game, player: Vector3) -> void:
 	stage += 1
 	stage_points = 0
+	game.campaign.reach_checkpoint("siege", stage, STAGES.size())
+	game.persist()
 	lives = mini(LIVES, lives + 1)
 	spawn_timer = BREATHER
 	for shot in foe_shots.duplicate(): drop_shot(foe_shots, shot)
 	game.add_floater(game.hole_position, I18n.t("siege_stage", stage + 1), true)
 	game.fx.ripple(player, 3.0, POWERS.spread)
 	game.sfx.play("grow")
-	var boss: String = STAGES[stage].get("boss", "")
-	if boss != "": add_foe(game, boss, player)
+	boss_due = STAGES[stage].has("boss")
 
 func edge_point(game, player: Vector3, distance: float) -> Vector3:
 	var angle := rng.randf_range(0, TAU)
@@ -406,7 +421,10 @@ func down(game, foe: Dictionary) -> void:
 	count += int(foe.value)
 	stage_points += int(foe.value)
 	downed += 1
-	if foe.kind == STAGES[stage].get("boss", ""): boss_down = true
+	if foe.kind == STAGES[stage].get("boss", ""):
+		boss_down = true
+		game.campaign.reach_checkpoint("siege", STAGES.size(), STAGES.size())
+		game.persist()
 	game.score += int(foe.value)*10
 	game.add_floater(Vector3(foe.pos.x, 0, foe.pos.z), "+%d" % int(foe.value), true)
 

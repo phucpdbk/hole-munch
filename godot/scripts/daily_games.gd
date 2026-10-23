@@ -1,10 +1,10 @@
 extends Node3D
 
 # Daily mini-games, one per day (campaign.gd picks the type from the date):
-#   stampede - fast ducks scatter from the hole; catch as many as you can.
+#   stampede - mother ducks lead lines of ducklings; eat a line from its tail.
 #   coinrain - coins rain down near the hole, with a few bombs mixed in.
-#   goldrush - only golden treasure scores, raced by the rival hole.
-#   findcow  - find today's named cow in a herd from opening clues (cow_hunt.gd).
+#   goldrush - carry golden treasure to the bank ring, raced by a thieving rival.
+#   findcow  - memorise a cow's look, then find it in the herd (cow_hunt.gd).
 #   skyhop   - one-tap flight through gaps high above the city (sky_hop.gd).
 #   slide    - a turn-based sliding puzzle on a block above the city (slide_puzzle.gd).
 #   siege    - the saucer shoots down the army's air force (sky_siege.gd).
@@ -21,20 +21,32 @@ const SECONDS := {"stampede":45.0, "coinrain":45.0, "goldrush":60.0, "findcow":7
 # The slide puzzle counts boards solved (its first star at 5); the siege counts
 # its stages, so its target is clearing the first one. The puzzle's own board
 # clock replaces SECONDS once a board is up.
-const TARGET := {"stampede":15, "coinrain":24, "goldrush":30, "findcow":1, "skyhop":20, "slide":5, "siege":1}
+const TARGET := {"stampede":30, "coinrain":24, "goldrush":30, "findcow":1, "skyhop":20, "slide":1, "siege":1}
 # Coins paid per catch (gold pays per value point, the sky hop per gap, the
 # siege per enemy point plus a stage bonus); the slide puzzle pays a base,
 # this per board solved and SLIDE_PAR_COINS per board solved in par.
-const COIN_RATE := {"stampede":6, "coinrain":4, "goldrush":4, "findcow":1, "skyhop":5, "slide":6, "siege":3}
+const COIN_RATE := {"stampede":3, "coinrain":4, "goldrush":4, "findcow":1, "skyhop":5, "slide":6, "siege":3}
 const SLIDE_BASE_COINS := 15
 const SLIDE_PAR_COINS := 4
 const SIEGE_STAGE_COINS := 15
 const ICON := {"stampede":"target", "coinrain":"coin", "goldrush":"chest", "findcow":"target", "skyhop":"star", "slide":"gem", "siege":"fire"}
 const STAR_SHARES := [0.5, 1.0, 1.5]
-# Ducks rest, then sprint away from a nearby hole; a sprint is faster than the
-# hole but short, so cornering a duck pays off.
-const DUCKS := 24
-const DUCK_SIZE := 0.46
+# Duck families: a mother leads a line of ducklings. Each duckling eaten from
+# the tail of an unbroken line scores one more than the last (1..5); a mother
+# eaten after all her ducklings scores FAMILY_POINTS, one eaten early scores
+# MOTHER_POINTS and scatters the line. Scattered ducklings and resting
+# mothers sprint away from a nearby hole; a sprint is faster than the hole but
+# short, so cornering a duck pays off.
+const FAMILIES := 4
+const CHICKS := 5
+const MOTHER_SIZE := 0.6
+const CHICK_SIZE := 0.32
+const CHICK_GAP := 0.75
+const CHICK_SPEED := 9.0
+const WANDER_SPEED := 1.3
+const MOTHER_DASH := 0.7
+const MOTHER_POINTS := 2
+const FAMILY_POINTS := 5
 const DUCK_ALERT := 7.0
 const DUCK_DASH := 0.55
 const DUCK_REST := Vector2(0.8, 1.6)
@@ -49,8 +61,15 @@ const COIN_LIFE := 6.0
 const DROP_HEIGHT := 14.0
 const DROP_TIME := 1.0
 const DROP_RANGE := 10.0
-# Gold rush treasure: [variant, radius, value, count].
+# Gold rush treasure: [variant, radius, value, count]. Swallowed gold is
+# carried, slowing the hole (CARRY_SLOW a point, down to CARRY_FLOOR), until
+# it is banked in the BANK_RADIUS ring on the plaza; the rival hole touching
+# the player takes everything carried (a STEAL_COOLDOWN apart).
 const GOLD := [[0, 0.32, 1, 20], [1, 0.95, 3, 7], [2, 1.7, 8, 3]]
+const BANK_RADIUS := 2.6
+const CARRY_SLOW := 0.04
+const CARRY_FLOOR := 0.5
+const STEAL_COOLDOWN := 2.0
 
 var kind := ""
 var count := 0
@@ -63,6 +82,12 @@ var next_coin := 0.0
 var next_bomb := 0.0
 var markers: Array[MeshInstance3D] = []
 var hunt := CowHunt.new()
+# Duck families: [{mother, chicks (in line order), chain, scattered}].
+var families: Array = []
+# Gold carried but not banked yet, and the bank ring's nodes.
+var carried := 0
+var steal_wait := 0.0
+var bank: Node3D
 var hop := SkyHop.new()
 var puzzle := SlidePuzzle.new()
 var siege := SkySiege.new()
@@ -111,10 +136,22 @@ func build(game, type: String, value: int) -> void:
 	rng.seed = value
 	match kind:
 		"stampede":
-			for i in DUCKS:
-				var duck: Dictionary = game.add_item("duck", road_spot(game, 6.0), DUCK_SIZE, 0, rng.randf_range(0, TAU))
-				duck.prey = true
-				prey.append(duck)
+			families.clear()
+			for f in FAMILIES:
+				var at := road_spot(game, 6.0)
+				var mother: Dictionary = game.add_item("duck", at, MOTHER_SIZE, 0, rng.randf_range(0, TAU))
+				mother.prey = true
+				mother.family = f
+				prey.append(mother)
+				var family := {"mother":mother, "chicks":[], "chain":0, "scattered":false}
+				for c in CHICKS:
+					var chick: Dictionary = game.add_item("duck", at + Vector3(0, 0, (c + 1)*CHICK_GAP), CHICK_SIZE, 0, mother.yaw)
+					chick.prey = true
+					chick.family = f
+					chick.chick = true
+					prey.append(chick)
+					family.chicks.append(chick)
+				families.append(family)
 		"coinrain":
 			for i in COINS + SKY_BOMBS:
 				var bomb := i >= COINS
@@ -132,16 +169,15 @@ func build(game, type: String, value: int) -> void:
 					prey.append(treasure)
 		"findcow":
 			var farm = game.countryside
-			if farm:
-				hunt.zone_of = farm.zone
-				hunt.build(game, rng, func(): return farm.spot(game, rng, 6.0))
-			else:
-				hunt.zone_of = func(at: Vector3) -> String: return CowHunt.quarter(at)
-				hunt.build(game, rng, func(): return road_spot(game, 6.0))
+			# Cows graze in the open: the forest's canopy would hide their looks.
+			if farm: hunt.build(game, rng, func(): return open_spot(game, farm))
+			else: hunt.build(game, rng, func(): return road_spot(game, 6.0))
 		"skyhop":
-			hop.build(game, value)
+			# One course for everyone, by lap, not by day.
+			hop.build(game, SkyHop.course_seed(game.campaign.lap("skyhop")))
 		"slide":
-			puzzle.build(game, value)
+			# The ladder is the same for everyone, by lap, not by day.
+			puzzle.build(game, SlidePuzzle.ladder_seed(game.campaign.lap("slide")))
 		"siege":
 			siege.build(value)
 	for item in prey + sky: item.optional = true
@@ -177,13 +213,21 @@ func reset(game) -> void:
 		duck.phase = "rest"
 		duck.timer = rng.randf_range(0.0, DUCK_REST.y)
 		duck.heading = Vector3.ZERO
+	for family in families:
+		family.chain = 0
+		family.scattered = false
+		family.mother.heading = Vector3(cos(rng.randf_range(0, TAU)), 0, sin(rng.randf_range(0, TAU)))
+	carried = 0
+	steal_wait = 0.0
+	if kind == "goldrush": show_bank(game)
+	elif is_instance_valid(bank): bank.visible = false
 	for drop in sky: park(game, drop)
 	for marker in markers: marker.visible = false
-	if kind == "findcow": hunt.reset()
-	if kind == "skyhop": hop.reset()
+	if kind == "findcow": hunt.reset(game, game.campaign.checkpoint("findcow"))
+	if kind == "skyhop": hop.reset(game.campaign.checkpoint("skyhop"))
 	if kind == "slide": puzzle.reset(game)
 	# The siege's planes and shots are its own nodes: clear them in other games.
-	if kind == "siege": siege.reset()
+	if kind == "siege": siege.reset(game.campaign.checkpoint("siege"))
 	else: siege.clear()
 
 func park(game, drop: Dictionary) -> void:
@@ -197,22 +241,156 @@ func park(game, drop: Dictionary) -> void:
 func update(game, dt: float) -> void:
 	clock += dt
 	if kind == "stampede":
-		for duck in prey: move_duck(game, duck, dt)
+		for family in families: move_family(game, family, dt)
+	elif kind == "goldrush":
+		update_gold(game, dt)
 	elif kind == "coinrain":
 		update_rain(game, dt)
 	elif kind == "findcow":
 		hunt.update(game, dt)
 	elif kind == "skyhop":
 		hop.update(game, dt)
-		count = hop.passed
+		count = hop.run_gaps()
 	elif kind == "slide":
 		puzzle.update(game, dt)
 		count = puzzle.cleared
 	elif kind == "siege":
 		siege.update(game, dt, game.hole_position, game.move_direction().length() < 0.1)
-		count = siege.stages_cleared()
+		count = siege.run_cleared()
 
-func move_duck(game, duck: Dictionary, dt: float) -> void:
+# The mother wanders (and sprints from a near hole); her line follows her.
+func move_family(game, family: Dictionary, dt: float) -> void:
+	var mother: Dictionary = family.mother
+	if Traffic.is_active(mother):
+		if mother.phase == "rest":
+			mother.timer -= dt
+			if rng.randf() < dt*0.4: mother.heading = mother.heading.rotated(Vector3.UP, rng.randf_range(-1.2, 1.2))
+			mother.position += mother.heading*WANDER_SPEED*dt
+			bounce(game, mother)
+			mother.yaw = atan2(mother.heading.x, mother.heading.z)
+			game.set_item_transform(mother)
+		move_duck(game, mother, dt, MOTHER_DASH)
+	var leader: Dictionary = mother
+	for chick in family.chicks:
+		if not Traffic.is_active(chick): continue
+		if family.scattered or not Traffic.is_active(leader):
+			move_duck(game, chick, dt)
+			continue
+		var ahead: Vector3 = Vector3(sin(leader.yaw), 0, cos(leader.yaw))
+		var spot: Vector3 = leader.position - ahead*CHICK_GAP
+		var to := Vector3(spot.x - chick.position.x, 0, spot.z - chick.position.z)
+		if to.length() > 0.02:
+			chick.position += to.limit_length(CHICK_SPEED*dt)
+			chick.yaw = atan2(to.x, to.z)
+		chick.roll = sin(clock*18.0 + chick.position.x)*0.1
+		game.set_item_transform(chick)
+		leader = chick
+
+# Keeps a duck inside the map, turning it back at the edge.
+func bounce(game, duck: Dictionary) -> void:
+	if absf(duck.position.x) > game.layout.move_x: duck.heading.x = -duck.heading.x
+	if absf(duck.position.z) > game.layout.move_z: duck.heading.z = -duck.heading.z
+	duck.position.x = clampf(duck.position.x, -game.layout.move_x, game.layout.move_x)
+	duck.position.z = clampf(duck.position.z, -game.layout.move_z, game.layout.move_z)
+
+# The last duckling still in the family's line; `eating` (already falling into
+# the hole) still counts as in it.
+func tail_of(family: Dictionary, eating: Dictionary) -> Dictionary:
+	for i in range(family.chicks.size() - 1, -1, -1):
+		var chick: Dictionary = family.chicks[i]
+		if chick == eating or Traffic.is_active(chick): return chick
+	return {}
+
+# Points for a duck by where it was in its family.
+func duck_points(item: Dictionary) -> int:
+	var family: Dictionary = families[int(item.family)]
+	if item.get("chick", false):
+		if family.scattered: return 1
+		if item == tail_of(family, item):
+			family.chain += 1
+			return family.chain
+		family.chain = 0
+		return 1
+	var left: Array = family.chicks.filter(func(chick): return Traffic.is_active(chick) and chick.fall < 0 and not chick.eaten)
+	if left.is_empty(): return FAMILY_POINTS
+	family.scattered = true
+	for chick in left:
+		chick.phase = "rest"
+		chick.timer = 0.0
+	return MOTHER_POINTS
+
+func open_spot(game, farm) -> Vector3:
+	var at: Vector3 = farm.spot(game, rng, 6.0)
+	for attempt in 12:
+		if farm.zone(at) != "forest": break
+		at = farm.spot(game, rng, 6.0)
+	return at
+
+# --- gold rush bank ------------------------------------------------------------------
+
+func show_bank(game) -> void:
+	if not is_instance_valid(bank):
+		bank = Node3D.new()
+		var ring := MeshInstance3D.new()
+		var disc := CylinderMesh.new()
+		disc.top_radius = BANK_RADIUS
+		disc.bottom_radius = BANK_RADIUS
+		disc.height = 0.05
+		ring.mesh = disc
+		ring.material_override = glow(Color(1.0, 0.84, 0.3, 0.45))
+		bank.add_child(ring)
+		var rim := MeshInstance3D.new()
+		var torus := TorusMesh.new()
+		torus.inner_radius = BANK_RADIUS - 0.15
+		torus.outer_radius = BANK_RADIUS + 0.1
+		rim.mesh = torus
+		rim.material_override = glow(Color(1.0, 0.85, 0.25, 0.95))
+		bank.add_child(rim)
+		var beam := MeshInstance3D.new()
+		var column := CylinderMesh.new()
+		column.top_radius = BANK_RADIUS*0.6
+		column.bottom_radius = BANK_RADIUS
+		column.height = 9.0
+		beam.mesh = column
+		beam.position.y = 4.5
+		beam.material_override = glow(Color(1.0, 0.9, 0.5, 0.2))
+		bank.add_child(beam)
+		add_child(bank)
+	# Above the plaza paving, which sits a little over the ground.
+	bank.position = bank_at() + Vector3(0, 0.3, 0)
+	bank.visible = true
+
+func glow(color: Color) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color = color
+	return material
+
+func bank_at() -> Vector3:
+	return Vector3.ZERO
+
+func flat_gap(a: Vector3, b: Vector3) -> float:
+	return Vector2(a.x - b.x, a.z - b.z).length()
+
+# Banks the gold carried into the ring; the rival takes it on a touch.
+func update_gold(game, dt: float) -> void:
+	steal_wait = maxf(0.0, steal_wait - dt)
+	if carried <= 0: return
+	if flat_gap(game.hole_position, bank_at()) < BANK_RADIUS:
+		count += carried
+		game.add_floater(game.hole_position, I18n.t("gold_banked", carried), true)
+		game.fx.ripple(bank_at(), BANK_RADIUS, Color("ffd84a"))
+		game.sfx.play("grow")
+		carried = 0
+		return
+	if game.rival.active and steal_wait <= 0.0 and flat_gap(game.rival.position, game.hole_position) < game.rival.radius + game.radius + 0.4:
+		game.add_floater(game.hole_position, I18n.t("gold_stolen", carried), false)
+		game.sfx.play("shot")
+		carried = 0
+		steal_wait = STEAL_COOLDOWN
+
+func move_duck(game, duck: Dictionary, dt: float, dash_scale := 1.0) -> void:
 	if not Traffic.is_active(duck): return
 	duck.timer -= dt
 	var away := Vector3(duck.position.x - game.hole_position.x, 0, duck.position.z - game.hole_position.z)
@@ -226,7 +404,7 @@ func move_duck(game, duck: Dictionary, dt: float) -> void:
 			var side := Vector3(-away.z, 0, away.x).normalized()*rng.randf_range(-0.6, 0.6)
 			duck.heading = ((away/maxf(distance, 0.001)) + side).normalized()
 	else:
-		duck.position += duck.heading*DUCK_SPEED*dt
+		duck.position += duck.heading*DUCK_SPEED*dash_scale*dt
 		duck.yaw = atan2(duck.heading.x, duck.heading.z)
 		duck.roll = sin(duck.timer*30.0)*0.12
 		# Bounce off the map edge instead of piling up in a corner.
@@ -305,10 +483,21 @@ func snap_to_road(game, at: Vector3) -> Vector3:
 func caught(game, item: Dictionary) -> void:
 	if kind == "findcow":
 		hunt.caught(game, item)
-		count = 1 if hunt.found else 0
+		count = hunt.finds
 		return
 	if not item.get("prey", false): return
+	if kind == "stampede":
+		var points := duck_points(item)
+		count += points
+		game.add_floater(item.position, I18n.t("duck_family") if points == FAMILY_POINTS and not item.get("chick", false) else "+%d" % points, true)
+		game.sfx.play("grow")
+		return
 	var value := int(item.get("value", 1))
+	if kind == "goldrush":
+		carried += value
+		game.add_floater(item.position, I18n.t("gold_carried", value), true)
+		game.sfx.play("grow")
+		return
 	count += value
 	game.add_floater(item.position, "+%d" % value if value > 1 else "+1", true)
 	game.sfx.play("grow")
@@ -341,7 +530,7 @@ func goal_labels() -> Array:
 func reward(coin_mul: float) -> int:
 	if kind == "findcow": return hunt.reward(coin_mul)
 	if kind == "slide": return roundi((SLIDE_BASE_COINS + puzzle.cleared*COIN_RATE.slide + puzzle.in_par*SLIDE_PAR_COINS)*coin_mul) if puzzle.cleared > 0 else 0
-	if kind == "siege": return roundi((siege.count*COIN_RATE.siege + siege.stages_cleared()*SIEGE_STAGE_COINS)*coin_mul)
+	if kind == "siege": return roundi((siege.count*COIN_RATE.siege + siege.run_cleared()*SIEGE_STAGE_COINS)*coin_mul)
 	return roundi(count*COIN_RATE.get(kind, 1)*coin_mul)
 
 # Minimap dots for what still scores.
@@ -357,10 +546,13 @@ func dots() -> Array:
 
 # The HUD's note line: the cow hunt's open clues, the puzzle's moves and size.
 func note() -> String:
+	if kind == "skyhop": return I18n.t("hop_note", [I18n.t("hop_map_" + SkyHop.map_of(hop.passed).id), hop.next_checkpoint()])
 	if kind == "slide": return I18n.t("slide_note", [puzzle.board + 1, SlidePuzzle.BOARD_COUNT, puzzle.moves, puzzle.par, puzzle.level()])
 	if kind == "siege" and not siege.won(): return I18n.t("siege_boss_note") if siege.stage_goal() == 0 else I18n.t("siege_note", [siege.stage + 1, siege.stage_points, siege.stage_goal()])
+	if kind == "goldrush" and carried > 0: return I18n.t("gold_note", carried)
 	return hunt.note() if kind == "findcow" else ""
 
-# Movement scale: a wrong cow is chewed slowly.
+# Movement scale: a wrong cow is chewed slowly; carried gold weighs the hole down.
 func speed_scale() -> float:
+	if kind == "goldrush": return maxf(CARRY_FLOOR, 1.0/(1.0 + carried*CARRY_SLOW))
 	return hunt.speed_scale() if kind == "findcow" else 1.0

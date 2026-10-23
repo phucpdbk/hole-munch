@@ -586,15 +586,47 @@ func check_daily_games(g) -> void:
 	g.swallow(chest)
 	var food: Dictionary = g.items.filter(func(item): return item.kind == "cone")[0]
 	g.swallow(food)
-	check(g.daily.count == 3, "only golden treasure scores (a chest is worth 3)")
+	check(g.daily.carried == 3 and g.daily.count == 0 and g.daily.speed_scale() < 1.0, "gold is carried (a chest is worth 3), slows the hole and scores nothing yet")
+	g.rival.position = g.hole_position + Vector3(9, 0, 0)
+	g.hole_position = g.daily.bank_at()
+	g.daily.update_gold(g, 0.02)
+	check(g.daily.count == 3 and g.daily.carried == 0, "the bank ring turns carried gold into score")
+	g.daily.carried = 5
+	g.hole_position = Vector3(6, 0, 6)
+	g.rival.position = g.hole_position
+	g.daily.update_gold(g, 0.02)
+	check(g.daily.carried == 0 and g.daily.count == 3, "the rival steals the gold the hole carries")
 	g.go_menu()
 	g.daily_override = "stampede"
 	g.start_daily()
 	var ducks: Array = g.items.filter(func(item): return item.kind == "duck")
-	check(ducks.size() == g.DailyGames.DUCKS and not g.rival.active and g.daily.count == 0, "duck stampede fills the city with ducks")
+	var daily = g.daily
+	check(ducks.size() == daily.FAMILIES*(daily.CHICKS + 1) and not g.rival.active and daily.count == 0, "duck families fill the city")
+	var family: Dictionary = daily.families[0]
+	g.started = true
+	for frame in 40: g.step(0.02, Vector2.ZERO)
+	var line_ok := true
+	var leader: Dictionary = family.mother
+	for chick in family.chicks:
+		line_ok = line_ok and chick.position.distance_to(leader.position) < daily.CHICK_GAP*2.5
+		leader = chick
+	check(line_ok, "ducklings follow their mother in a line")
+	var chain: Array = []
+	for i in range(family.chicks.size() - 1, -1, -1):
+		var before_count: int = daily.count
+		g.swallow(family.chicks[i])
+		chain.append(daily.count - before_count)
+	var family_count: int = daily.count
+	g.swallow(family.mother)
+	check(chain == [1, 2, 3, 4, 5] and daily.count - family_count == daily.FAMILY_POINTS, "a line eaten from its tail chains 1-5 and the mother then pays the family bonus %s" % [chain])
+	var other: Dictionary = daily.families[1]
+	family_count = daily.count
+	g.swallow(other.mother)
+	check(daily.count - family_count == daily.MOTHER_POINTS and other.scattered, "a mother eaten first scatters her ducklings")
+	daily.count = 0
 	g.started = true
 	g.defense.grace = INF
-	var duck: Dictionary = ducks[0]
+	var duck: Dictionary = daily.families[2].mother
 	var start: Vector3 = duck.position
 	g.hole_position = start + Vector3(2.5, 0, 0)
 	g.hole_position.y = 0
@@ -654,36 +686,55 @@ func check_daily_games(g) -> void:
 	check(g.mechanics.powers.magnet > 0 and g.mechanics.powers.speed > 0 and g.campaign.items.magnet == 0, "carry-in powers start the next campaign round")
 	g.go_menu()
 
-# Find the cow (cow_hunt.gd): a herd on countryside farmland (countryside.gd)
-# where only today's cow matches every clue; the hole never grows; a wrong bite
-# costs time, a chew and opens a clue; the right one wins.
+# Find the cow (cow_hunt.gd): a card shows the named cow's look before the
+# first move; its look is unique among the cows on show; a warm/cold radar
+# tells how close it is; a wrong bite costs time and shows the card again; a
+# find raises the level (a bigger herd), adds time and is kept as a checkpoint.
 func check_cow_hunt(g) -> void:
 	g.campaign.daily = {}
+	g.campaign.checkpoints = {}
 	g.daily_override = "findcow"
 	g.start_daily()
 	var hunt = g.daily.hunt
-	var herd: Array = g.items.filter(func(item): return item.kind == "huntcow")
-	var twins: Array = herd.filter(func(cow): return cow != hunt.star and cow.bell == hunt.star.bell and cow.coat == hunt.star.coat and hunt.zone_of.call(cow.origin) == hunt.zone_of.call(hunt.star.origin))
-	var reachable := herd.all(func(cow): return absf(cow.origin.x) <= g.layout.move_x - 1.0 and absf(cow.origin.z) <= g.layout.move_z - 1.0)
+	var on_show := func() -> Array: return hunt.cows.filter(func(cow): return not cow.hidden and not cow.eaten)
+	var herd: Array = on_show.call()
+	var twins: Array = herd.filter(func(cow): return cow != hunt.star and cow.variant == hunt.star.variant)
 	var city: Array = g.items.filter(func(item): return item.kind in ["car", "person", "house", "soldier", "police", "patrol_car"])
-	var zones: Array = g.countryside.cells.values() if g.countryside else []
-	check(g.countryside != null and city.is_empty() and zones.has("forest") and zones.has("farm") and hunt.note().contains(I18n.t("cow_bell_" + str(hunt.star.bell))), "the hunt is farmland in named zones, no city")
-	check(reachable and herd.size() == hunt.COWS and twins.is_empty() and hunt.note().contains(hunt.star_name) and g.daily.dots().is_empty(), "the herd has one cow that fits all clues, and no minimap help")
+	check(g.countryside != null and city.is_empty() and hunt.level == 0 and herd.size() == hunt.HERD_START and herd.has(hunt.star) and twins.is_empty(), "the hunt starts on farmland with a small herd and one cow of its look")
+	g.update_hud()
+	check(not g.hud.cow_card.is_empty() and g.hud.cow_warmth < 0.0 and g.daily.dots().is_empty(), "the named cow's card shows before the first move, with no radar or minimap yet")
 	g.started = true
 	g.defense.grace = INF
+	for frame in int(hunt.MEMO_TIME/0.02) + 5: g.step(0.02, Vector2.ZERO)
+	g.update_hud()
+	check(g.hud.cow_card.is_empty() and g.hud.cow_warmth >= 0.0, "the card fades and the radar takes over")
+	g.hole_position = Vector3(hunt.star.position.x, 0, hunt.star.position.z) + Vector3(18, 0, 0)
+	var cold: float = hunt.warmth(g)
+	g.hole_position = Vector3(hunt.star.position.x, 0, hunt.star.position.z) + Vector3(1.5, 0, 0)
+	check(hunt.warmth(g) > 0.9 and cold < hunt.warmth(g), "the radar warms up near the named cow")
 	var decoy: Dictionary = herd.filter(func(cow): return cow != hunt.star)[0]
 	var before: float = g.remaining
 	# Hold the hole on the cow (drift and wind would carry it off).
 	for frame in 30:
 		if decoy.fall < 0 and not decoy.eaten: g.hole_position = Vector3(decoy.position.x, 0, decoy.position.z)
 		g.step(0.02, Vector2.ZERO)
-	check(hunt.wrong == 1 and hunt.clues == 2 and g.remaining < before - 2.0 and g.daily.speed_scale() < 1.0, "a wrong cow costs time, a chew, and opens the next clue")
+	check(hunt.wrong == 1 and g.remaining < before - 2.0 and not hunt.card().is_empty(), "a wrong cow costs time and shows the card again")
 	check(is_equal_approx(g.target_radius, g.START_RADIUS), "the hunt's hole keeps its small size")
+	var named: Dictionary = hunt.star
+	before = g.remaining
 	for frame in 60:
-		if g.mode != "playing": break
-		if hunt.star.fall < 0: g.hole_position = Vector3(hunt.star.position.x, 0, hunt.star.position.z)
+		if hunt.finds > 0: break
+		if named.fall < 0: g.hole_position = Vector3(named.position.x, 0, named.position.z)
 		g.step(0.02, Vector2.ZERO)
-	check(g.mode == "result" and g.hud.won and g.hud.stars == 3 and g.reward > 0, "swallowing today's cow wins the hunt")
+	check(hunt.finds == 1 and hunt.level == 1 and hunt.star != named and on_show.call().size() > herd.size() - 2 and g.remaining > before, "a find raises the level, brings more of the herd and adds time")
+	check(g.campaign.checkpoint("findcow") == 1, "the level reached is kept")
+	g.remaining = 0.01
+	g.step(0.02, Vector2.ZERO)
+	check(g.mode == "result" and g.hud.won and g.hud.stars == 1 and g.reward > 0, "a find wins the round")
+	g.go_menu()
+	g.campaign.daily = {}
+	g.start_daily()
+	check(hunt.level == 1 and on_show.call().size() == hunt.HERD_START + hunt.HERD_STEP, "the next run starts at the kept level")
 	g.go_menu()
 
 # Sky hop (sky_hop.gd): the clock waits for the first tap, a pilot that hops
@@ -691,6 +742,7 @@ func check_cow_hunt(g) -> void:
 # into the street, which ends the round.
 func check_sky_hop(g) -> void:
 	g.campaign.daily = {}
+	g.campaign.checkpoints = {}
 	g.daily_override = "skyhop"
 	# A bigger equipped craft still flies the hop as the default saucer.
 	var craft: int = g.campaign.craft
@@ -718,9 +770,49 @@ func check_sky_hop(g) -> void:
 		if g.mode != "playing": break
 		g.step(0.02, Vector2.ZERO)
 	check(hop.crashed and g.mode == "result" and g.hud.won and g.hud.stars >= 2 and g.reward > 0, "falling into the street ends the run and pays the gaps")
+	check(g.campaign.checkpoint("skyhop") == 20, "every 10 gaps is kept as a checkpoint (%d)" % g.campaign.checkpoint("skyhop"))
 	g.go_menu()
 	g.update_view(0.02)
 	check(not hop.visible and g.camera.current, "home hands the view back to the city camera")
+	g.campaign.daily = {}
+	g.start_daily()
+	check(hop.first == 20 and hop.passed == 20 and hop.map_of(hop.passed).id == "desert" and g.daily.count == 0, "the next run starts at the checkpoint, on the desert map")
+	check_hop_hazards(g, hop)
+	g.go_menu()
+
+# Each map's hazard catches or pushes the saucer where it should.
+func check_hop_hazards(g, hop) -> void:
+	var find := func(kind: String) -> int:
+		for i in range(0, hop.COURSE):
+			if hop.gap_at(i).hazard == kind: return i
+		return -1
+	var maps: Array = hop.MAPS.map(func(map): return map.hazard)
+	check(maps == ["", "wind", "icicle", "beam", "gull"] and find.call("wind") >= 20 and find.call("gull") >= 80 and find.call("") == 0, "five maps of 20 gaps, each with its own hazard")
+	var gust: Dictionary = hop.gap_at(find.call("wind"))
+	hop.running = true
+	hop.crashed = false
+	hop.passed = find.call("wind")
+	hop.x = gust.x - hop.SPACING*0.5
+	hop.y = hop.centre(gust)
+	hop.vy = 0.0
+	hop.update(g, 0.02)
+	check(not is_equal_approx(hop.vy, -hop.GRAVITY*0.02), "desert gusts push the saucer up or down")
+	var ice: Dictionary = hop.gap_at(find.call("icicle"))
+	hop.passed = find.call("icicle")
+	hop.x = ice.x - 2.0
+	hop.y = hop.centre(ice)
+	for frame in 15: hop.update(g, 0.02)
+	check(float(ice.drop) > 0.5, "an icicle drops into the gap ahead")
+	var light: Dictionary = hop.gap_at(find.call("beam"))
+	var ends: Array = hop.beam_ends(light)
+	hop.x = ends[1].x
+	hop.y = ends[1].y
+	check(hop.hazard_hits(light), "the searchlight's beam catches the saucer")
+	var gull: Dictionary = hop.gap_at(find.call("gull"))
+	var bird: Vector2 = hop.gull_at(gull)
+	hop.x = bird.x
+	hop.y = bird.y
+	check(hop.hazard_hits(gull) and not hop.hazard_hits(gust), "a gull catches the saucer; a plain gap has nothing to hit")
 
 # Slide puzzle (slide_puzzle.gd): today's 30-board ladder is seeded, gets
 # harder and every board is solvable in its tier's par range; each board has
@@ -728,6 +820,7 @@ func check_sky_hop(g) -> void:
 # the solver's path climbs the whole ladder for three stars.
 func check_slide_puzzle(g) -> void:
 	g.campaign.daily = {}
+	g.campaign.checkpoints = {}
 	g.daily_override = "slide"
 	g.start_daily()
 	var puzzle = g.daily.puzzle
@@ -735,7 +828,7 @@ func check_slide_puzzle(g) -> void:
 	check(g.slide_puzzle() and puzzle.board == 0 and puzzle.boards.size() == 1 and puzzle.par == path.size(), "the ladder opens on its first board, made on its own")
 	check(is_equal_approx(g.remaining, puzzle.board_seconds()) and puzzle.lives == puzzle.LIVES, "the board's own clock is set and every life is there")
 	var twin = load("res://scripts/slide_puzzle.gd").new()
-	twin.generate(g.daily.seed_value)
+	twin.generate(puzzle.seed_value)
 	var started := Time.get_ticks_msec()
 	twin.layout_of(puzzle.BOARD_COUNT - 1)
 	var made_in := Time.get_ticks_msec() - started
@@ -775,6 +868,13 @@ func check_slide_puzzle(g) -> void:
 			g.step(0.02, Vector2.ZERO)
 	check(climbed and puzzle.cleared == puzzle.BOARD_COUNT, "the solver's path clears every board in par, one after another")
 	check(g.mode == "result" and g.hud.won and g.hud.stars == 3 and puzzle.in_par == puzzle.BOARD_COUNT and g.reward > 0, "the whole ladder wins three stars")
+	check(g.campaign.lap("slide") == 1 and g.campaign.checkpoint("slide") == 0, "finishing the ladder starts a new lap")
+	g.go_menu()
+	g.campaign.reach_checkpoint("slide", 4, puzzle.BOARD_COUNT)
+	g.campaign.daily = {}
+	g.start_daily()
+	check(puzzle.board == 4 and puzzle.first_board == 4 and puzzle.seed_value == puzzle.ladder_seed(1), "a run starts at the kept board of the current lap")
+	g.campaign.checkpoints = {}
 	g.go_menu()
 	g.campaign.daily = {}
 	g.start_daily()
@@ -791,6 +891,7 @@ func check_slide_puzzle(g) -> void:
 # helicopter into an escort, and three hits end the run.
 func check_siege(g) -> void:
 	g.campaign.daily = {}
+	g.campaign.checkpoints = {}
 	g.daily_override = "siege"
 	g.start_daily()
 	var siege = g.daily.siege
@@ -827,7 +928,7 @@ func check_siege(g) -> void:
 	siege.lives = 1
 	siege.stage_points = siege.stage_goal()
 	g.step(0.02, Vector2.ZERO)
-	check(siege.stage == 1 and siege.lives == 2 and siege.stages_cleared() == 1, "a stage's goal opens the next stage and gives a life back")
+	check(siege.stage == 1 and siege.lives == 2 and siege.stages_cleared() == 1 and g.campaign.checkpoint("siege") == 1, "a stage's goal opens the next stage, gives a life back and is kept")
 	siege.stage_points = siege.stage_goal()
 	g.step(0.02, Vector2.ZERO)
 	var blimps: Array = siege.foes.filter(func(foe): return foe.kind == "blimp")
@@ -836,6 +937,15 @@ func check_siege(g) -> void:
 	check(siege.won() and siege.stages_cleared() == 3, "downing the blimp clears the last stage")
 	g.step(0.02, Vector2.ZERO)
 	check(g.mode == "result" and g.hud.won and g.reward > 0 and g.hud.stars == 3, "all three stages win three stars and pay out")
+	check(g.campaign.lap("siege") == 1 and g.campaign.checkpoint("siege") == 0, "downing the blimp finishes the lap")
+	g.go_menu()
+	g.campaign.reach_checkpoint("siege", 2, 3)
+	g.campaign.daily = {}
+	g.start_daily()
+	g.started = true
+	g.step(0.02, Vector2.ZERO)
+	check(siege.stage == 2 and siege.first_stage == 2 and siege.foes.any(func(foe): return foe.kind == "blimp"), "a run starts at the kept stage, its blimp and all")
+	g.campaign.checkpoints = {}
 	g.go_menu()
 	g.update_view(0.02)
 	check(not siege.visible, "home hides the siege's planes")

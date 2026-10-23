@@ -2090,6 +2090,9 @@ func update_hud() -> void:
 		hud.guardian_max = DailyGames.SlidePuzzle.LIVES
 		hud.guardian_hp = daily.puzzle.lives
 	hud.puzzle_buttons = slide_puzzle() and mode == "playing"
+	var hunting: bool = run_kind == "daily" and daily_kind == "findcow" and mode == "playing"
+	hud.cow_card = daily.hunt.card() if hunting else {}
+	hud.cow_warmth = daily.hunt.warmth(self) if hunting and started else -1.0
 	hud.revive_left = revive_left
 	hud.revive_seconds = int(Ads.REVIVE_SECONDS)
 	hud.can_double = can_double()
@@ -2141,7 +2144,7 @@ func update_hud() -> void:
 	hud.start_hint = I18n.t("hop_hint") if sky_hop() else I18n.t("slide_hint") if slide_puzzle() else I18n.t("siege_hint") if siege() else ""
 	hud.daily_count = daily.count
 	# The puzzle counts boards of its ladder; the siege's stages read as stars.
-	hud.daily_target = DailyGames.SlidePuzzle.BOARD_COUNT if slide_puzzle() else 3 if siege() else daily.target()
+	hud.daily_target = DailyGames.SlidePuzzle.STAR_BOARDS[-1] if slide_puzzle() else 3 if siege() else daily.target()
 	hud.items = campaign.items
 	hud.goal_mask = goal_mask if mode == "result" else campaign.goals[campaign.selected] if run_kind == "campaign" else 0
 	hud.rival_growth = clampf(rival.radius*EAT_RATIO/boss_radius, 0, 1) if rival.active else -1.0

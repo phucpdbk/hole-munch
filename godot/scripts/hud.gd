@@ -121,6 +121,11 @@ var stick_delta := Vector2.ZERO
 # Saucer skill button (skills.gd): kind ("" hides it), bar fill and the share
 # of a running skill still left.
 var skill_kind := ""
+# The cow hunt: the named cow's card ({} hides it) and the radar (-1 hides it).
+var cow_card := {}
+var cow_warmth := -1.0
+const COW_COATS = preload("res://scripts/cow_hunt.gd").COATS
+const COW_BELLS = preload("res://scripts/cow_hunt.gd").BELLS
 # The slide puzzle's undo and restart buttons, bottom centre.
 var puzzle_buttons := false
 const PUZZLE_RADIUS := 38.0
@@ -490,6 +495,8 @@ func draw_playing() -> void:
 		text_at(note, Vector2(w/2, 186), 20, LIGHT, true, 6)
 	if skill_kind != "": draw_skill()
 	if puzzle_buttons: draw_puzzle_buttons()
+	if cow_warmth >= 0.0: draw_cow_radar()
+	if not cow_card.is_empty(): draw_cow_card()
 	if stick_active:
 		draw_circle(stick_origin, 54, Color(1,1,1,0.13))
 		draw_arc(stick_origin, 54, 0, TAU, 32, Color(1,1,1,0.65), 2, true)
@@ -508,6 +515,41 @@ func puzzle_layout() -> Dictionary:
 		return {"board":board, "undo":Vector2(board.position.x - 70, mid), "restart":Vector2(board.end.x + 70, mid), "hint":Vector2(board.position.x/2, mid - 80)}
 	var portrait := Rect2(20, 170, w - 40, w - 40)
 	return {"board":portrait, "undo":Vector2(w/2 - 70, portrait.end.y + 60), "restart":Vector2(w/2 + 70, portrait.end.y + 60), "hint":Vector2(w/2, portrait.end.y + 140)}
+
+# Warm/cold bar under the clock: blue far from the named cow, red on it.
+func draw_cow_radar() -> void:
+	var rect := Rect2(size.x/2 - 150, 140, 300, 22)
+	panel(rect.grow(6), Color("1b3048ed"), 14)
+	var fill := Color("4aa3ff").lerp(Color("ff5a4e"), cow_warmth)
+	draw_rect(Rect2(rect.position, Vector2(rect.size.x*maxf(0.04, cow_warmth), rect.size.y)), fill)
+	text_at(I18n.t("cow_radar"), Vector2(size.x/2, rect.end.y - 5), 13, LIGHT, true, 3)
+
+# The named cow's look: a flat cow with its coat, hat and bell, and the words.
+func draw_cow_card() -> void:
+	var fade: float = cow_card.get("fade", 1.0)
+	var rect := Rect2(size.x/2 - 170, size.y/2 - 150, 340, 260)
+	panel(rect, Color(0.106, 0.188, 0.282, 0.94*fade), 22)
+	text_at(I18n.t("cow_memo", cow_card.name), Vector2(size.x/2, rect.position.y + 38), 22, Color(GOLD, fade), true, 4)
+	var coat: Array = COW_COATS[int(cow_card.coat)]
+	var main := Color(Color(coat[0]), fade)
+	var patch := Color(Color(coat[1]), fade)
+	var at := Vector2(size.x/2 - 20, rect.position.y + 130)
+	for leg in [-46, -26, 26, 46]: draw_rect(Rect2(at + Vector2(leg - 6, 18), Vector2(12, 34)), patch.darkened(0.2))
+	draw_rect(Rect2(at + Vector2(-60, -28), Vector2(120, 56)), main)
+	draw_rect(Rect2(at + Vector2(-30, -22), Vector2(34, 26)), patch)
+	draw_rect(Rect2(at + Vector2(14, 0), Vector2(26, 22)), patch)
+	draw_rect(Rect2(at + Vector2(56, -50), Vector2(48, 44)), main)
+	draw_rect(Rect2(at + Vector2(92, -30), Vector2(16, 20)), Color(Color("f2b8b8"), fade))
+	draw_circle(at + Vector2(72, -6), 13, Color(Color(COW_BELLS[int(cow_card.bell)]), fade))
+	match int(cow_card.hat):
+		1:
+			draw_rect(Rect2(at + Vector2(48, -56), Vector2(64, 8)), Color(Color("e8c56a"), fade))
+			draw_rect(Rect2(at + Vector2(64, -74), Vector2(32, 20)), Color(Color("e8c56a"), fade))
+			draw_rect(Rect2(at + Vector2(64, -60), Vector2(32, 5)), Color(Color("c0392b"), fade))
+		2:
+			for i in 5: draw_circle(at + Vector2(58 + i*11, -54), 7, Color(Color(["ff8fc8", "ffd23f", "ffffff", "c39bff", "ff8fc8"][i]), fade))
+	var words := "%s · %s · %s" % [I18n.t("cow_coat_" + str(cow_card.coat)), I18n.t("cow_hat_" + str(cow_card.hat)), I18n.t("cow_bell_" + str(cow_card.bell))]
+	UiStyle.text(self, words, Vector2(size.x/2, rect.end.y - 28), 15, Color(LIGHT, fade), true, 0, body_font)
 
 func puzzle_button_center(kind: String) -> Vector2:
 	return puzzle_layout()[kind]

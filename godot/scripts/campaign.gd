@@ -150,6 +150,9 @@ var daily := {}
 var items := {"magnet":0, "speed":0, "time":0}
 # Endless survival records.
 var endless := {"best":0, "stage":0}
+# Daily mini-games with a ladder keep their furthest point for good:
+# type -> {"at": board/stage/gap/level reached, "lap": ladders finished}.
+var checkpoints := {}
 # Days in a row with a finished daily round: {"count":n, "last":"YYYY-MM-DD"}.
 var streak := {"count":0, "last":""}
 # The once-a-day reminder (notify.gd); the player can switch it off.
@@ -447,7 +450,7 @@ func data() -> Dictionary:
 	return {"version":9, "selected":mini(selected,unlocked), "unlocked":unlocked, "medals":medals, "goals":goals,
 		"craft":craft, "skin":skin, "effect":effect, "trail":trail, "owned":owned.duplicate(true), "best":best, "coins":coins, "upgrades":upgrades.duplicate(),
 		"daily":daily.duplicate(), "items":items.duplicate(), "endless":endless.duplicate(), "seen":seen.duplicate(), "lang":lang,
-		"streak":streak.duplicate(), "reminders":reminders, "volume":volume}
+		"streak":streak.duplicate(), "reminders":reminders, "volume":volume, "checkpoints":checkpoints.duplicate(true)}
 
 func restore(value: Variant) -> void:
 	if not value is Dictionary: return
@@ -538,6 +541,16 @@ func restore_settings(value: Dictionary) -> void:
 		if id is String and id.length() <= 32 and id not in seen: seen.append(id)
 
 func restore_records(value: Dictionary) -> void:
+	checkpoints = {}
+	var saved_points = value.get("checkpoints", {})
+	if saved_points is Dictionary:
+		for type in saved_points:
+			var entry = saved_points[type]
+			if not type in DAILY_TYPES or not entry is Dictionary: continue
+			var at = entry.get("at", 0)
+			var lap = entry.get("lap", 0)
+			if (at is int or at is float) and (lap is int or lap is float):
+				checkpoints[type] = {"at":clampi(int(at), 0, CHECKPOINT_MAX), "lap":clampi(int(lap), 0, CHECKPOINT_MAX)}
 	var saved_daily = value.get("daily", {})
 	if saved_daily is Dictionary and saved_daily.get("date") is String and saved_daily.date.length() <= 10:
 		var record := {"date":saved_daily.date, "type":daily_type(saved_daily.date), "attempts":0, "bonus":0, "best":0,
@@ -583,6 +596,7 @@ const DAILY_TYPES := ["stampede", "coinrain", "goldrush", "findcow", "skyhop", "
 const DAILY_ATTEMPTS := 3
 # Rewarded ads can add this many more tries a day ("bonus" in the record).
 const DAILY_AD_TRIES := 2
+const CHECKPOINT_MAX := 999
 const MAX_ITEMS := 9
 const POWER_KINDS := ["magnet", "speed", "time"]
 
@@ -633,6 +647,23 @@ func use_daily_attempt(date: String) -> bool:
 	var record := daily_record(date).duplicate()
 	record.attempts = int(record.attempts) + 1
 	daily = record
+	return true
+
+# Where a ladder mini-game picks up: the furthest point reached (0 at first).
+func checkpoint(type: String) -> int:
+	return int(checkpoints.get(type, {}).get("at", 0))
+
+# Ladders finished; each lap brings new boards or a new course.
+func lap(type: String) -> int:
+	return int(checkpoints.get(type, {}).get("lap", 0))
+
+# Keeps the furthest point reached; reaching `total` finishes the ladder and
+# starts the next lap from 0. True when the checkpoint moved.
+func reach_checkpoint(type: String, at: int, total: int) -> bool:
+	if at <= checkpoint(type): return false
+	var entry := {"at":mini(at, CHECKPOINT_MAX), "lap":lap(type)}
+	if at >= total: entry = {"at":0, "lap":mini(lap(type) + 1, CHECKPOINT_MAX)}
+	checkpoints = checkpoints.merged({type:entry}, true)
 	return true
 
 # Returns true for the first win of that day, which also grants the day's power.

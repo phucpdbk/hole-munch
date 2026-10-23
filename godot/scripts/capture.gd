@@ -124,23 +124,67 @@ func run(game, campaign_mode: bool) -> void:
 		return
 	# The cow hunt's farmland from above, then the hole beside today's cow with
 	# every clue open (test-output/cow-overview.png, cow-play.png).
+	# The cow hunt's card before the first move, then the radar beside the
+	# named cow (test-output/cow-card.png, cow-play.png).
 	if "--cow-capture" in OS.get_cmdline_user_args():
 		g.campaign.daily = {}
+		g.campaign.checkpoints = {"findcow":{"at":2, "lap":0}}
 		g.daily_override = "findcow"
 		g.start_daily()
+		await frames(40)
+		await snapshot("cow-card")
 		g.started = true
-		g.overview_size = maxf(g.layout.half_x, g.layout.half_z)*2.3
-		g.camera.far = 600
-		await frames(90)
-		await snapshot("cow-overview")
-		g.overview_size = 0.0
-		g.camera.far = 200
-		g.daily.hunt.clock = 31.0
+		g.daily.hunt.memo = 0.0
 		var star: Dictionary = g.daily.hunt.star
-		g.hole_position = star.position + Vector3(1.8, 0, 1.2)
+		g.hole_position = star.position + Vector3(2.4, 0, 1.6)
 		g.hole_position.y = 0
 		await frames(60)
 		await snapshot("cow-play")
+		g.get_tree().quit()
+		return
+	# Duck families in their lines and the gold rush's bank ring
+	# (test-output/duck-families.png, gold-bank.png).
+	if "--duckgold-capture" in OS.get_cmdline_user_args():
+		g.campaign.daily = {}
+		g.daily_override = "stampede"
+		g.start_daily()
+		g.started = true
+		var mother: Dictionary = g.daily.families[0].mother
+		g.hole_position = mother.position + Vector3(7, 0, 5)
+		g.hole_position.y = 0
+		await frames(90)
+		await snapshot("duck-families")
+		g.go_menu()
+		g.campaign.daily = {}
+		g.daily_override = "goldrush"
+		g.start_daily()
+		g.started = true
+		g.daily.carried = 11
+		g.hole_position = g.daily.bank_at() + Vector3(4.5, 0, 3.0)
+		await frames(60)
+		await snapshot("gold-bank")
+		g.get_tree().quit()
+		return
+	# Each sky hop map a few gaps in (test-output/hop-map-0.png ... hop-map-4.png).
+	if "--hopmaps-capture" in OS.get_cmdline_user_args():
+		var hop = g.daily.hop
+		for m in hop.MAPS.size():
+			g.go_menu()
+			g.campaign.daily = {}
+			g.campaign.checkpoints = {"skyhop":{"at":m*hop.MAP_GAPS, "lap":0}}
+			g.daily_override = "skyhop"
+			g.start_daily()
+			var index: int = m*hop.MAP_GAPS + 3
+			var gap: Dictionary = hop.gap_at(index)
+			hop.running = true
+			hop.passed = index
+			hop.clock = 2.0
+			hop.x = gap.x - 3.0
+			hop.y = hop.centre(gap)
+			if gap.hazard == "icicle": gap.drop = hop.ICICLE_DROP
+			hop.place()
+			await frames(20)
+			await snapshot("hop-map-%d" % m)
 		g.get_tree().quit()
 		return
 	# A grown hole parked on the map edge: shaft and rim stop at the slab (test-output/edge-*.png).

@@ -6,13 +6,17 @@ const I18n = preload("res://scripts/i18n.gd")
 # until a building, the edge or something too big stops it, swallowing every
 # snack small enough on the way. The hole grows a size at each of the board's
 # "grow" points eaten; the landmark only fits a size-3 hole, so the order of
-# the slides matters. A day is a ladder of BOARD_COUNT boards, BOARDS_PER_TIER
-# from each of the TIERS in turn, each from the date's seed and made when it
+# the slides matters. The puzzle is a ladder of BOARD_COUNT boards,
+# BOARDS_PER_TIER from each of the TIERS in turn, the same for everyone (each
+# board's seed comes from its place and the ladder's lap) and made when it
 # comes up; a breadth-first solver keeps only layouts with a known shortest
-# solution (par) in the tier's range. Every board has its own clock
+# solution (par) in the tier's range. A run starts at the player's checkpoint
+# (Campaign.checkpoint "slide"), which every solved board moves on; finishing
+# the ladder starts a new lap of new boards. Every board has its own clock
 # (BASE_SECONDS plus SECONDS_PER_PAR a par slide); running out costs one of
-# LIVES and starts the board over. The run ends with the last life or the last
-# board. Stars at STAR_BOARDS boards solved. The board has its own camera.
+# LIVES and starts the board over. The run ends with the last life or the
+# ladder's last board. Stars at STAR_BOARDS boards solved in the run. The
+# board has its own camera.
 const ALTITUDE := 800.0
 const CELL := 2.0
 # Snacks are [size, count]; the landmark comes on top and needs a size-3 hole.
@@ -29,7 +33,10 @@ const BOARDS_PER_TIER := 5
 const LIVES := 3
 const BASE_SECONDS := 15.0
 const SECONDS_PER_PAR := 3.0
-const STAR_BOARDS := [5, 15, 30]
+const STAR_BOARDS := [1, 3, 5]
+# Board seeds: LADDER_SEED, a step per lap and BOARD_SEED_STEP per board.
+const LADDER_SEED := 7177
+const LAP_SEED_STEP := 100003
 const LANDMARK := 3
 # The camera frames the biggest board, so it never jumps between boards.
 const VIEW_SIZE := 7
@@ -54,6 +61,8 @@ var cleared := 0
 var in_par := 0
 var lives := LIVES
 var seed_value := 0
+# The board this run began on (the checkpoint).
+var first_board := 0
 var size := 7
 var grow_at: Array = []
 var walls := {}
@@ -226,12 +235,16 @@ func build(game, value: int) -> void:
 	reset(game)
 	visible = false
 
-# Back to the first board of the day, all lives back.
+static func ladder_seed(lap: int) -> int:
+	return LADDER_SEED + lap*LAP_SEED_STEP
+
+# Back to the checkpoint board with every life.
 func reset(game) -> void:
 	cleared = 0
 	in_par = 0
 	lives = LIVES
-	start_board(game, 0)
+	first_board = mini(game.campaign.checkpoint("slide"), BOARD_COUNT - 1)
+	start_board(game, first_board)
 
 # Loads a board and sets the round clock to its own time.
 func start_board(game, index: int) -> void:
@@ -262,6 +275,8 @@ func move(game, dir: Vector2i) -> bool:
 	if mask & landmark_bit():
 		solved = true
 		cleared += 1
+		game.campaign.reach_checkpoint("slide", board + 1, BOARD_COUNT)
+		game.persist()
 		game.score += BOARD_POINTS
 		if moves <= par:
 			in_par += 1
