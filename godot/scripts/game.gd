@@ -7,6 +7,7 @@ const Hud = preload("res://scripts/hud.gd")
 const Traffic = preload("res://scripts/traffic.gd")
 const DuckBoss = preload("res://scripts/duck_boss.gd")
 const Mechanics = preload("res://scripts/mechanics.gd")
+const Skills = preload("res://scripts/skills.gd")
 const HoleStyle = preload("res://scripts/hole_style.gd")
 const Smoke = preload("res://scripts/smoke.gd")
 const Fx = preload("res://scripts/fx.gd")
@@ -177,6 +178,8 @@ var floaters: Array[Dictionary] = []
 var rim: MeshInstance3D
 var wall: MeshInstance3D
 var defense = preload("res://scripts/defense.gd").new()
+# The saucer's skill and its energy bar (scripts/skills.gd).
+var skills = Skills.new()
 var defense_visual = preload("res://scripts/defense_visual.gd").new()
 var army = Army.new()
 var army_visual = preload("res://scripts/army_visual.gd").new()
@@ -1038,6 +1041,7 @@ func reset_stats() -> void:
 	doubled = false
 	reset_hazards()
 	mechanics.reset(self, level.weather, 991 + campaign.selected*31)
+	skills.reset(campaign.craft, skills_on())
 	if fx: fx.clear()
 	if showtime: showtime.reset(self)
 	if events: events.reset(self)
@@ -1193,6 +1197,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		if DailyGames.SkyHop.is_tap(event): daily.hop.flap(self)
 		return
 	var tapped: bool = (event is InputEventScreenTouch or event is InputEventMouseButton) and event.pressed
+	# The skill button takes its presses (and the mouse copy of a touch) before the stick.
+	if tapped and hud.skill_hit(event.position):
+		use_skill()
+		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_E, KEY_SHIFT]: use_skill()
 	if tapped or (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE): tap_guardian()
 	if event is InputEventScreenTouch:
 		if event.pressed and touch_id == -1:
@@ -1289,7 +1298,7 @@ func step(dt: float, input: Vector2) -> void:
 	right.y = 0
 	down.y = 0
 	var movement := (right.normalized()*input.x + down.normalized()*input.y).limit_length()
-	var wanted: Vector3 = movement*(5.8+minf(radius,4.0)*0.45)*float(stats.speed)*defense.speed_multiplier()*mechanics.speed_multiplier()*(daily.speed_scale() if run_kind == "daily" else 1.0)
+	var wanted: Vector3 = movement*(5.8+minf(radius,4.0)*0.45)*float(stats.speed)*defense.speed_multiplier()*mechanics.speed_multiplier()*skills.speed_multiplier()*(daily.speed_scale() if run_kind == "daily" else 1.0)
 	hole_velocity = mechanics.steer(wanted, dt, elapsed)
 	hole_position += hole_velocity*dt
 	hole_position = layout.clamp_point(hole_position)
@@ -1299,6 +1308,7 @@ func step(dt: float, input: Vector2) -> void:
 	pulse = maxf(0, pulse-dt*2.0)
 	combo_time = maxf(0, combo_time-dt)
 	if combo_time <= 0: combo = 0
+	skills.update(dt)
 	update_floaters(dt)
 	update_boss(dt)
 	mechanics.update(self, dt)
@@ -1332,7 +1342,7 @@ func step(dt: float, input: Vector2) -> void:
 func eat_reachable() -> void:
 	for item in items:
 		if item.eaten or item.get("hidden", false) or item.fall >= 0 or item.get("falling", 0.0) > 0: continue
-		if item.radius > radius*EAT_RATIO or item.get("shielded", false) or not mechanics.guardian_biteable(item): continue
+		if item.radius > radius*EAT_RATIO*skills.eat_scale(item) or item.get("shielded", false) or not mechanics.guardian_biteable(item): continue
 		# Like 2D: the centre must pass inside the rim, less a bit for bigger objects.
 		var reach: float = radius - item.radius*0.4
 		if Vector2(item.position.x-hole_position.x,item.position.z-hole_position.z).length() < reach:
@@ -1382,7 +1392,7 @@ func map_cleared() -> bool:
 	return not items.any(func(item): return not item.eaten and not item.get("bonus", false) and not item.get("optional", false))
 
 func magnet_level() -> int:
-	return int(stats.magnet) + mechanics.magnet_bonus()
+	return int(stats.magnet) + mechanics.magnet_bonus() + skills.magnet_bonus()
 
 # Near the end of a landmark city the landmark fights back: volleys of blasts
 # around the hole and a reinforcement squad from the map edge.
@@ -1404,10 +1414,12 @@ func update_counter() -> void:
 
 func update_rival(dt: float) -> void:
 	if not rival.active: return
-	for item in rival.update(dt, items, items[boss_index], hole_position, radius):
-		start_fall(item, rival.position)
-		item.sink = "rival"
-		rival.grow(bite_size(item))
+	# The freeze skill holds the rival in place too.
+	if not skills.frozen():
+		for item in rival.update(dt, items, items[boss_index], hole_position, radius):
+			start_fall(item, rival.position)
+			item.sink = "rival"
+			rival.grow(bite_size(item))
 	rival.position = features.collide(rival.position, rival.radius, EAT_RATIO, rival.heading)
 	if rival.swallowed_by(hole_position, radius):
 		eat_rival()
@@ -1526,6 +1538,8 @@ func swallow(item: Dictionary) -> void:
 	combo += 1
 	combo_time = COMBO_WINDOW
 	best_combo = maxi(best_combo, combo)
+	if skills.charge(float(base_points(item))/maxi(1, total_points), combo):
+		add_floater(hole_position, I18n.t("skill_ready", I18n.t("skill_" + skills.kind)), true)
 	var extra := combo_seconds(combo) if clock_can_grow() else 0.0
 	if extra > 0:
 		remaining += extra
@@ -1552,6 +1566,15 @@ func grow(bite_radius: float) -> void:
 		add_floater(hole_position, I18n.t("bigger"), true)
 		fx.ripple(hole_position, target_radius, Color("b7a2f1"))
 
+# Saucer skills play in campaign and endless cities only.
+func skills_on() -> bool:
+	return run_kind in ["campaign", "endless"] and countryside == null
+
+# Fires the saucer's skill once the energy bar is full.
+func use_skill() -> void:
+	if mode != "playing" or not started or showtime.busy(): return
+	skills.use(self)
+
 # Only endless survival earns time back; everywhere else the clock only falls.
 func clock_can_grow() -> bool:
 	return run_kind == "endless"
@@ -1563,8 +1586,13 @@ static func combo_seconds(count: int) -> float:
 	if count > last and (count-last)%COMBO_REPEAT == 0: return COMBO_REPEAT_SECONDS
 	return 0.0
 
-# A hit costs time, breaks the combo and shrinks the hole a little.
-func take_hit(from := Vector3.INF) -> void:
+# A hit costs time, breaks the combo and shrinks the hole a little; the shield
+# skill turns it away (false).
+func take_hit(from := Vector3.INF) -> bool:
+	if skills.absorbs_hit():
+		fx.ripple(hole_position, radius*1.2, Skills.COLORS.shield)
+		sfx.play("tick", 0.6)
+		return false
 	remaining = maxf(0,remaining-HIT_SECONDS)
 	combo = 0
 	combo_time = 0.0
@@ -1578,12 +1606,12 @@ func take_hit(from := Vector3.INF) -> void:
 	var source: Dictionary = defense.last_hit.get("source", {})
 	if from == Vector3.INF: from = source.get("position", hole_position - hole_velocity)
 	mechanics.knock_back(hole_position - from, HIT_KNOCK)
+	return true
 
 # Army rounds reel the saucer like a blast; a missile also shrinks the hole a
 # second step and shakes harder.
 func army_hit() -> void:
-	take_hit(army.last_from)
-	if not army.heavy: return
+	if not take_hit(army.last_from) or not army.heavy: return
 	target_radius = maxf(float(stats.start_radius), target_radius*HIT_SHRINK)
 	fx.shake = 1.0
 	fx.puff(saucer.position, 1.6, 1.0)
@@ -1958,6 +1986,9 @@ func update_hud() -> void:
 	hud.stick_active = dragging
 	hud.stick_origin = drag_origin
 	hud.stick_delta = drag_delta
+	hud.skill_kind = skills.kind if skills.enabled else ""
+	hud.skill_energy = skills.energy
+	hud.skill_active = skills.active_share()
 	var target_name: String = Campaign.boss_name(level.boss)
 	mechanics.sync_shield(self)
 	if run_kind == "runner": hud.note = I18n.t("run_hint", target_name) if not started else I18n.t("big_enough", target_name) if radius*EAT_RATIO >= boss_radius and not boss_down else ""

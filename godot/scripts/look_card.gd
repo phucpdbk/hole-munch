@@ -7,6 +7,7 @@ const Fx = preload("res://scripts/fx.gd")
 const ShapeTextures = preload("res://scripts/shape_textures.gd")
 const UiStyle = preload("res://scripts/ui_style.gd")
 const UiButton = preload("res://scripts/ui_button.gd")
+const Skills = preload("res://scripts/skills.gd")
 const PREVIEW := 46.0
 const BUTTON_H := 34.0
 const THUMBS := "res://assets/thumbs/craft_%d.png"
@@ -54,6 +55,7 @@ func _draw() -> void:
 		"effects": draw_shapes(center, Fx.EFFECT_LOOKS[index])
 		"trails": draw_trail(center)
 		_: draw_craft(center)
+	if slot == "crafts": draw_skill_badge()
 	var font_size := 15 if UiStyle.text_width(title, 15) < size.x - 12 else 12
 	UiStyle.text(self, title, Vector2(size.x/2, 10 + PREVIEW + 20), font_size, UiStyle.LIGHT, true)
 
@@ -102,6 +104,14 @@ func draw_craft(center: Vector2) -> void:
 	var side := PREVIEW*1.25
 	var at := center + Vector2(0, sin(clock*2.0)*1.5)
 	draw_texture_rect(thumb, Rect2(at - Vector2.ONE*side/2, Vector2.ONE*side), false)
+
+# Each saucer flies with its own skill (skills.gd): its icon in the top corner.
+func draw_skill_badge() -> void:
+	var kind := Skills.skill_of(index)
+	var at := Vector2(size.x - 20, 20)
+	draw_circle(at, 14, Color("1b3048"))
+	draw_arc(at, 14, 0, TAU, 24, Skills.COLORS[kind], 2, true)
+	UiStyle.draw_icon(self, Skills.ICONS[kind], at, 18)
 
 func draw_trail(center: Vector2) -> void:
 	var look: Array = Fx.TRAIL_LOOKS[index]

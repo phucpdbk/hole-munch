@@ -86,6 +86,7 @@ func run(game) -> void:
 	g.retry_city()
 	check(g.mode == "playing" and g.campaign.selected == city and not g.boss_down, "retry replays the same city")
 	check_mechanics()
+	check_skills()
 	check_features()
 	check_ads()
 	check_updates()
@@ -569,6 +570,44 @@ func check_updates() -> void:
 	check(U.parse('{"version_code": 99, "url": "javascript:alert(1)"}', 12).is_empty() and U.parse('not json', 12).is_empty() \
 		and U.parse('{"version_code": "13", "url": "https://x"}', 12).is_empty(), "bad or unsafe version files are ignored")
 	check(U.current_code() > 0, "the build code is set in project settings")
+
+# Saucer skills (skills.gd): the bar fills from food, a full bar fires the skill.
+func check_skills() -> void:
+	g.load_level(0)
+	g.reset_round()
+	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
+	var s = g.skills
+	check(s.enabled and s.kind == s.skill_of(g.campaign.craft) and s.energy == 0.0, "a campaign round starts with an empty skill bar")
+	g.use_skill()
+	check(s.active == 0.0, "an empty bar fires nothing")
+	check(not s.charge(0.1, 0) and is_equal_approx(s.energy, 0.5) and s.charge(0.1, 0), "a fifth of the map's food fills the bar")
+	s.energy = 0.0
+	s.charge(0.1, s.COMBO_CHARGE_FROM)
+	check(s.energy > 0.5, "long combos charge faster")
+	s.energy = 1.0
+	var before: float = g.remaining
+	g.take_hit()
+	check(is_equal_approx(s.energy, 1.0 - s.HIT_DRAIN) and g.remaining < before, "a hit drains energy")
+	for kind in s.KINDS:
+		s.kind = kind
+		s.active = 0.0
+		s.energy = 1.0
+		var at: Vector3 = g.hole_position
+		g.hole_velocity = Vector3(1, 0, 0)
+		g.use_skill()
+		check(s.energy == 0.0 and (s.active > 0.0 or (kind == "blink" and g.hole_position.distance_to(at) > 2.0)), "the %s skill fires and empties the bar" % kind)
+		match kind:
+			"dash": check(s.speed_multiplier() > 1.5, "dash speeds the hole up")
+			"vacuum": check(g.magnet_level() >= s.VACUUM_MAGNET, "vacuum adds magnet pull")
+			"gulp": check(s.eat_scale({}) > 1.0 and s.eat_scale({"is_boss":true}) == 1.0, "gulp eats one size up but never the landmark")
+			"freeze": check(g.defense.grace >= s.DURATION.freeze and s.frozen(), "freeze holds the defence")
+			"shield":
+				before = g.remaining
+				check(not g.take_hit() and g.remaining == before, "the shield blocks a hit")
+	s.active = 0.0
+	g.run_kind = "daily"
+	check(not g.skills_on(), "daily mini-games have no saucer skill")
+	g.run_kind = "campaign"
 
 # Starts a round with 30 s on the clock and swallows the landmark at once.
 func win_fast(boss: Dictionary) -> void:

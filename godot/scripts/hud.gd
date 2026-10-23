@@ -116,6 +116,14 @@ var waiting := true
 var stick_active := false
 var stick_origin := Vector2.ZERO
 var stick_delta := Vector2.ZERO
+# Saucer skill button (skills.gd): kind ("" hides it), bar fill and the share
+# of a running skill still left.
+var skill_kind := ""
+var skill_energy := 0.0
+var skill_active := 0.0
+const SKILL_RADIUS := 50.0
+const SKILL_ICONS = preload("res://scripts/skills.gd").ICONS
+const SKILL_COLORS = preload("res://scripts/skills.gd").COLORS
 var progress := 0.0
 var note := ""
 var stars := 0
@@ -472,10 +480,33 @@ func draw_playing() -> void:
 		if run_kind == "runner": text_at(note, Vector2(w/2, 186), 20, LIGHT, true, 6)
 	elif note != "":
 		text_at(note, Vector2(w/2, 186), 20, LIGHT, true, 6)
+	if skill_kind != "": draw_skill()
 	if stick_active:
 		draw_circle(stick_origin, 54, Color(1,1,1,0.13))
 		draw_arc(stick_origin, 54, 0, TAU, 32, Color(1,1,1,0.65), 2, true)
 		draw_circle(stick_origin+stick_delta.limit_length(54), 22, Color("fff9edb0"))
+
+# Bottom right, clear of the stick that starts wherever the player touches.
+func skill_center() -> Vector2:
+	return Vector2(size.x - 34 - SKILL_RADIUS, size.y - 120 - SKILL_RADIUS)
+
+func skill_hit(point: Vector2) -> bool:
+	return mode == "playing" and skill_kind != "" and point.distance_to(skill_center()) <= SKILL_RADIUS + 10
+
+# A round button with the skill's icon: the ring fills with energy, glows when
+# full and counts down while the skill runs.
+func draw_skill() -> void:
+	var center := skill_center()
+	var color: Color = SKILL_COLORS[skill_kind]
+	var full := skill_energy >= 1.0 and skill_active <= 0.0
+	var glow := 0.5 + 0.5*sin(Time.get_ticks_msec()/160.0) if full else 0.0
+	if full: draw_circle(center, SKILL_RADIUS + 8 + glow*4, Color(color, 0.18 + glow*0.14))
+	draw_circle(center, SKILL_RADIUS, Color("1b3048ed"))
+	draw_arc(center, SKILL_RADIUS - 4, 0, TAU, 48, Color("465d6b"), 6, true)
+	var share := skill_active if skill_active > 0.0 else skill_energy
+	if share > 0.0: draw_arc(center, SKILL_RADIUS - 4, -PI/2, -PI/2 + TAU*share, 48, color, 6, true)
+	UiStyle.draw_icon(self, SKILL_ICONS[skill_kind], center - Vector2(0, 6), 40, Color.WHITE if full or skill_active > 0.0 else Color(1, 1, 1, 0.45))
+	text_at(I18n.t("skill_" + skill_kind), center + Vector2(0, 30), 11, color if full else MUTED, true, 3)
 
 func draw_portrait_result() -> void:
 	var w := size.x

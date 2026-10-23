@@ -11,6 +11,7 @@ const JourneyMap = preload("res://scripts/journey_map.gd")
 const Album = preload("res://scripts/album.gd")
 const Cosmetics = preload("res://scripts/cosmetics.gd")
 const LookCard = preload("res://scripts/look_card.gd")
+const Skills = preload("res://scripts/skills.gd")
 const WARDROBE_TABS := ["crafts", "skins", "effects", "trails"]
 # Panels that cover the whole screen (no 3D preview of the hole beside them).
 const FULL_TABS := ["levels", "album", "shop", "language"]
@@ -249,7 +250,9 @@ func _draw() -> void:
 	else:
 		var left := size.x*0.46 if size.x > size.y else 28.0
 		title_at(I18n.t("collection"), Vector2(left, 64))
-		label_at(I18n.t("tap_equip"), Vector2(left,size.y-70), 16, UiStyle.MUTED, body_font) if size.x>size.y else label_at(I18n.t("tap_equip"),Vector2(28,size.y-415),17)
+		# The saucer tab names the equipped saucer's skill instead.
+		var hint := I18n.t("skill_tip_" + Skills.skill_of(game.campaign.craft)) if tab == "crafts" else I18n.t("tap_equip")
+		label_at(hint, Vector2(left,size.y-70), 16, UiStyle.MUTED, body_font) if size.x>size.y else label_at(hint,Vector2(28,size.y-415),17)
 		label_at(I18n.t("looks_tip"), Vector2(left,size.y-40), 15, UiStyle.MINT, body_font)
 		UiStyle.draw_icon(self, "coin", Vector2(size.x-196, 46), 30)
 		UiStyle.text(self, str(game.campaign.coins), Vector2(size.x-176, 56), 22, UiStyle.GOLD, false, 0, UiStyle.font(800))

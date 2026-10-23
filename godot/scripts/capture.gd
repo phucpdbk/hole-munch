@@ -611,6 +611,10 @@ func single() -> void:
 		g.hole_position = Vector3(cone.position.x, 0, cone.position.z)
 		await frames(3)
 	await snapshot("combo")
+	# A full skill bar glows on its button, bottom right.
+	g.skills.energy = 1.0
+	await frames(3)
+	await snapshot("skill-ready")
 	# Catch the boss to show the celebration, then the result screen.
 	g.eaten_points = int(g.total_points*0.8)
 	g.target_radius = g.boss_radius/g.EAT_RATIO + 0.2
