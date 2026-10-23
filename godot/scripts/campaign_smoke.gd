@@ -123,6 +123,7 @@ func check_progress() -> void:
 	var stats: Dictionary = progress.stats()
 	check(is_equal_approx(stats.start_radius, Campaign.START_RADIUS+Campaign.SIZE_PER_UPGRADE) and stats.magnet == 5, "upgrades change round stats")
 	check(progress.reward(true, 3, 400) > progress.reward(false, 0, 400), "winning pays more coins than losing")
+	check_replay_coins(progress)
 	# A maxed size upgrade must not let the starting hole eat a street building.
 	var maxed := Campaign.START_RADIUS + Campaign.SIZE_PER_UPGRADE*progress.upgrade_max("size")
 	var smallest_shop: float = 0.95 + 0.07
@@ -141,6 +142,23 @@ func check_progress() -> void:
 		sizes.append(int(info.cols)*int(info.rows))
 	check(sizes[0] == 9 and sizes[Campaign.regular_count()-1] == 35 and sizes[30] == 25 and sizes[23] > sizes[0], "maps grow from 3×3 to 5×7")
 	check(sizes[7] > sizes[6], "continent finale uses a bigger map")
+
+# Replays only pay in full for stars the city did not have yet.
+func check_replay_coins(progress) -> void:
+	var keep: int = progress.selected
+	progress.selected = 0
+	var full: int = progress.reward(true, 3, 2000, 0, 3)
+	var grind: int = progress.reward(true, 3, 2000, 0, progress.new_star_count(7))
+	check(progress.goals[0] == 7 and progress.is_farm_replay(0) and grind > 0 and grind*4 < full, "a replay with no new star pays a small share (%d vs %d)" % [grind, full])
+	var parts: Dictionary = progress.reward_parts(true, 3, 2000, 0, 0)
+	check(parts.replay and parts.stars == 0 and parts.win == 0, "a grind replay pays no star or win coins")
+	progress.selected = 1
+	progress.goals[1] = 1
+	var mended: Dictionary = progress.reward_parts(true, 3, 2000, 0, progress.new_star_count(7))
+	check(progress.new_star_count(7) == 2 and not mended.replay and mended.stars == 30 and mended.win > 0, "a replay that adds stars pays them and the win")
+	progress.goals[1] = 0
+	check(not progress.is_farm_replay(0), "a city never won is not a grind replay")
+	progress.selected = keep
 
 # Festival cities (campaign.gd HOLIDAYS): side stops after their city on the
 # route, opened by beating it, never in the way, stars kept like any city.
@@ -263,7 +281,8 @@ func check_levels(g) -> void:
 		g.started = true
 		for frame in 60: g.step(0.02,Vector2.ZERO)
 		check(g.boss_down and g.mode == "result", "level %d ends when the boss falls" % (i+1))
-		check(g.mode == "result" and g.hud.won and g.campaign.coins > coins_before, "level %d boss can be caught and pays coins" % (i+1))
+		# The route above already won the city, so this catch is a replay without a new star.
+		check(g.mode == "result" and g.hud.won and g.campaign.coins >= coins_before and g.time_coins == 0 and g.record_note == I18n.t("replay_coins"), "level %d boss can be caught; the replay pays as a grind" % (i+1))
 		if i == 0:
 			g.go_menu()
 			check(g.campaign.selected == 1 and g.mode == "menu" and g.score == 0, "home after a win shows the next city")

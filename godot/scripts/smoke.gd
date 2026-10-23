@@ -72,16 +72,16 @@ func run(game) -> void:
 	g.hole_position = Vector3(boss.position.x,0,boss.position.z)
 	for i in range(60): g.step(0.02,Vector2.ZERO)
 	check(g.mode=="result" and g.hud.won,"catching the boss in the final second still wins")
-	g.reset_round()
-	g.playing=true; g.mode="playing"; g.started=true; g.remaining=30.0
-	boss.shielded = false
-	g.target_radius = g.boss_radius/g.EAT_RATIO+0.1; g.radius = g.target_radius
-	g.hole_position = Vector3(boss.position.x,0,boss.position.z)
-	for i in range(60): g.step(0.02,Vector2.ZERO)
+	# The win above took the city's first star; forget it so this win is a first one.
+	g.campaign.goals[g.campaign.selected] = 0
+	win_fast(boss)
 	check(g.boss_down and g.mode=="result" and g.hud.won and g.remaining > 20,"swallowing the boss wins the round at once")
 	# The test keeps stepping after the result, so the clock may have moved on since.
 	check(g.time_coins >= int(g.remaining)*g.CLEAR_COINS and g.time_coins > 40,"seconds left on the clock pay coins")
 	check(g.hud.goal_progress.size() == g.goal_list.size() and g.hud.coin_parts != "", "the result shows goal progress and coin sources")
+	var first_reward: int = g.reward
+	win_fast(boss)
+	check(g.hud.won and g.time_coins == 0 and g.reward*4 < first_reward and g.record_note == g.I18n.t("replay_coins"), "a replay with no new star pays no time coins and few coins (%d vs %d)" % [g.reward, first_reward])
 	var city: int = g.campaign.selected
 	g.retry_city()
 	check(g.mode == "playing" and g.campaign.selected == city and not g.boss_down, "retry replays the same city")
@@ -569,6 +569,15 @@ func check_updates() -> void:
 	check(U.parse('{"version_code": 99, "url": "javascript:alert(1)"}', 12).is_empty() and U.parse('not json', 12).is_empty() \
 		and U.parse('{"version_code": "13", "url": "https://x"}', 12).is_empty(), "bad or unsafe version files are ignored")
 	check(U.current_code() > 0, "the build code is set in project settings")
+
+# Starts a round with 30 s on the clock and swallows the landmark at once.
+func win_fast(boss: Dictionary) -> void:
+	g.reset_round()
+	g.playing=true; g.mode="playing"; g.started=true; g.remaining=30.0
+	boss.shielded = false
+	g.target_radius = g.boss_radius/g.EAT_RATIO+0.1; g.radius = g.target_radius
+	g.hole_position = Vector3(boss.position.x,0,boss.position.z)
+	for i in range(60): g.step(0.02,Vector2.ZERO)
 
 # Shield pylons, bombs, hunger and pickups (scripts/mechanics.gd).
 func check_mechanics() -> void:

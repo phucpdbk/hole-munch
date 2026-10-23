@@ -42,6 +42,7 @@ const S := {
 	"hungry": ["ĐANG ĐÓI! ĂN NGAY KẺO CO LẠI", "HUNGRY! EAT OR YOU'LL SHRINK", "¡HAMBRE! COME O ENCOGERÁS", "COM FOME! COMA OU VAI ENCOLHER", "AFFAMÉ ! MANGE OU TU RÉTRÉCIS", "LAPAR! MAKAN ATAU MENGECIL"],
 	"boss_down": ["Đã hạ %s!", "%s is down!", "¡%s cayó!", "%s caiu!", "%s est tombé !", "%s tumbang!"],
 	"eat_guardian": ["Nuốt linh vật canh gác trước!", "Swallow the guardian first!", "¡Trágate antes al guardián!", "Engula o guardião primeiro!", "Avale d'abord le gardien !", "Telan penjaganya dulu!"],
+	"replay_coins": ["KHÔNG CÓ SAO MỚI · XU GIẢM", "NO NEW STARS · FEWER COINS", "SIN ESTRELLAS NUEVAS · MENOS MONEDAS", "SEM ESTRELAS NOVAS · MENOS MOEDAS", "PAS DE NOUVELLE ÉTOILE · MOINS DE PIÈCES", "TIDAK ADA BINTANG BARU · KOIN BERKURANG"],
 	"time_left_coins": ["CÒN %d GIÂY · +%d XU", "%d S LEFT · +%d COINS", "QUEDAN %d S · +%d MONEDAS", "RESTAM %d S · +%d MOEDAS", "%d S RESTANTES · +%d PIÈCES", "SISA %d DTK · +%d KOIN"],
 	"guardian_down": ["HẠ LINH VẬT · KHIÊN ĐÃ VỠ!", "GUARDIAN DOWN · SHIELD OFF!", "¡GUARDIÁN CAÍDO · SIN ESCUDO!", "GUARDIÃO CAIU · SEM ESCUDO!", "GARDIEN AVALÉ · PLUS DE BOUCLIER !", "PENJAGA TUMBANG · PERISAI LEPAS!"],
 	"tip_guardian_t": ["LINH VẬT CANH GÁC", "LANDMARK GUARDIAN", "GUARDIÁN DEL MONUMENTO", "GUARDIÃO DO MONUMENTO", "GARDIEN DU MONUMENT", "PENJAGA LANDMARK"],

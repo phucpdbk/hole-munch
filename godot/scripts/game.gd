@@ -1613,6 +1613,9 @@ func finish(won: bool) -> void:
 	floaters.clear()
 	clear_drag()
 	sfx.play("win" if won else "lose")
+	# Campaign stars this round adds; a replay with none is paid as a grind.
+	var new_stars := -1
+	var farmed := false
 	var summary := run_summary(won)
 	goal_mask = Challenges.evaluate(goal_list, summary)
 	hud.stars = Challenges.count(goal_mask)
@@ -1645,17 +1648,21 @@ func finish(won: bool) -> void:
 			reward = campaign.endless_reward(score, endless_stage)
 			record_note = (I18n.t("new_record") if campaign.record_endless(score, endless_stage) else I18n.t("record", int(campaign.endless.best))) + I18n.t("cities_taken", endless_stage)
 		_:
-			reward = campaign.reward(won, hud.stars, eaten_points, best_combo)
+			new_stars = campaign.new_star_count(goal_mask)
+			farmed = campaign.is_farm_replay(new_stars)
+			reward = campaign.reward(won, hud.stars, eaten_points, best_combo, new_stars)
+			if farmed: record_note = I18n.t("replay_coins")
 			var first_win: bool = won and campaign.goals[campaign.selected] == 0
 			campaign.complete_goals(goal_mask, score)
 			bonus_pending = first_win and not Campaign.is_holiday(campaign.selected) and Runner.due(campaign.selected) and has_next_city()
 	# Taking the landmark early pays for every second left on the clock.
-	time_coins = int(remaining)*CLEAR_COINS if won and run_kind == "campaign" else 0
+	# A replay that earns no new star gets no time coins either.
+	time_coins = int(remaining)*CLEAR_COINS if won and run_kind == "campaign" and not farmed else 0
 	if time_coins > 0:
 		reward += time_coins
 		if record_note == "": record_note = I18n.t("time_left_coins", [int(remaining), time_coins])
 	if run_kind == "campaign":
-		var parts: Dictionary = campaign.reward_parts(won, hud.stars, eaten_points, best_combo)
+		var parts: Dictionary = campaign.reward_parts(won, hud.stars, eaten_points, best_combo, new_stars)
 		hud.coin_parts = I18n.t("coin_parts", [roundi(parts.food), parts.stars, parts.win, time_coins, ("%.2f" % parts.multiplier).trim_suffix("0").trim_suffix(".0")])
 	campaign.coins += reward
 	# Reminders are offered after the first win, never at launch.

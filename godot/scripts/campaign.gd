@@ -408,16 +408,33 @@ func stats() -> Dictionary:
 	return {"start_radius":START_RADIUS + upgrades.size*SIZE_PER_UPGRADE, "speed":1.0 + upgrades.speed*SPEED_PER_UPGRADE,
 		"bonus_time":upgrades.time*TIME_PER_UPGRADE, "magnet":upgrades.magnet, "coin_mul":1.0 + upgrades.greed*GREED_PER_UPGRADE}
 
-func reward(won: bool, stars: int, eaten_points: int, best_combo := 0) -> int:
-	var parts := reward_parts(won, stars, eaten_points, best_combo)
+# A replay of a city that already has a star pays full coins only when it earns
+# a star it did not have yet; otherwise only this share of the food coins (no
+# star, win or time coins), so grinding an easy city stops paying.
+const REPLAY_SHARE := 0.15
+
+func reward(won: bool, stars: int, eaten_points: int, best_combo := 0, new_stars := -1) -> int:
+	var parts := reward_parts(won, stars, eaten_points, best_combo, new_stars)
 	return roundi((parts.food + parts.stars + parts.win)*parts.multiplier)
 
+# Stars a round's goal mask adds to the selected city's kept stars.
+func new_star_count(mask: int) -> int:
+	return Challenges.count(mask & ~goals[selected])
+
+# True when a round adds nothing to a city that was already won.
+func is_farm_replay(new_stars: int) -> bool:
+	return new_stars == 0 and goals[selected] != 0
+
 # Where a round's coins come from, before the combo and coin-bonus multiplier.
-func reward_parts(won: bool, stars: int, eaten_points: int, best_combo := 0) -> Dictionary:
+# new_stars < 0 counts every star as new.
+func reward_parts(won: bool, stars: int, eaten_points: int, best_combo := 0, new_stars := -1) -> Dictionary:
+	var fresh := stars if new_stars < 0 else new_stars
+	var replay := is_farm_replay(new_stars)
 	var combo_mul := 1.0 + mini(best_combo, COMBO_COIN_CAP)/100.0
-	return {"food":eaten_points/(POINTS_PER_COIN_WIN if won else POINTS_PER_COIN_LOSS),
-		"stars":stars*15 if won else 0, "win":10 + selected*2 if won else 0,
-		"multiplier":combo_mul*float(stats().coin_mul)}
+	var food := eaten_points/(POINTS_PER_COIN_WIN if won else POINTS_PER_COIN_LOSS)
+	return {"food":food*(REPLAY_SHARE if replay else 1.0),
+		"stars":fresh*15 if won and not replay else 0, "win":10 + selected*2 if won and not replay else 0,
+		"multiplier":combo_mul*float(stats().coin_mul), "replay":replay}
 
 func data() -> Dictionary:
 	# A temporary preview selection must not become a permanent unlock.
