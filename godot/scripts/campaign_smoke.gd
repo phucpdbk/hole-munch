@@ -700,12 +700,15 @@ func check_sky_hop(g) -> void:
 	for frame in 50: g.step(0.02, Vector2.ZERO)
 	check(not hop.running and g.remaining == before, "the sky hop waits for the first tap")
 	var target: int = g.daily.target()
+	# The first tap starts the flight even when the first gap sits low.
+	hop.flap(g)
 	for frame in 6000:
 		if g.mode != "playing" or hop.passed >= target: break
-		var gap: Dictionary = hop.gap_at(hop.passed)
-		if hop.y < hop.centre(gap) - 0.6 and hop.vy < 1.0: hop.flap(g)
+		# Far below a high gap it hops again before the last hop peaks.
+		var below: float = hop_aim(hop) - hop.y
+		if below > 0.6 and hop.vy < (4.0 if below > 2.5 else 1.0): hop.flap(g)
 		g.step(0.02, Vector2.ZERO)
-	check(hop.passed >= target and not hop.crashed and g.daily.count == hop.passed and g.remaining < before, "a steady pilot flies through the target's gaps")
+	check(hop.passed >= target and not hop.crashed and g.daily.count == hop.passed and g.remaining < before, "a steady pilot flies through the target's gaps (%d/%d, crashed %s, level %d)" % [hop.passed, target, hop.crashed, g.campaign.selected])
 	for frame in 200:
 		if g.mode != "playing": break
 		g.step(0.02, Vector2.ZERO)
@@ -793,6 +796,14 @@ func check_siege(g) -> void:
 	g.go_menu()
 	g.update_view(0.02)
 	check(not siege.visible, "home hides the siege's planes")
+
+# Where the test pilot aims: a little under the next gap's centre as it will
+# be when the craft gets there (swaying gaps move meanwhile).
+func hop_aim(hop) -> float:
+	var gap: Dictionary = hop.gap_at(hop.passed)
+	var ahead := maxf(0.0, (float(gap.x) - hop.x)/hop.SPEED)
+	var sway: float = sin((hop.clock + ahead)*1.6 + float(gap.phase))*hop.SWAY if gap.sway else 0.0
+	return float(gap.y) + sway - 0.3
 
 # Tuning aid (`-- --campaign-smoke --rival-bench`): seconds an unopposed rival
 # needs to swallow each landmark, next to the level timer.

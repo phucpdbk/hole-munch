@@ -57,6 +57,11 @@ const HOLIDAYS = [
 		"palette":["6b5a7a", "4a4552", "cdbfae", "8a8f5a", "7a6a3a", "b9a7d6", "5b3a7a", "e07b2a"], "water":"3f5a62"},
 	{"id":"easter", "region":5, "after":40, "city":"Sydney", "boss":"easteregg", "cols":5, "rows":7, "shape":"isles", "weather":"sun", "map":[151.21, -36.03],
 		"palette":["9fd0c0", "6c8591", "f5ecd0", "b9d99a", "7cc48a", "d6f0ff", "f29ab2", "8fd3ff"], "water":"4fb8c9"},
+	# Added after the first six, so older saves keep their festival indices.
+	{"id":"durbar", "region":2, "after":21, "city":"Kano", "boss":"kanogate", "cols":5, "rows":5, "shape":"kano", "weather":"wind", "map":[8.52, 12.0],
+		"palette":["c9a06b", "8c7458", "ecd2a0", "d8b878", "a3a35a", "f2dfb8", "1f7a4a", "c0392b"], "water":"4f8fa8"},
+	{"id":"carnaval", "region":4, "after":32, "city":"Salvador", "boss":"carnivalfloat", "cols":5, "rows":5, "shape":"salvador", "weather":"clear", "dusk":true, "map":[-38.5, -13.6],
+		"palette":["f0a35e", "5f6b7a", "f6e2b8", "8fc47a", "3fa35f", "ffd6e8", "8e44ad", "ffd23f"], "water":"2f8fb8"},
 ]
 const LANDMARKS = {
 	"namsan":"THÁP NAMSAN",
@@ -90,7 +95,7 @@ const LANDMARKS = {
 	"christ":"TƯỢNG CHÚA CỨU THẾ", "machu":"MACHU PICCHU", "obelisco":"ĐÀI TƯỞNG NIỆM OBELISCO", "sugarloaf":"NÚI SUGARLOAF",
 	"sydney":"NHÀ HÁT SYDNEY", "uluru":"ĐÁ ULURU", "skytower":"THÁP SKY TOWER", "moai":"TƯỢNG MOAI",
 	"tetmai":"CÂY MAI NGÀY TẾT", "starlantern":"ĐÈN ÔNG SAO", "juliet":"BAN CÔNG JULIET", "xmastree":"CÂY THÔNG NOEL",
-	"jackolantern":"BÍ NGÔ HALLOWEEN", "easteregg":"TRỨNG PHỤC SINH"}
+	"jackolantern":"BÍ NGÔ HALLOWEEN", "easteregg":"TRỨNG PHỤC SINH", "kanogate":"CỔNG CUNG ĐIỆN KANO", "carnivalfloat":"XE HOA CARNAVAL"}
 # Earth's defence units flee the hole and leave small minions behind.
 const DEFENSES = {"tank":"XE TĂNG", "heli":"TRỰC THĂNG", "mech":"ROBOT CHIẾN ĐẤU", "titan":"SIÊU ROBOT TITAN"}
 const MINIONS = {"tank":"soldier", "heli":"soldier", "mech":"drone", "titan":"drone"}
@@ -267,7 +272,7 @@ static func holiday_info(index: int) -> Dictionary:
 # (the 48 cities, then the festival cities in HOLIDAYS order).
 # timer gives generous slack early and less later; regenerate with --campaign-smoke
 # (it prints each route) after changing map contents.
-const PAR_SECONDS: Array[int] = [21, 38, 31, 26, 28, 21, 23, 34, 24, 23, 27, 41, 45, 31, 41, 47, 39, 39, 36, 46, 55, 33, 59, 44, 20, 34, 33, 29, 39, 45, 56, 32, 43, 30, 54, 40, 35, 34, 51, 42, 44, 34, 53, 40, 42, 50, 56, 41, 38, 45, 41, 47, 44, 40]
+const PAR_SECONDS: Array[int] = [21, 38, 31, 26, 28, 21, 23, 34, 24, 23, 27, 41, 45, 31, 41, 47, 39, 39, 36, 46, 55, 33, 59, 44, 20, 34, 33, 29, 39, 45, 56, 32, 43, 30, 54, 40, 35, 34, 51, 42, 44, 34, 53, 40, 42, 50, 56, 41, 38, 45, 41, 47, 44, 40, 62, 53]
 
 # Timer = par × slack, never below a floor. The par route plays like a sharp
 # player who knows the whole map and takes the landmark the moment it fits, so

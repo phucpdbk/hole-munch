@@ -6,7 +6,7 @@ release AAB pipeline, AdMob IDs, upload signing, consent/privacy and verificatio
 An alien saucer drops a black hole on Earth. Swallow each city, grow, then swallow
 its landmark to conquer it, while dodging independent military defenders.
 
-- **6 continents × 8 cities = 48 levels, plus 6 festival cities** (Asia, Europe, Africa, North America,
+- **6 continents × 8 cities = 48 levels, plus 8 festival cities** (Asia, Europe, Africa, North America,
   South America, Oceania). Each continent has its own palette, houses, trees and
   weather. All 48 objectives are city landmarks. Tanks and rifle infantry approach along roads and attack independently of the landmark.
 - **Street fronts follow the landmark city** (`city_profiles.gd`): each city
@@ -42,20 +42,27 @@ its landmark to conquer it, while dodging independent military defenders.
   sailboats, ferries, gondolas by continent) drift and rock on the water; only
   a hole big enough to reach out from the shore can eat one (optional food).
 - **Festival cities** (`campaign.gd` `HOLIDAYS`, `festive.gd`,
-  `festive_models.gd`): six extra stops, after the 48 cities in save order:
+  `festive_models.gd`): eight extra stops, after the 48 cities in save order:
   Lunar New Year in Saigon and Mid-Autumn in Hội An (Asia), Valentine's in
   Verona and Christmas in Nuremberg (Europe), Halloween in Salem (North
-  America) and Easter in Sydney (Oceania). Each hangs off the city before it on
+  America), Easter in Sydney (Oceania), then the Durbar in Kano (Africa, after
+  Lagos) and Carnaval in Salvador (South America, after Rio). New festivals go
+  on the end of `HOLIDAYS` so saved festival indices never shift. Each hangs off the city before it on
   the journey map (a pink side trip), opens when that city is beaten, never
   blocks the route, and plays at that city's difficulty rank with its own
-  landmark, guardian, weather, colours (Mid-Autumn and Halloween at dusk), water
-  and shape (Verona's Adige, Hội An's Thu Bồn) and the same food share. Trees,
+  landmark, guardian, weather, colours (Mid-Autumn, Halloween and Carnaval at
+  dusk), water and shape (Verona's Adige, Hội An's Thu Bồn, Kano's dye pits,
+  Salvador's Bay of All Saints) and the same food share. Trees,
   benches and opening cones become the holiday's trees, stands and snacks at
   the same size, so food totals match. NEXT after the opening city goes to the
   festival while it is unbeaten. Festival guardians: a banh chung (Tết), a lion
   dance lion (Mid-Autumn), a cupid (Valentine's), a snowman (Christmas), a
   pumpkin-head scarecrow (Halloween) and an Easter bunny, all Meshy rigs with
-  the six clips; the festival landmarks are Meshy bakes too.
+  the six clips; those six festival landmarks are Meshy bakes too. Kano (the
+  Emir's palace gate, parasols and a decked Durbar horse, guarded by a Durbar
+  rider) and Salvador (a Carnaval float with a giant feathered mask, guarded
+  by a Carnaval dancer) still use their primitive landmark and toy rig; their
+  Meshy prompts are in `tools/meshy/landmarks.json` and `mascots.json`.
 - **Weather** (`weather.gd`): rain and storm add a dense screen layer of
   streaks (`shaders/precipitation.gdshader`) over 3D drops and ground
   splashes; snow uses parallax flake layers plus soft 3D flakes. Fog covers
@@ -101,7 +108,7 @@ its landmark to conquer it, while dodging independent military defenders.
   shoots every style. The first city has no guardian (`mechanics.gd`
   `GUARDIAN_FROM`): it is only eat, grow and swallow the landmark; the guardian
   and its intro card join from city 2. Hà Nội (Chùa Một Cột), Agra, Paris, New
-  York (Liberty), Sydney and all six festival cities have Meshy guardians (`assets/mascots/<id>.scn`, auto-rigged,
+  York (Liberty), Sydney and the first six festival cities have Meshy guardians (`assets/mascots/<id>.scn`, auto-rigged,
   clips idle/walk/run/attack = Charged Spell Cast/hit = Hit Reaction/leap = Jump Attack, fixed in
   `KINDS.mascots.actions` of `tools/meshy/meshy.mjs` (idle=0,attack=125,hit=178,leap=86),
   baked by `tools/bake_mascots.gd`, scaled to the toy rig's two-unit height);
@@ -530,12 +537,12 @@ Then bake (headless Godot, `--script res://tools/<tool>.gd [-- ids]`):
 - **Check**: `-- --capture --guardian-capture` shoots every attack style with the
   baked guardians and saucer, and `-- --capture --landmark-gallery` shows every landmark.
 
-Landmarks still on primitives (43): namsan, watarun, pearl, tokyotower,
+Landmarks still on primitives (45): namsan, watarun, pearl, tokyotower,
 brandenburg, alcala, royalpalace, stbasils, cairotower, kicc, nationaltheatre,
 tablemountain, willis, cntower, hollywood, capitol, masp, limacathedral, monserrate,
 costanera, flinders, belltower, fijitemple, parliament, khuevan, fuji, bigben, pisa,
 colosseum, pyramid, sphinx, djenne, baobab, empire, needle, chichen, christ, machu,
-obelisco, sugarloaf, uluru, skytower, moai.
+obelisco, sugarloaf, uluru, skytower, moai, kanogate, carnivalfloat.
 
 ## Deferred migration
 

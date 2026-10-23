@@ -59,6 +59,9 @@ const PROFILES = {
 	"juliet": {"style":"mediterranean", "walls":["e8b48a","f0d9a8","d98c5f"], "signs":["8e2a2a","2e6b3a","1f4f7a"], "roof":"b8603f", "towers":0.05, "tower":["stone","stone"]},
 	"xmastree": {"style":"altbau", "walls":["efe0c0","d7c2a0","e6c3a8"], "signs":["b22a2a","2e6b3a","1d3f6e"], "roof":"8a3b2e", "towers":0.15, "tower":["stone","concrete"]},
 	"jackolantern": {"style":"brownstone", "walls":["7a4a3a","5e4b4a","8c5a4a"], "signs":["e07b2a","5b3a7a","2e6b3a"], "roof":"3f3a46", "towers":0.2, "tower":["deco","glass"]},
+	# Kano's mud-walled Sahel houses; Salvador's pastel Pelourinho fronts.
+	"kanogate": {"style":"sahel", "walls":["c98a5a","b8774a","d9a06b"], "signs":["1f7a4a","c0392b","f2c94c"], "roof":"9a5b3f", "towers":0.0, "tower":["concrete","concrete"]},
+	"carnivalfloat": {"style":"colonial", "walls":["ffd6e8","8fd3ff","ffe08a"], "signs":["8e44ad","e63946","2e8b57"], "roof":"b8603f", "towers":0.2, "tower":["concrete","hotel"]},
 	"easteregg": {"style":"victorian", "walls":["f0e6d2","f4c7d0","d8ecf0"], "signs":["1d3f6e","2e6b3a","e5566e"], "roof":"7d858c", "towers":0.6, "tower":["glass","glass"]},
 	"sydney": {"style":"victorian", "walls":["e8d8b8","b5654a","f0e6d2"], "signs":["1d3f6e","2e6b3a","b22a2a"], "roof":"7d858c", "towers":0.7, "tower":["glass","glass"]},
 	"flinders": {"style":"victorian", "walls":["c9a27a","e6d3b0","8b5a3c"], "signs":["2e6b3a","b22a2a","e0a030"], "roof":"7d858c", "towers":0.7, "tower":["glass","glass"]},

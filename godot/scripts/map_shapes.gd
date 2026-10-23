@@ -46,6 +46,12 @@ const SHAPES := {
 		# three bridges to the far bank.
 		"verona": {"water":[Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1), Vector2i(3, 1), Vector2i(4, 1)],
 			"bridges":[[Vector2i(0, 1), E], [Vector2i(1, 1), E], [Vector2i(3, 1), E]], "festival":true},
+		# Kano (Durbar): the old city is inland; the Kofar Mata dye pits sit in one
+		# corner and the Jakara pond in the other.
+		"kano": {"water":[Vector2i(0, 4), Vector2i(1, 4), Vector2i(4, 0)], "festival":true},
+		# Salvador (Carnaval): the Bay of All Saints along the west below the
+		# upper city, curling in at the south.
+		"salvador": {"water":[Vector2i(0, 0), Vector2i(0, 1), Vector2i(0, 2), Vector2i(0, 3), Vector2i(0, 4), Vector2i(1, 4)], "festival":true},
 	},
 	"5x7": {
 		"river": {"water":[Vector2i(3, 0), Vector2i(3, 1), Vector2i(3, 2), Vector2i(4, 2), Vector2i(4, 3), Vector2i(4, 4), Vector2i(3, 4), Vector2i(3, 5), Vector2i(3, 6)],

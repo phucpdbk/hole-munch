@@ -181,3 +181,78 @@ func easter_snack(variant: int) -> Array:
 	var parts: Array = []
 	egg(parts, Vector3(0, 0.17, 0), 0.13, [["8fd3ff", "fff59d", "ff9fbf"], ["ff9fbf", "ffffff", "c8f7c5"]][variant % 2])
 	return parts
+
+# --- Durbar (Kano): date palms with pennants, royal parasols, decked horses, calabashes
+func palm(parts: Array, fronds: String, height := 2.0) -> void:
+	add(parts, "cylinder", Vector3(0, height*0.45, 0), Vector3(0.12, height*0.9, 0.12), "8a6a46")
+	for i in 6:
+		var a := i*TAU/6.0
+		add(parts, "box", Vector3(cos(a)*0.38, height*0.92, sin(a)*0.38), Vector3(0.7, 0.05, 0.2), fronds, Vector3(0, -a, 0.35))
+
+func durbar_tree(variant: int) -> Array:
+	var parts: Array = []
+	if variant == 0:
+		palm(parts, "4f8a3a")
+		add(parts, "ball", Vector3(0, 1.72, 0), Vector3(0.22, 0.22, 0.22), "b8642a")
+		return parts
+	crowned(parts, "7a5a3a", ["5f9e4a", "6fae55", "4f8a3a"])
+	for i in 4: add(parts, "prism", Vector3(-0.45 + i*0.3, 1.0, 0.42), Vector3(0.14, 0.04, 0.16), ["1f7a4a", "c0392b", "f2c94c", "f4f1e6"][i], Vector3(PI/2, 0, 0))
+	return parts
+
+func durbar_stand(variant: int) -> Array:
+	var parts: Array = []
+	if variant == 0:
+		# A royal parasol on its pole, fringed in gold.
+		add(parts, "cylinder", Vector3(0, 0.7, 0), Vector3(0.05, 1.4, 0.05), "6b4226")
+		add(parts, "hemi", Vector3(0, 1.35, 0), Vector3(0.95, 0.35, 0.95), "c0392b")
+		add(parts, "cyl", Vector3(0, 1.32, 0), Vector3(0.98, 0.06, 0.98), "f2c94c")
+		add(parts, "ball", Vector3(0, 1.72, 0), Vector3.ONE*0.12, "f2c94c")
+		return parts
+	# A Durbar horse in a bright saddle cloth.
+	add(parts, "box", Vector3(0, 0.62, 0), Vector3(0.32, 0.32, 0.8), "f4f1e6")
+	for at in [Vector3(-0.1, 0.24, 0.3), Vector3(0.1, 0.24, 0.3), Vector3(-0.1, 0.24, -0.3), Vector3(0.1, 0.24, -0.3)]:
+		add(parts, "box", at, Vector3(0.08, 0.48, 0.08), "e8e2d0")
+	add(parts, "box", Vector3(0, 0.92, 0.45), Vector3(0.18, 0.42, 0.18), "f4f1e6", Vector3(-0.4, 0, 0))
+	add(parts, "box", Vector3(0, 1.1, 0.6), Vector3(0.16, 0.16, 0.3), "f4f1e6")
+	add(parts, "box", Vector3(0, 0.74, 0), Vector3(0.38, 0.12, 0.5), "1f7a4a")
+	add(parts, "box", Vector3(0, 0.6, 0), Vector3(0.4, 0.22, 0.12), "c0392b")
+	add(parts, "box", Vector3(0, 0.84, -0.42), Vector3(0.06, 0.3, 0.06), "3b2a1a", Vector3(0.5, 0, 0))
+	return parts
+
+func durbar_snack(_variant: int) -> Array:
+	var parts: Array = []
+	add(parts, "ball", Vector3(0, 0.15, 0), Vector3(0.3, 0.26, 0.3), "d9a35a")
+	add(parts, "cyl", Vector3(0, 0.15, 0), Vector3(0.31, 0.05, 0.31), "8c4a2a")
+	add(parts, "cylinder", Vector3(0, 0.3, 0), Vector3(0.06, 0.08, 0.06), "8c6a3a")
+	return parts
+
+# --- Carnaval (Salvador): palms with streamers, drums, feather plumes, masks ---
+func carnaval_tree(variant: int) -> Array:
+	var parts: Array = []
+	palm(parts, "3fa35f", 2.1)
+	if variant == 1:
+		for i in 4: add(parts, "box", Vector3(cos(i*1.6)*0.2, 1.3, sin(i*1.6)*0.2), Vector3(0.05, 0.9, 0.05), ["8e44ad", "ffd23f", "2ec4b6", "e63946"][i], Vector3(0.2, i*1.6, 0.15))
+	return parts
+
+func carnaval_stand(variant: int) -> Array:
+	var parts: Array = []
+	if variant == 0:
+		# A big samba drum on its side stand.
+		add(parts, "cylinder", Vector3(0, 0.5, 0), Vector3(0.62, 0.55, 0.62), "8e44ad", Vector3(PI/2, 0, 0))
+		for z in [-0.28, 0.28]: add(parts, "cylinder", Vector3(0, 0.5, z), Vector3(0.66, 0.04, 0.66), "ffd23f", Vector3(PI/2, 0, 0))
+		add(parts, "cylinder", Vector3(0, 0.5, 0.3), Vector3(0.58, 0.02, 0.58), "f6f1e4", Vector3(PI/2, 0, 0))
+		return parts
+	# A feather plume on a pole, the dancers' headdress colours.
+	add(parts, "cylinder", Vector3(0, 0.55, 0), Vector3(0.06, 1.1, 0.06), "ffd23f")
+	for i in 7:
+		var a := (i - 3)*0.32
+		add(parts, "box", Vector3(sin(a)*0.35, 1.3 + cos(a)*0.25, 0), Vector3(0.12, 0.62, 0.05), ["2ec4b6", "ffd23f", "e63946", "8e44ad"][i % 4], Vector3(0, 0, -a))
+	return parts
+
+func carnaval_snack(variant: int) -> Array:
+	var parts: Array = []
+	var color: String = ["8e44ad", "2ec4b6"][variant % 2]
+	add(parts, "ball", Vector3(0, 0.2, 0), Vector3(0.34, 0.18, 0.12), color)
+	for x in [-0.08, 0.08]: add(parts, "ball", Vector3(x, 0.21, 0.05), Vector3(0.07, 0.05, 0.03), "1d1530")
+	add(parts, "box", Vector3(0.12, 0.34, 0), Vector3(0.04, 0.16, 0.03), "ffd23f", Vector3(0, 0, -0.4))
+	return parts

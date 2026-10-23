@@ -752,3 +752,47 @@ func lm_easteregg() -> void:
 		add("cyl", Vector3(0, band[0], 0), Vector3(1.52 - absf(band[0] - 2.7)*0.25, 0.22, 1.52 - absf(band[0] - 2.7)*0.25), band[1])
 	for at in [Vector3(1.4, 0.95, 1.2), Vector3(-1.5, 0.95, 0.9), Vector3(0.3, 0.95, 1.8)]:
 		add("ball", at, Vector3(0.35, 0.45, 0.35), Color("c8f7c5") if at.x > 0 else Color("ff9fbf"))
+
+# Kano: the Emir's palace gate, red-ochre mud brick with a pointed arch and
+# zanko horns, banners, two royal parasols and a decked Durbar horse.
+func lm_kanogate() -> void:
+	var ochre := Color("b8643a")
+	box(Vector3(0, 0.08, 0), Vector3(5, 0.16, 5), Color("d9b98a"))
+	box(Vector3(0, 1.6, -0.4), Vector3(4.2, 3.0, 1.2), ochre)
+	box(Vector3(0, 3.35, -0.4), Vector3(4.4, 0.5, 1.3), ochre.darkened(0.08))
+	for x in [-2.0, -0.7, 0.7, 2.0]: add("point", Vector3(x, 4.0, -0.4), Vector3(0.36, 0.9, 0.36), ochre.darkened(0.08))
+	arch(Vector3(0, 1.25, 0.21), 1.3, 2.3, 0.0, Color("3b2418"))
+	add("point", Vector3(0, 2.55, 0.22), Vector3(0.95, 0.6, 0.06), Color("3b2418"))
+	for x in [-1.4, 1.4]:
+		for y in [1.2, 2.2]: box(Vector3(x, y, 0.22), Vector3(0.5, 0.5, 0.04), Color("f2dfb8"))
+	for i in 4: box(Vector3(-1.5 + i*1.0, 2.9, 0.24), Vector3(0.34, 0.6, 0.04), [Color("1f7a4a"), Color("c0392b"), Color("f2c94c"), Color("1f7a4a")][i])
+	for x in [-1.9, 1.9]:
+		beam(Vector3(x, 0.16, 1.4), Vector3(x, 2.1, 1.4), 0.08, WOOD, "cyl")
+		add("hemi", Vector3(x, 2.05, 1.4), Vector3(0.9, 0.36, 0.9), Color("c0392b"))
+		add("cyl", Vector3(x, 2.02, 1.4), Vector3(0.94, 0.06, 0.94), GOLD)
+	box(Vector3(0.6, 0.8, 1.7), Vector3(1.2, 0.5, 0.45), Color("f4f1e6"))
+	for x in [0.15, 1.05]:
+		for z in [1.55, 1.85]: box(Vector3(x, 0.38, z), Vector3(0.12, 0.6, 0.12), Color("e8e2d0"))
+	box(Vector3(-0.1, 1.2, 1.7), Vector3(0.3, 0.6, 0.25), Color("f4f1e6"), Vector3(0, 0, 0.5))
+	box(Vector3(0.6, 1.08, 1.7), Vector3(0.7, 0.14, 0.55), Color("1f7a4a"))
+
+# Salvador: a Carnaval float, a giant smiling mask in feathers on a decked
+# platform with drums at the front.
+func lm_carnivalfloat() -> void:
+	var purple := Color("8e44ad")
+	box(Vector3(0, 0.08, 0), Vector3(5, 0.16, 5), STONE)
+	box(Vector3(0, 0.6, 0), Vector3(4.2, 0.8, 3.6), purple)
+	box(Vector3(0, 1.05, 0), Vector3(4.3, 0.12, 3.7), GOLD)
+	for x in [-1.6, 1.6]:
+		for z in [-1.4, 1.4]: add("cylinder", Vector3(x, 0.3, z), Vector3(0.6, 0.3, 0.6), DARK, Vector3(0, 0, PI/2))
+	# The mask's eyes and smile sit on its front surface.
+	add("ball", Vector3(0, 2.8, -0.3), Vector3(1.6, 1.8, 0.9), Color("ffd23f"))
+	for x in [-0.5, 0.5]: add("ball", Vector3(x, 3.05, 0.5), Vector3(0.36, 0.26, 0.14), Color("2a1640"))
+	add("hemi", Vector3(0, 2.35, 0.48), Vector3(0.6, 0.3, 0.16), Color("e63946"), Vector3(PI, 0, 0))
+	for i in 9:
+		var a := (i - 4)*0.3
+		add("box", Vector3(sin(a)*1.3, 4.0 + cos(a)*0.6, -0.5), Vector3(0.3, 1.6, 0.08), [Color("2ec4b6"), Color("ffd23f"), Color("e63946"), purple][i % 4], Vector3(0, 0, -a))
+	for x in [-1.3, 0.0, 1.3]:
+		add("cylinder", Vector3(x, 1.45, 1.4), Vector3(0.6, 0.7, 0.6), purple.lightened(0.2))
+		add("cyl", Vector3(x, 1.82, 1.4), Vector3(0.64, 0.05, 0.64), Color("f6f1e4"))
+	for at in [Vector3(-1.9, 1.3, -1.5), Vector3(1.9, 1.3, -1.5)]: add("ball", at, Vector3.ONE*0.5, Color("ff8fc8"))

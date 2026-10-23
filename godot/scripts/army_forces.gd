@@ -16,7 +16,7 @@ const COUNTRY := {
 	"machu":"pe", "limacathedral":"pe", "obelisco":"ar", "monserrate":"co", "costanera":"cl", "moai":"cl",
 	"sydney":"au", "flinders":"au", "uluru":"au", "belltower":"au", "parliament":"au", "skytower":"nz",
 	"fijitemple":"fj", "tetmai":"vn", "starlantern":"vn", "juliet":"it", "xmastree":"de", "jackolantern":"us",
-	"easteregg":"au"}
+	"easteregg":"au", "kanogate":"ng", "carnivalfloat":"br"}
 
 # police uniform, cap, cap band | car body, lower body ("" = same), side stripe
 # ("" = none), checker pair ([] = none), light bar | soldier camo, helmet,
