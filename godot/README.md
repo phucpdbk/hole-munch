@@ -57,12 +57,11 @@ its landmark to conquer it, while dodging independent military defenders.
   the same size, so food totals match. NEXT after the opening city goes to the
   festival while it is unbeaten. Festival guardians: a banh chung (Tết), a lion
   dance lion (Mid-Autumn), a cupid (Valentine's), a snowman (Christmas), a
-  pumpkin-head scarecrow (Halloween) and an Easter bunny, all Meshy rigs with
-  the six clips; those six festival landmarks are Meshy bakes too. Kano (the
-  Emir's palace gate, parasols and a decked Durbar horse, guarded by a Durbar
-  rider) and Salvador (a Carnaval float with a giant feathered mask, guarded
-  by a Carnaval dancer) still use their primitive landmark and toy rig; their
-  Meshy prompts are in `tools/meshy/landmarks.json` and `mascots.json`.
+  pumpkin-head scarecrow (Halloween), an Easter bunny, a Durbar rider (Kano)
+  and a Carnaval dancer (Salvador), all Meshy rigs with the six clips; every
+  festival landmark is a Meshy bake too (Kano: the Emir's palace gate with
+  royal parasols and a decked Durbar horse; Salvador: a Carnaval float with a
+  giant feathered mask and drums).
 - **Weather** (`weather.gd`): rain and storm add a dense screen layer of
   streaks (`shaders/precipitation.gdshader`) over 3D drops and ground
   splashes; snow uses parallax flake layers plus soft 3D flakes. Fog covers
@@ -108,7 +107,7 @@ its landmark to conquer it, while dodging independent military defenders.
   shoots every style. The first city has no guardian (`mechanics.gd`
   `GUARDIAN_FROM`): it is only eat, grow and swallow the landmark; the guardian
   and its intro card join from city 2. Hà Nội (Chùa Một Cột), Agra, Paris, New
-  York (Liberty), Sydney and the first six festival cities have Meshy guardians (`assets/mascots/<id>.scn`, auto-rigged,
+  York (Liberty), Sydney and all eight festival cities have Meshy guardians (`assets/mascots/<id>.scn`, auto-rigged,
   clips idle/walk/run/attack = Charged Spell Cast/hit = Hit Reaction/leap = Jump Attack, fixed in
   `KINDS.mascots.actions` of `tools/meshy/meshy.mjs` (idle=0,attack=125,hit=178,leap=86),
   baked by `tools/bake_mascots.gd`, scaled to the toy rig's two-unit height);
@@ -475,7 +474,9 @@ build the branch locally without publishing.
 
 `tools/meshy/meshy.mjs` turns the prompts in `tools/meshy/<kind>.json` into GLBs
 (text-to-image, then image-to-3d). Review the PNGs before paying for models.
-Every step is resumable through the output folder's `manifest.json`. Keys never go
+Every step is resumable through the output folder's `manifest.json`. A model
+still building when a run stops is picked up again from its saved task id, so it
+is never paid for twice. Keys never go
 in the game or the repo: list several accounts in the git-ignored
 `tools/meshy/keys.local.json` (`{"acc1": "msy_...", "acc2": "msy_..."}`, see
 `keys.example.json`; put the original key first, it owns items made before
@@ -537,12 +538,12 @@ Then bake (headless Godot, `--script res://tools/<tool>.gd [-- ids]`):
 - **Check**: `-- --capture --guardian-capture` shoots every attack style with the
   baked guardians and saucer, and `-- --capture --landmark-gallery` shows every landmark.
 
-Landmarks still on primitives (45): namsan, watarun, pearl, tokyotower,
+Landmarks still on primitives (43): namsan, watarun, pearl, tokyotower,
 brandenburg, alcala, royalpalace, stbasils, cairotower, kicc, nationaltheatre,
 tablemountain, willis, cntower, hollywood, capitol, masp, limacathedral, monserrate,
 costanera, flinders, belltower, fijitemple, parliament, khuevan, fuji, bigben, pisa,
 colosseum, pyramid, sphinx, djenne, baobab, empire, needle, chichen, christ, machu,
-obelisco, sugarloaf, uluru, skytower, moai, kanogate, carnivalfloat.
+obelisco, sugarloaf, uluru, skytower, moai.
 
 ## Deferred migration
 

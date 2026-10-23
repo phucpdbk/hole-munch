@@ -83,6 +83,14 @@ const KINDS = {
 			"whole object fully visible and centered, three-quarter view from slightly above, floating with no base or stand, " +
 			"plain white background, no text, no letters, no numbers, game asset",
 	},
+	// The sky siege daily's air force (sky_siege.gd FOES): toy army vehicles in
+	// colours only, never a real insignia.
+	aircraft: {
+		out: "aircraft_src", polycount: 3000, refs: ["heli", "jet"],
+		style: "stylized toy army vehicle, chunky simplified shapes, bright soft colors, no insignia, no flags, " +
+			"whole object fully visible and centered, three-quarter view from front-right slightly above, " +
+			"plain white background, no text overlay, game asset",
+	},
 	crafts: {
 		out: "crafts_src", polycount: 5000, refs: ["0", "1", "2"],
 		style: "stylized toy spaceship, chunky simplified shapes, bright soft colors, whole object fully visible and centered, " +
@@ -306,6 +314,8 @@ async function makeModel(id) {
 	const entry = manifest[id];
 	if (!hasImage(entry)) throw new Error(`${id}: run "images" first`);
 	if (entry.glb && !flag("--redo")) return;
+	// A run cut off while the model was building left its paid task: wait for it again.
+	if (entry.modelTask && !flag("--redo")) return finishModel(id, entry, pinnedAccount(id, entry), entry.modelTask);
 	// A Google image has no Meshy task: its chain starts here and the PNG goes up as a data URI.
 	const google = entry.imageSource === "google";
 	const account = google && !entry.account ? startChain(id, [], false) : continueChain(id, entry, COSTS.model);
@@ -326,6 +336,10 @@ async function makeModel(id) {
 	});
 	entry.modelTask = result;
 	await saveManifest();
+	await finishModel(id, entry, account, result);
+}
+
+async function finishModel(id, entry, account, result) {
 	const task = await waitFor(account, "image-to-3d", result, id);
 	await download(task.model_urls.glb, join(OUT, `${id}.glb`));
 	if (task.thumbnail_url) await download(task.thumbnail_url, join(OUT, `${id}_preview.png`));
