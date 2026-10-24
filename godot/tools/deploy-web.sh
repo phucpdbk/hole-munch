@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Exports the "Web" preset and publishes it to the gh-pages branch, which GitHub
 # Pages serves at https://phucpdbk.github.io/hole-munch/. The previous HTML5 game
-# from the repo root is kept under /classic/, and privacy.html stays at the root
+# from the repo root is kept under /classic/, and privacy.html/support.html stay at the root
 # because store listings link to it. Usage: bash godot/tools/deploy-web.sh [--no-push]
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 repo_root="$(cd "$project_root/.." && pwd)"
@@ -30,7 +30,7 @@ find "$site_dir" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
 cp -r "$export_dir"/. "$site_dir"/
 mkdir -p "$site_dir/classic"
 cp -r "$repo_root/index.html" "$repo_root/style.css" "$repo_root/src" "$repo_root/assets" "$site_dir/classic"/
-cp "$repo_root/privacy.html" "$site_dir"/
+cp "$repo_root/privacy.html" "$repo_root/support.html" "$site_dir"/
 touch "$site_dir/.nojekyll"
 
 git -C "$site_dir" add -A

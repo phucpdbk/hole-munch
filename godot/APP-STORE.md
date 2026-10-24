@@ -1,0 +1,120 @@
+# App Store release — Hole Munch (iOS)
+
+Builds the Godot game for App Store Connect. The iOS 1.0 build **ships without ads**:
+the AdMob backend only runs on Android (`scripts/ads.gd`), release builds hide every
+ad offer, and `admob/general/ios/enabled=false`. That keeps App Privacy at
+"Data Not Collected" and avoids ATT/UMP work. `tools/export_ios_release.gd` refuses
+to build if iOS ads or tracking get enabled without updating these answers first.
+
+## One-time setup
+
+1. **Apple Developer Program** membership (paid, 99 USD/year) and your 10-character Team ID.
+2. **Bundle ID** `com.phucpdbk.holemunch`, the same ID as the Play release. Xcode
+   registers it automatically on the first signed archive, or create it under
+   Certificates, Identifiers & Profiles → Identifiers.
+3. **App Store Connect → Apps → +** New App: platform iOS, name, primary language
+   English (U.S.), bundle ID above, SKU `holemunch-ios`. If the name is already
+   taken, use `Hole Munch: City Swallow`. Names must be unique on the App Store.
+4. Deploy the web site so these URLs work: `bash godot/tools/deploy-web.sh`.
+   - Privacy policy: https://phucpdbk.github.io/hole-munch/privacy.html
+   - Support URL: https://phucpdbk.github.io/hole-munch/support.html
+5. On the Mac: Xcode 26 or newer (required for App Store uploads since April 2026),
+   signed in under Settings → Accounts; Godot 4.7.1 plus its export templates.
+
+## Build the signed IPA (Mac)
+
+`builds/release-settings.json` provides `package_id`, `app_name`, `version_name` and
+`version_code` (shared with Android; the AdMob fields are ignored on iOS). Copy it to
+the Mac together with the `godot` folder. Raise `version_code` (CFBundleVersion) for
+every upload. `version_name` is the version users see.
+
+```bash
+export HOLE_IOS_TEAM_ID="ABCDE12345"
+bash tools/build-ios-release.sh
+```
+
+The script runs `export_ios_release.gd`. It applies the production bundle ID, name, version,
+App Store export method and `ITSAppUsesNonExemptEncryption=false` in memory, then
+Godot archives with Xcode (automatic signing) and writes
+`builds/ios/release-XXXXXX/HoleMunch.ipa`. If signing fails, open the generated
+`HoleMunch.xcodeproj` in that folder, choose your Team under Signing & Capabilities,
+then use **Product → Archive → Distribute App → App Store Connect**.
+
+Upload the IPA with **Transporter** (free on the Mac App Store) or Xcode Organizer.
+After processing (~15–30 min) the build appears under TestFlight. Test it there first.
+
+Check on Windows (config only, nothing built):
+
+```powershell
+$env:HOLE_RELEASE_SETTINGS = (Resolve-Path godot/builds/release-settings.json).Path
+Godot_v4.7.1-stable_win64_console.exe --headless --path godot --editor --script res://tools/export_ios_release.gd -- --check
+```
+
+## Graphics
+
+`node godot/tools/make-store-assets.mjs` writes:
+
+| File | Use |
+|---|---|
+| `assets/app_icon/ios_1024.png` | App icon (checked in, 24-bit RGB, no alpha; set in the iOS preset) |
+| `builds/store/ios/screenshot-1..7.png` | iPhone 6.9" screenshots, 2868×1320 landscape |
+
+The preset is iPhone-only (`targeted_device_family=0`), so iPad screenshots are not
+required. App Store Connect scales the 6.9" set down for smaller iPhones.
+Screenshots are captured at the same 2.17:1 aspect ratio, sized to fit a desktop monitor (2294×1056),
+into `builds/store/raw-ios/`:
+
+```powershell
+$godot = 'Godot_v4.7.1-stable_win64_console.exe'
+foreach ($city in 8, 24, 40) {
+    & $godot --path godot --resolution 2294x1056 -- --capture --lang=en "--levels=$city"
+    foreach ($shot in 'game', 'combo', 'boss') { Copy-Item "godot/test-output/$shot.png" "godot/builds/store/raw-ios/$city-$shot.png" }
+}
+& $godot --path godot --resolution 2294x1056 -- --capture --ui-capture --lang=en
+foreach ($shot in 'journey-1', 'wardrobe', 'result', 'shop') { Copy-Item "godot/test-output/ui-en-$shot.png" "godot/builds/store/raw-ios/ui-en-$shot.png" }
+```
+
+The result screen is left out on iOS because debug captures show a "Watch ad" button
+that the iOS build does not have. Do not upload screenshots that show ads.
+
+## Listing text
+
+- **Name** (30): `Hole Munch`
+- **Subtitle** (30): `Swallow cities, topple icons`
+- **Promotional text** (170): `Steer a hungry hole through 48 world cities, outsmart landmark guardians and play a new daily mini-game every day. No ads, plays offline!`
+- **Keywords** (100, comma-separated, no spaces): `hole,io,black,city,eat,swallow,grow,arcade,casual,offline,landmark,ufo,saucer,puzzle,daily`
+- **Description:** use the Play full description in [STORE-LISTING.md](STORE-LISTING.md), but
+  replace the last line of QUICK TO PLAY with `Play offline, no ads.`
+- **Category:** Games, primary Casual, secondary Arcade
+- **Copyright:** `2026 phucpdbk`
+- **Support URL / Privacy URL:** see setup step 4. Marketing URL is optional.
+
+## App Store Connect answers
+
+- **App Privacy:** Data Not Collected. Progress stays on the device. There is no
+  analytics, ads, account or developer server. The privacy manifest generated by Godot
+  declares no tracking and no collected data, plus the engine's required-reason APIs.
+- **Age rating:** answer the questionnaire honestly. The game has cartoon/fantasy
+  destruction (swallowing cars and buildings, guardians attacking the saucer), with no
+  blood, gambling, chat, web access or purchases. Expect 4+ or 9+ depending on how
+  "Cartoon or Fantasy Violence" is rated (None vs Infrequent/Mild).
+- **Made for Kids:** No (general audience, same as Play).
+- **Export compliance:** handled by `ITSAppUsesNonExemptEncryption=false` in Info.plist.
+- **Content rights:** the game uses licensed third-party assets (Synty POLYGON packs,
+  Meshy-generated models). Answer "Yes, it contains third-party content" and confirm
+  you hold the licences.
+- **Pricing:** Free. **In-app purchases:** none.
+- **Review notes:** "Offline single-player game, no login needed. Drag to steer the hole."
+
+## Before submitting — check on a real iPhone (TestFlight)
+
+- Notch/Dynamic Island and home indicator do not cover the HUD in both landscape directions.
+- The Privacy button only shows the policy link (no ads choices on iOS); the link opens Safari.
+- No ad offers appear anywhere (revive, double coins, daily swap).
+- Progress persists after force-quitting; the app pauses when backgrounded.
+- FPS in the storm/snow cities on the oldest iPhone you support (iOS 15 minimum).
+
+App Review also tests on iPad (iPhone apps run in compatibility mode), so check one iPad if you can.
+
+Adding AdMob to iOS later needs: the iOS plugin enabled, iOS ad unit IDs, an ATT prompt
+or non-personalized-only ads, SKAdNetwork IDs, UMP consent, and new App Privacy answers.

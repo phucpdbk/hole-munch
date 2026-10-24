@@ -46,7 +46,7 @@ project cũ, vì vậy thay đổi signing thủ công trong Xcode cũ không t�
 
 Nếu Xcode không tìm thấy iPhone SDK, chọn lại Command Line Tools trong Settings.
 Nếu ký lỗi, kiểm tra Apple account, Team và Bundle ID ngay trong Xcode.
-TestFlight/App Store cần cấu hình phát hành và ký riêng; script này phục vụ chạy thử.
+TestFlight/App Store: dùng `tools/build-ios-release.sh`, xem [APP-STORE.md](APP-STORE.md); script này phục vụ chạy thử.
 
 ## Kiểm tra đã thực hiện
 
