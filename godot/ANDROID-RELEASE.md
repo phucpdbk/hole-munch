@@ -7,12 +7,13 @@ No store upload or account creation is performed by these scripts.
 
 ## Before the first production build
 
-1. Choose the permanent package ID. The example uses `com.phucpdbk.holemunch`; confirm it is yours and available before creating the Play listing. Changing it later creates a separate app. Prototype saves do not migrate to a different package.
+1. Package ID: `com.phucpdbk.holemunch` (confirmed 2026-10-24; the old Capacitor build `io.github.phucpdbk.holemunch` was never uploaded to Play). Changing it later creates a separate app. Prototype saves do not migrate to a different package.
 2. Create and verify your Google Play developer account and create the app listing.
 3. In AdMob create the Android app, then one rewarded unit and one interstitial unit. Link the published store listing when available. In **Privacy & messaging**, configure and publish the applicable messages. The SDK cannot publish those messages for you.
 4. Copy `tools/release-settings.example.json` to `builds/release-settings.json`; fill the three AdMob IDs. These IDs are public identifiers, not signing secrets. Release builds reject empty IDs and Google's sample publisher ID.
 5. Create an upload keystore (instructions below). Enroll in Play App Signing when uploading. Back up the upload key and password securely, separately from the repo.
-6. Publish the updated root `privacy.html` at `https://phucpdbk.github.io/hole-munch/privacy.html` before submission. The local edit is not automatically deployed. Verify the live text/date and set the same URL in Play and AdMob.
+6. Prepare the store listing text and graphics with [STORE-LISTING.md](STORE-LISTING.md).
+7. Publish the updated root `privacy.html` at `https://phucpdbk.github.io/hole-munch/privacy.html` before submission. The local edit is not automatically deployed. Verify the live text/date and set the same URL in Play and AdMob.
 
 The proposed audience is general, not specifically directed to under-13 children. This is a product decision, not a replacement for Play's target-audience questionnaire or IARC content rating. If the actual design/marketing targets children or a mixed audience, stop and implement the relevant age/ads controls before release. Do not select an older audience merely to avoid those requirements. G-rated ad content alone is not a children's-compliance mechanism.
 
