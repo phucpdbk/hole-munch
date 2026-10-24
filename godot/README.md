@@ -106,12 +106,11 @@ its landmark to conquer it, while dodging independent military defenders.
   saucer, shakes the camera and shoves the hole. `-- --capture --guardian-capture`
   shoots every style. The first city has no guardian (`mechanics.gd`
   `GUARDIAN_FROM`): it is only eat, grow and swallow the landmark; the guardian
-  and its intro card join from city 2. Hà Nội (Chùa Một Cột), Agra, Paris, New
-  York (Liberty), Sydney and all eight festival cities have Meshy guardians (`assets/mascots/<id>.scn`, auto-rigged,
+  and its intro card join from city 2. Every city and festival has a Meshy guardian (`assets/mascots/<id>.scn`, auto-rigged,
   clips idle/walk/run/attack = Charged Spell Cast/hit = Hit Reaction/leap = Jump Attack, fixed in
   `KINDS.mascots.actions` of `tools/meshy/meshy.mjs` (idle=0,attack=125,hit=178,leap=86),
   baked by `tools/bake_mascots.gd`, scaled to the toy rig's two-unit height);
-  the rest keep the toy rig. `--mascot-capture --levels=0,4` shoots chosen cities
+  the toy rig is only a fallback. `--mascot-capture --levels=0,4` shoots chosen cities
   (idle, windup, attack and mid-beam frames). Meshy prompts must not ask for
   effects ("spray water"): Meshy bakes them into the mesh.
 - **Showtime** (`showtime.gd`), the clip-friendly moments: the guardian's last
@@ -584,7 +583,13 @@ account with credits for its whole chain (about 42 for a landmark or saucer, 59
 for a rigged guardian) and stays on it, since later steps reuse that account's
 task ids; `status` shows each item's account. An account that runs out before an
 item starts hands it to the next one; one that runs out mid-chain stops that
-item until it is topped up or the item is redone with `--redo`.
+item until it is topped up or the item is redone with `--redo`. To move a stuck item to
+another account without paying again: for a missing model, set its manifest entry to
+`imageSource: "google"` and drop `imageTask` and `account` (the PNG on disk is
+uploaded); for a missing rig, set `account` to the new one and `rigUpload: true` (the
+model GLB on disk is uploaded to `/rigging`). Background removal also cuts away
+pure white, so prompts give white parts an off-white colour (a `#ffffff` belly left a
+hole through Tokyo Tower's guardian).
 
 `images --google` draws the image with Google's Nano Banana Pro
 (`gemini-3-pro-image`, key in the git-ignored `tools/meshy/gemini.local.json` as
@@ -638,12 +643,10 @@ Then bake (headless Godot, `--script res://tools/<tool>.gd [-- ids]`):
 - **Check**: `-- --capture --guardian-capture` shoots every attack style with the
   baked guardians and saucer, and `-- --capture --landmark-gallery` shows every landmark.
 
-Landmarks still on primitives (43): namsan, watarun, pearl, tokyotower,
-brandenburg, alcala, royalpalace, stbasils, cairotower, kicc, nationaltheatre,
-tablemountain, willis, cntower, hollywood, capitol, masp, limacathedral, monserrate,
-costanera, flinders, belltower, fijitemple, parliament, khuevan, fuji, bigben, pisa,
-colosseum, pyramid, sphinx, djenne, baobab, empire, needle, chichen, christ, machu,
-obelisco, sugarloaf, uluru, skytower, moai.
+Every landmark and every guardian of the 48 cities and 8 festivals is a Meshy bake;
+the primitive landmarks (`landmarks.gd`) and toy rigs (`mascot_specs.gd`) remain as
+fallbacks for a checkout without the baked files. `-- --capture --landmark-gallery`
+and `-- --capture --guardian-gallery` shoot each city's landmark and guardian.
 
 ## Deferred migration
 

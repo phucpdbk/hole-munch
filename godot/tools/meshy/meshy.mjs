@@ -403,7 +403,12 @@ async function makeRig(id) {
 	if (entry.clips && !flag("--redo")) return;
 	const account = continueChain(id, entry, rigCost());
 	if (!entry.rigTask || flag("--redo")) {
-		const { result } = await api(account, "POST", "/rigging", { input_task_id: entry.modelTask, height_meters: RIG_HEIGHT_METERS });
+		// A model moved to another account (rigUpload) goes up as a GLB data URI,
+		// since its model task belongs to the account that made it.
+		const input = entry.rigUpload
+			? { model_url: `data:application/octet-stream;base64,${(await readFile(join(OUT, `${id}.glb`))).toString("base64")}` }
+			: { input_task_id: entry.modelTask };
+		const { result } = await api(account, "POST", "/rigging", { ...input, height_meters: RIG_HEIGHT_METERS });
 		entry.rigTask = result;
 		await saveManifest();
 	}

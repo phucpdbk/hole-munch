@@ -379,6 +379,23 @@ func run(game, campaign_mode: bool) -> void:
 			await snapshot("landmark-%02d-%s" % [index+1, g.level.boss])
 		g.get_tree().quit()
 		return
+	# Every guardian in its city, close by the saucer, to review Meshy rigs side by
+	# side (test-output/guardian-NN-<id>.png; cities before the first guardian skipped).
+	if "--guardian-gallery" in OS.get_cmdline_user_args():
+		for index in g.Campaign.level_count():
+			g.load_level(index)
+			g.reset_round()
+			if g.mechanics.mascot == null: continue
+			g.playing = true; g.mode = "playing"; g.started = true; g.remaining = 99.0
+			g.rival.active = false
+			g.defense.grace = INF
+			var guardian: Dictionary = g.mechanics.guardian
+			g.hole_position = guardian.position + Vector3(-1.5, 0, guardian.radius + 3.0)
+			g.hole_position.y = 0
+			await frames(45)
+			await snapshot("guardian-%02d-%s" % [index+1, g.level.boss])
+		g.get_tree().quit()
+		return
 	# Conquest album: the menu button, a few continents with mixed progress, a
 	# landmark card, test mode, then the same in portrait (test-output/album-*.png,
 	# add --lang=en etc.).
@@ -765,6 +782,8 @@ func guardian_preview() -> void:
 		g.rival.active = false
 		g.defense.grace = 0.0
 		var mascot = g.mechanics.mascot
+		# The first cities have no guardian yet.
+		if mascot == null: continue
 		var guardian: Dictionary = g.mechanics.guardian
 		mascot.cooldown = 0.0
 		g.hole_position = guardian.position + Vector3(-3.0, 0, guardian.radius + 3.5)
