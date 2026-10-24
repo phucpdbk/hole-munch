@@ -228,22 +228,34 @@ its landmark to conquer it, while dodging independent military defenders.
   about 70–90% of the timer).
 - **Daily challenge** (THỬ THÁCH NGÀY): one city per date for everyone, with a
   rival and one continent tougher defence; the first win of the day pays ×1.5.
-  Mini-games by date (ten, `Campaign.DAILY_TYPES`).
+  Mini-games by date (eleven, `Campaign.DAILY_TYPES`).
   **Classic games with the saucer** (fixed starting hole, checked in
   `classic_daily_smoke.gd`). Each plays on its own themed map instead of a city
   (`theme_maps.gd`, like the cow hunt's farmland): the street grid stays as
   paths and the blocks are decorated by theme, every decoration too big to
   swallow, with no buildings, traffic or army. `-- --capture --classic-capture`
-  shoots all three (`test-output/classic-*.png`).
-  **Saucer snake** (`snake_trail.gd`, 90 s, a flower garden: lawns, sand
-  paths, flower beds, hedges, a fountain) — the saucer never stops (an idle
-  stick keeps its last direction); three fruits sit on the paths, and each one
-  eaten brings a pet (chick, bunny, piglet, kitten) hopping along the hole's
-  path behind it. A purple monster naps 3 s in a far corner, then chases the
-  line (3.4 rising to 5.6 a second as it grows) and chomps the last pet, then
-  chews 1.4 s; with no pets left it bites 3 s off the clock. Running into the
-  line past its first 4 pets ends the run. The score is the line at the end;
-  target 12 pets, 5 coins each. **Mole munch** (`mole_patch.gd`, 60 s, a
+  shoots all three, the pets close up and each harder garden (`test-output/classic-*.png`).
+  **Saucer snake** (`snake_trail.gd`, 90 s, a garden) — the saucer never stops
+  (an idle stick keeps its last direction). Pets (`critters.gd`: puppy, kitten,
+  piglet, bunny, chick, built from primitives with their legs, head, ears, tail
+  and wings on pivots: the four-legged ones trot, bunnies hop, chicks waddle and
+  flap) roam the garden, resting, wandering and bolting from a saucer within
+  5. Glide over one to catch it and it joins the line, hopping along the hole's
+  path 1.1 apart; a new pet appears elsewhere. Monsters, the Meshy "gobbler"
+  (`assets/mascots/gobbler.scn`, a rigged villain from the `monsters` kind of
+  `tools/meshy/meshy.mjs`, baked with `bake_mascots.gd -- monsters`, played
+  through `mascot_rig.gd`), nap 3 s, then each hunts the pet nearest to it: a
+  bite takes that pet and every pet behind it scatters back into the garden;
+  with no pets left a monster bites 3 s off the clock. More monsters join
+  during the round. Hedges, flower beds, ponds, trees and the fountain block the
+  saucer, the pets and the monsters (`theme_maps.gd` `push_out`). Running into
+  the line past its first 4 pets ends the run. The score is the line at the
+  end; target 12 pets, 5 coins each. Reaching it unlocks the next garden for
+  good (`Campaign.checkpoints` "snake"), each tier with more monsters, sooner:
+  flower garden (1 monster, +1 every 30 s up to 3), hedge garden (hedged rooms,
+  1, every 25 s, up to 4), pond garden (rooms round a pond, 2, every 22 s, up
+  to 4) and hedge maze (a perfect maze in every block, 2, every 18 s, up to 5).
+  The camera sits at 0.75 of the city zoom. **Mole munch** (`mole_patch.gd`, 60 s, a
   vegetable patch: furrowed soil, carrot and cabbage rows, scarecrows) —
   whack-a-mole: moles pop out of 16 mole hills on the dirt paths 3.5–14 from
   the hole for 3 s (down to 1.3 s as catches add up), two at a time and three
@@ -255,6 +267,23 @@ its landmark to conquer it, while dodging independent military defenders.
   1.5–3 s (greens shorten and reds lengthen as fruit goes down); moving on red
   after a 0.3 s grace costs 3 points and a 1.2 s freeze, three strikes end the
   run; target 30.
+  **Beam & drop** (`beam_drop.gd`, 90 s, clear weather, fixed hole, a toy
+  depot from `beam_yard.gd`: sand paths, lawns with sandboxes and bushes, a dark
+  puzzle deck on the plaza; checked in `beam_smoke.gd`) — a lift-and-drop
+  puzzle. Each pad on the deck shows a ghost of the toy it wants (a block,
+  ball, cone or drum in red, yellow, blue or green). Toys sit in piles 7–16
+  from the deck. A quick tap (touch let go within 0.3 s and 14 px, a mouse
+  click or Space) beams the top toy of the pile under the saucer up (the
+  saucer slows to 0.85 while carrying); a second tap drops it. Over a pad it
+  goes in only if the pad wants it (the pad lights green, else red; a wrong
+  pad costs 2 s), elsewhere it lands on the ground or on a pile in reach, up
+  to 3 high, so a buried toy is dug out by moving the ones on top. A full board
+  adds 6 s and brings the next: 2×2, then 3×2 with 2 decoys and piles of 2,
+  3×3 with 3 decoys, then 4×3 with 4 decoys and piles of 3 (repeating). Target
+  12 toys, 5 coins each. `-- --capture --beam-capture` shoots
+  `test-output/beam-*.png`. The daily rotation shuffles every mini-game into
+  each cycle of `DAILY_TYPES.size()` days (`Campaign.daily_type`), so each
+  comes up once per cycle.
   **Checkpoints**: the ladder games keep their furthest point for good
   (`Campaign.checkpoints`, `reach_checkpoint`): the slide puzzle's board, the
   siege's stage, the sky hop every 10 gaps and the cow hunt's level. A run

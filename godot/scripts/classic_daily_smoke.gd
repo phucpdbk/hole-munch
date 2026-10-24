@@ -2,6 +2,7 @@ extends RefCounted
 # Checks for the classic-game dailies (snake, mole, red light), run from
 # campaign_smoke.gd check_daily_games; `smoke` is that runner (its check()).
 const Campaign = preload("res://scripts/campaign.gd")
+const MascotRig = preload("res://scripts/mascot_rig.gd")
 
 static func run(smoke, g) -> void:
 	check_snake(smoke, g)
@@ -15,47 +16,75 @@ static func begin(g, type: String) -> void:
 	g.start_daily()
 	g.defense.grace = INF
 
-# Saucer snake (snake_trail.gd): fruit on the garden paths, a line of pets
-# that grows by one a fruit and follows the hole's path, a saucer that keeps
-# gliding, a monster that chomps the last pet, and running into the line that
-# ends the run.
+# Saucer snake (snake_trail.gd): pets roam a garden and join the line behind
+# the saucer when it catches them; hedges block the hole; monsters (the
+# Meshy gobbler) bite the nearest pet and scatter the pets behind it, bite the
+# clock when the line is empty, and grow in number; the target unlocks the
+# next garden; running into the line ends the run.
 static func check_snake(smoke, g) -> void:
+	g.campaign.checkpoints = {}
 	begin(g, "snake")
 	var snake = g.daily.snake
-	var limit: float = Campaign.START_RADIUS*g.EAT_RATIO
-	smoke.check(g.mode == "playing" and snake.fruits.size() == snake.FRUITS and snake.fruits.all(func(f): return not f.hidden and f.radius < limit), "the snake starts with fruit on the paths, each fits the hole")
-	smoke.check(snake.monster.visible and snake.monster_wait > 0 and snake.flat_gap(snake.monster_at, g.hole_position) > 10.0, "the monster naps far from the saucer at the start")
+	var map = g.countryside
+	var tier: Array = snake.TIERS[0]
+	smoke.check(map.tier == 0 and snake.roamers.size() == tier[3] and snake.monsters.size() == tier[0] and snake.line.is_empty(), "the snake starts in the open garden with roaming pets and its first monster")
+	smoke.check(snake.monsters[0].body is MascotRig and snake.monsters[0].body.source == "animated" and snake.monsters[0].wait > 0, "the monster is the rigged Meshy gobbler, napping at the start")
+	smoke.check(snake.roamers.all(func(c): return map.is_free(c.position, snake.ANIMAL_RADIUS)), "pets start clear of hedges, beds and ponds")
 	g.step(0.02, Vector2(1, 0))
 	var from: Vector3 = g.hole_position
 	for frame in 40: g.step(0.02, Vector2.ZERO)
 	smoke.check(g.hole_position.distance_to(from) > 2.0, "the snake saucer keeps gliding with the stick let go")
-	var before: int = g.daily.count
-	var bitten := 0
-	for fruit in snake.fruits:
-		if fruit.fall >= 0 or fruit.hidden: continue
-		g.swallow(fruit)
-		bitten += 1
-	smoke.check(bitten > 0 and snake.length == g.daily.count and g.daily.count == before + bitten and is_equal_approx(g.target_radius, float(g.stats.start_radius)), "each fruit brings a pet into the line and scores, and the hole keeps its size")
-	for frame in 40: g.step(0.02, Vector2(0, 1))
-	smoke.check(snake.fruits.all(func(f): return not f.eaten and (f.fall >= 0 or not f.hidden)), "eaten fruit comes back somewhere else")
-	var first: MeshInstance3D = snake.pets[0]
-	smoke.check(snake.flat_gap(first.position, g.hole_position) < snake.ORB_GAP*1.6 and first.visible and not snake.pets[snake.length].visible, "the pets hop right behind the saucer")
-	smoke.check(not snake.crashed and g.mode == "playing", "a straight run never bites the line")
-	# The monster catches the last pet: the line and the score drop by one.
-	var line: int = snake.length
-	snake.monster_wait = 0.0
-	snake.monster_at = snake.orb_at(line - 1)
+	# A pet walks with its legs: the front leg swings while it moves.
+	var walker = snake.roamers[0]
+	var swings: Array = []
+	for frame in 12:
+		walker.position += Vector3(0.05, 0, 0)
+		walker.animate(0.02)
+		swings.append(walker.pivots.get("fl", walker.pivots.get("leg_l")).rotation.x)
+	smoke.check(swings.max() - swings.min() > 0.2, "a moving pet swings its legs (%.2f)" % (swings.max() - swings.min()))
+	# Catching: the saucer over a pet adds it to the line and a new pet appears.
+	var pet = snake.roamers[0]
+	g.hole_position = Vector3(pet.position.x, 0, pet.position.z)
+	snake.monsters[0].wait = 99.0
 	g.step(0.02, Vector2.ZERO)
-	smoke.check(snake.length == line - 1 and g.daily.count == line - 1 and snake.chomped == 1 and snake.monster_wait > 0, "the monster chomps the last pet, then chews")
-	snake.length = 0
-	snake.monster_wait = 0.0
-	snake.monster_at = Vector3(g.hole_position.x, 0, g.hole_position.z)
+	smoke.check(snake.line.size() == 1 and snake.line[0] == pet and g.daily.count == 1 and snake.roamers.size() == tier[3], "catching a roaming pet adds it to the line, and another pet appears")
+	# Hedges block the saucer.
+	var wall: Dictionary = map.solids.filter(func(s): return s.has("h"))[0]
+	g.hole_position = Vector3(wall.c.x, 0, wall.c.y)
+	g.step(0.02, Vector2.ZERO)
+	smoke.check(map.is_free(g.hole_position, g.radius*0.6 - 0.01), "a hedge pushes the saucer out")
+	# Six pets in line; the monster bites the third and the three behind scatter.
+	for i in 5:
+		var extra = snake.take_critter(g)
+		extra.visible = true
+		extra.position = snake.orb_at(snake.line.size())
+		snake.line.append(extra)
+	for frame in 5: g.step(0.02, Vector2.ZERO)
+	var monster: Dictionary = snake.monsters[0]
+	var roaming: int = snake.roamers.size()
+	monster.wait = 0.0
+	monster.holder.position = snake.line[2].position
+	g.step(0.02, Vector2.ZERO)
+	smoke.check(snake.line.size() == 2 and g.daily.count == 2 and snake.roamers.size() == roaming + 3 and snake.chomped == 1 and monster.wait > 0, "a monster bites the nearest pet and the pets behind it scatter")
+	for critter in snake.line.duplicate(): snake.park(critter)
+	snake.line.clear()
+	monster.wait = 0.0
+	monster.holder.position = Vector3(g.hole_position.x, 0.16, g.hole_position.z)
 	var clock: float = g.remaining
 	g.step(0.02, Vector2.ZERO)
-	smoke.check(g.remaining < clock - snake.BITE_TIME + 0.1, "with no pets left the monster bites the saucer's clock")
+	smoke.check(g.remaining < clock - snake.BITE_TIME + 0.1, "with no pets left a monster bites the saucer's clock")
+	snake.next_monster = 0.0
+	g.step(0.02, Vector2.ZERO)
+	smoke.check(snake.monsters.size() == tier[0] + 1 and snake.next_monster > 0, "another monster joins after a while")
+	# Reaching the target unlocks the hedge garden for the next run.
+	for i in g.daily.target():
+		var extra = snake.take_critter(g)
+		extra.visible = true
+		snake.line.append(extra)
+	for monster_entry in snake.monsters: monster_entry.wait = 99.0
+	g.step(0.02, Vector2.ZERO)
+	smoke.check(g.campaign.checkpoint("snake") == 1, "reaching the target unlocks the next garden")
 	# A full loop: the trail circles back to the hole, so a later pet sits on it.
-	snake.length = 10
-	snake.monster_wait = 99.0
 	var loop: float = 8*snake.ORB_GAP
 	var turn := int(loop/snake.STEP)
 	var centre: Vector3 = Vector3(g.spawn.x, 0, g.spawn.z) + Vector3(loop/TAU, 0, 0)
@@ -69,6 +98,17 @@ static func check_snake(smoke, g) -> void:
 	g.step(0.02, Vector2.ZERO)
 	smoke.check(g.mode == "result", "the crashed snake goes to the result")
 	g.go_menu()
+	# The next runs play the harder gardens: hedged rooms, then the maze.
+	begin(g, "snake")
+	smoke.check(g.countryside.tier == 1 and g.daily.snake.monsters.size() == snake.TIERS[1][0], "the next run plays the hedge garden")
+	g.go_menu()
+	g.campaign.checkpoints = {"snake":{"at":3, "lap":0}}
+	begin(g, "snake")
+	var maze = g.countryside
+	var hedges: int = maze.solids.filter(func(s): return s.has("h")).size()
+	smoke.check(maze.tier == 3 and hedges > 60 and maze.is_free(Vector3(g.spawn.x, 0, g.spawn.z), g.radius*0.6) and g.daily.snake.monsters.size() == snake.TIERS[3][0], "the hardest garden is a hedge maze (%d hedges) with a clear start" % hedges)
+	g.go_menu()
+	g.campaign.checkpoints = {}
 
 # Each classic game plays on its own themed map, not a city: no buildings,
 # traffic or army, and no decoration the hole could swallow.

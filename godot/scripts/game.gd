@@ -417,7 +417,7 @@ func load_level(index: int) -> void:
 		level.weather = "clear"
 	countryside = null
 	if run_kind == "daily" and daily_kind == "findcow": countryside = Countryside.new()
-	elif run_kind == "daily" and ThemeMaps.themed(daily_kind): countryside = ThemeMaps.new(daily_kind)
+	elif run_kind == "daily" and ThemeMaps.themed(daily_kind): countryside = ThemeMaps.new(daily_kind, campaign.checkpoint(daily_kind))
 	goal_list = [] if run else Challenges.goals(level)
 	layout = MapLayout.make(Runner.COLS, Runner.ROWS) if run else MapLayout.make(level.cols, level.rows)
 	if not run: layout.vary_districts(campaign.selected)
@@ -1323,6 +1323,8 @@ func step(dt: float, input: Vector2) -> void:
 	hole_position += hole_velocity*dt
 	hole_position = layout.clamp_point(hole_position)
 	hole_position = features.collide(hole_position, radius, EAT_RATIO, hole_velocity)
+	# Hedges, ponds, beds and stands on a themed daily map stop the hole.
+	if countryside and countryside.has_method("push_out"): hole_position = countryside.push_out(hole_position, radius*0.6)
 	radius = lerpf(radius, target_radius, 1.0-exp(-dt*8.0))
 	bite_time = maxf(0, bite_time-dt*2.5)
 	pulse = maxf(0, pulse-dt*2.0)
@@ -2016,7 +2018,7 @@ func update_view(dt: float) -> void:
 	camera.position = look + (RUN_CAMERA if run_view else CAMERA_OFFSET).rotated(Vector3.UP, showtime.angle*shot)*(6.0 if overview_size > 0.0 else 1.0)
 	camera.look_at(look)
 	var menu_zoom := 21.0 + boss_radius*1.7
-	var zoom: float = 12.0 if mode == "customize" else menu_zoom if mode == "menu" else (21.0+radius*1.8)*mechanics.view_scale()
+	var zoom: float = 12.0 if mode == "customize" else menu_zoom if mode == "menu" else (21.0+radius*1.8)*mechanics.view_scale()*(daily.zoom_scale() if run_kind == "daily" else 1.0)
 	if shot > 0.0: zoom = lerpf(zoom, showtime.size, shot)
 	if overview_size > 0.0:
 		zoom = overview_size

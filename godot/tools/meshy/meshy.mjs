@@ -91,6 +91,16 @@ const KINDS = {
 			"whole object fully visible and centered, three-quarter view from front-right slightly above, " +
 			"plain white background, no text overlay, game asset",
 	},
+	// Daily-game villains (snake_trail.gd's monster): rigged like the guardians,
+	// but menacing instead of cute. Same clip ids as the guardians.
+	monsters: {
+		out: "monsters_src", polycount: 10000, rig: true,
+		actions: { idle: 0, attack: 125, hit: 178, leap: 86 },
+		style: "stylized cartoon villain creature for a mobile game, menacing and mean, standing upright on two legs in a T-pose " +
+			"with arms spread out to the sides and legs slightly apart, clearly separated arms and legs, empty open clawed hands, " +
+			"no props, no weapons, no fire, smoke, slime drips, sparks or other effects, chunky stylized shapes, rich saturated colors, " +
+			"full body visible and centered, front view facing the camera, plain white background, no text overlay, game asset",
+	},
 	crafts: {
 		out: "crafts_src", polycount: 5000, refs: ["0", "1", "2"],
 		style: "stylized toy spaceship, chunky simplified shapes, bright soft colors, whole object fully visible and centered, " +

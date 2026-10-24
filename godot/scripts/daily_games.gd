@@ -8,7 +8,7 @@ extends Node3D
 #   skyhop   - one-tap flight through gaps high above the city (sky_hop.gd).
 #   slide    - a turn-based sliding puzzle on a block above the city (slide_puzzle.gd).
 #   siege    - the saucer shoots down the army's air force (sky_siege.gd).
-#   snake    - fruit brings pets to follow the saucer; a monster chomps the line (snake_trail.gd).
+#   snake    - catch roaming pets to grow a line; monsters bite it (snake_trail.gd).
 #   mole     - moles pop out of manholes for a moment: whack-a-mole (mole_patch.gd).
 #   redlight - red light, green light: eat on green, stand still on red (red_light.gd).
 # The landmark, its guardian and the defence squads sit the round out. game.gd
@@ -197,7 +197,6 @@ func build(game, type: String, value: int) -> void:
 			siege.build(value)
 		"snake":
 			snake.build(game, value)
-			prey.append_array(snake.fruits)
 		"mole":
 			moles.build(game, value)
 			prey.append_array(moles.moles)
@@ -261,7 +260,7 @@ func reset(game) -> void:
 	# The siege's planes and shots are its own nodes: clear them in other games.
 	if kind == "siege": siege.reset(game.campaign.checkpoint("siege"))
 	else: siege.clear()
-	# So are the snake's tail, the manholes and the light ring.
+	# So are the snake's animals and monsters, the mole hills and the lights.
 	if kind == "snake": snake.reset(game)
 	else: snake.clear()
 	if kind == "mole": moles.reset(game)
@@ -298,7 +297,7 @@ func update(game, dt: float) -> void:
 		count = siege.run_cleared()
 	elif kind == "snake":
 		snake.update(game, dt)
-		count = snake.length
+		count = snake.line.size()
 	elif kind == "mole":
 		moles.update(game, dt)
 	elif kind == "redlight":
@@ -536,10 +535,6 @@ func caught(game, item: Dictionary) -> void:
 		count = hunt.finds
 		return
 	if not item.get("prey", false): return
-	if kind == "snake":
-		snake.caught(game, item)
-		count = snake.length
-		return
 	if kind == "mole":
 		count += moles.caught(game, item)
 		return
@@ -602,6 +597,7 @@ func dots() -> Array:
 	if kind == "findcow" or kind == "slide": return list
 	if kind == "siege": return siege.dots()
 	if kind == "mole": return moles.dots()
+	if kind == "snake": return snake.dots()
 	for item in prey + sky:
 		if item.get("prey", false) and Traffic.is_active(item) and item.get("falling", 0.0) <= 0:
 			list.append(Vector2(item.position.x, item.position.z))
@@ -616,6 +612,10 @@ func note() -> String:
 	if kind == "snake": return snake.note()
 	if kind == "redlight": return light.note()
 	return hunt.note() if kind == "findcow" else ""
+
+# Camera zoom: the snake garden is seen closer up.
+func zoom_scale() -> float:
+	return SnakeTrail.ZOOM if kind == "snake" else 1.0
 
 # Movement scale: a wrong cow is chewed slowly; carried gold weighs the hole down.
 func speed_scale() -> float:

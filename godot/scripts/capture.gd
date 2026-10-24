@@ -174,11 +174,43 @@ func run(game, campaign_mode: bool) -> void:
 		g.started = true
 		g.bot_input = Vector2(1, 0.3)
 		await frames(50)
-		g.daily.snake.length = 8
-		g.daily.snake.monster_wait = 0.0
-		g.daily.snake.monster_at = g.daily.snake.orb_at(7) + Vector3(-3.0, 0, 1.5)
+		# A line of eight pets with a monster closing in on it.
+		var snake = g.daily.snake
+		for i in 8:
+			var pet = snake.take_critter(g)
+			pet.visible = true
+			pet.position = snake.orb_at(snake.line.size())
+			snake.line.append(pet)
+		var monster: Dictionary = snake.monsters[0]
+		monster.wait = 0.0
+		monster.holder.position = snake.orb_at(7) + Vector3(-3.0, 0.16, 1.5)
 		await frames(20)
 		await snapshot("classic-snake")
+		# Pets roaming and running, close up (classic-pets.png).
+		g.bot_input = Vector2.ZERO
+		monster.wait = 99.0
+		var near = snake.roamers[0]
+		for i in snake.roamers.size():
+			var roamer = snake.roamers[i]
+			roamer.position = near.position + Vector3((i % 4)*1.3 - 2.0, 0, (i/4)*1.3)
+			snake.roam(roamer, "wander", 9.0, Vector3(1, 0, 0.4).normalized())
+		# The saucer parks just out of their alert range while the camera settles.
+		snake.heading = Vector2.ZERO
+		g.hole_position = near.position + Vector3(0, 0, 6.5)
+		g.hole_position.y = 0
+		await frames(60)
+		await snapshot("classic-pets")
+		# Each harder garden (classic-garden-1.png ... classic-garden-3.png).
+		for garden in [1, 2, 3]:
+			g.go_menu()
+			g.campaign.daily = {}
+			g.campaign.checkpoints = {"snake":{"at":garden, "lap":0}}
+			g.start_daily()
+			g.started = true
+			g.bot_input = Vector2(0, -1)
+			await frames(40)
+			await snapshot("classic-garden-%d" % garden)
+		g.campaign.checkpoints = {}
 		g.bot_input = Vector2.ZERO
 		g.go_menu()
 		g.campaign.daily = {}

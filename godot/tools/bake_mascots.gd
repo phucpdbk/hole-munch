@@ -12,6 +12,8 @@ extends SceneTree
 # Army foot units (army_soldiers.gd) bake the same way from assets/soldiers_src into
 # assets/soldiers/, with 512 px textures since up to two dozen share the screen:
 #   Godot --headless --path . --script res://tools/bake_mascots.gd -- soldiers [vn_soldier]
+# Daily-game monsters bake from assets/monsters_src into assets/mascots/:
+#   Godot --headless --path . --script res://tools/bake_mascots.gd -- monsters [gobbler]
 const MeshyBake = preload("res://tools/meshy_bake.gd")
 const LOOPING := ["idle", "walk", "run", "alert", "aim", "shoot", "panic"]
 var SOURCE := "res://assets/mascots_src/"
@@ -25,6 +27,11 @@ func _initialize() -> void:
 		SOURCE = "res://assets/soldiers_src/"
 		TARGET = "res://assets/soldiers/"
 		texture_size = 512
+	# Daily-game villains (the snake's monster) come from their own Meshy folder but
+	# load like guardians, through mascot_rig.gd.
+	elif not ids.is_empty() and ids[0] == "monsters":
+		ids.pop_front()
+		SOURCE = "res://assets/monsters_src/"
 	if ids.is_empty():
 		for file in DirAccess.get_files_at(SOURCE):
 			if file.get_extension() == "glb" and not file.contains("@"): ids.append(file.get_basename())
