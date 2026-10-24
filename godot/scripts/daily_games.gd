@@ -71,7 +71,7 @@ const DROP_RANGE := 10.0
 # carried, slowing the hole (CARRY_SLOW a point, down to CARRY_FLOOR), until
 # it is banked in the BANK_RADIUS ring on the plaza; the rival hole touching
 # the player takes everything carried (a STEAL_COOLDOWN apart).
-const GOLD := [[0, 0.32, 1, 20], [1, 0.95, 3, 7], [2, 1.7, 8, 3]]
+const GOLD := [[0, 0.32, 1, 20], [1, 0.55, 3, 7], [2, 0.75, 8, 3]]
 # Mini-games whose hole (and the gold rival's) never grows; every prey above
 # fits a starting hole (Campaign.START_RADIUS*EAT_RATIO ~ 0.8).
 const FIXED_HOLE := ["stampede", "coinrain", "goldrush", "snake", "mole", "redlight"]

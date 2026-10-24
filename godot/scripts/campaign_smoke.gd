@@ -587,6 +587,9 @@ func check_daily_games(g) -> void:
 	var food: Dictionary = g.items.filter(func(item): return item.kind == "cone")[0]
 	g.swallow(food)
 	check(g.daily.carried == 3 and g.daily.count == 0 and g.daily.speed_scale() < 1.0, "gold is carried (a chest is worth 3), slows the hole and scores nothing yet")
+	check(is_equal_approx(g.target_radius, float(g.stats.start_radius)), "the gold rush hole keeps its starting size")
+	var gold_limit: float = Campaign.START_RADIUS*g.EAT_RATIO
+	check(g.items.filter(func(item): return item.kind == "gold" and item.radius > gold_limit).is_empty(), "every treasure fits a starting hole")
 	g.rival.position = g.hole_position + Vector3(9, 0, 0)
 	g.hole_position = g.daily.bank_at()
 	g.daily.update_gold(g, 0.02)
