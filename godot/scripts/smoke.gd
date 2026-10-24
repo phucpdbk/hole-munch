@@ -271,6 +271,19 @@ func check_guardian() -> void:
 	g.hole_position.y = 0
 	for i in 60: g.step(0.02, Vector2.ZERO)
 	check(g.mechanics.mascot.state.begins_with("flee") and guardian.position.x < home.x - 0.5, "an edible guardian runs from the hole")
+	# Cornered, it still strikes back once the grace is over.
+	g.defense.grace = 0.0
+	g.mechanics.mascot.cooldown = 0.0
+	g.hole_position = Vector3(guardian.position.x + guardian.radius + g.radius + 1.0, 0, guardian.position.z)
+	var struck := false
+	for i in int((g.mechanics.mascot.WINDUP + 0.6)/0.02):
+		g.step(0.02, Vector2.ZERO)
+		struck = struck or g.defense.strikes.any(func(s): return s.source == guardian)
+	check(struck, "an edible guardian still strikes back between its sprints")
+	# The aim leads a hole that keeps its course.
+	g.hole_velocity = Vector3(6.0, 0, 0)
+	var ahead: Vector3 = g.mechanics.mascot.predict(g)
+	check(ahead.x > g.hole_position.x + 2.0 or ahead.x >= g.layout.move_x - 0.01, "the guardian leads a moving hole")
 	g.mechanics.mascot.animate(0.1)
 	check(g.mechanics.mascot.rig.scale.y > 0.5, "the guardian animates")
 	check_guardian_fight()
@@ -307,6 +320,17 @@ func check_guardian_fight() -> void:
 	g.hole_position.y = 0
 	for i in 60: g.step(0.02, Vector2.ZERO)
 	check(mascot.state == "hunt" and guardian.position.x > home.x + 1.0, "the guardian leaves the landmark to hunt a nearby hole")
+	# After the grace it comes for a hole anywhere in the city.
+	g.defense.grace = 0.0
+	g.hole_position = Vector3(-g.layout.move_x + 1.0, 0, -g.layout.move_z + 1.0)
+	var far_before := Vector2(guardian.position.x - g.hole_position.x, guardian.position.z - g.hole_position.z).length()
+	for i in 175: g.step(0.02, Vector2.ZERO)
+	var far_after := Vector2(guardian.position.x - g.hole_position.x, guardian.position.z - g.hole_position.z).length()
+	check(mascot.state != "patrol" and far_after < far_before - 12.0, "the guardian hunts a hole across the city (%.0f -> %.0f)" % [far_before, far_after])
+	g.defense.grace = 99.0
+	g.hole_position = home + Vector3(12.0, 0, 0)
+	g.hole_position.y = 0
+	for i in 60: g.step(0.02, Vector2.ZERO)
 	g.update_hud()
 	check(g.hud.guardian_max == mascot.HP and g.minimap_data().has("guardian"), "the HUD shows the guardian's hearts and the minimap its position")
 	check_guardian_streets(mascot, guardian)

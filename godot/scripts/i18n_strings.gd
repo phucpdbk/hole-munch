@@ -106,7 +106,7 @@ const S := {
 	"ate_rival": ["NUỐT HỐ ĐỐI THỦ! +%d", "RIVAL SWALLOWED! +%d", "¡RIVAL DEVORADO! +%d", "RIVAL DEVORADO! +%d", "RIVAL AVALÉ ! +%d", "SAINGAN DITELAN! +%d"],
 	"combo_time": ["COMBO %d · +%d GIÂY", "COMBO %d · +%d S", "COMBO %d · +%d S", "COMBO %d · +%d S", "COMBO %d · +%d S", "KOMBO %d · +%d DTK"],
 	"bigger": ["LỚN HƠN!", "BIGGER!", "¡MÁS GRANDE!", "MAIOR!", "PLUS GROS !", "MAKIN BESAR!"],
-	"hit": ["TRÚNG ĐÒN · −2 GIÂY · CO LẠI", "HIT · −2 S · SHRUNK", "¡IMPACTO! · −2 S", "ATINGIDO · −2 S", "TOUCHÉ · −2 S", "KENA · −2 DTK · MENGECIL"],
+	"hit": ["TRÚNG ĐÒN · −3 GIÂY · CO LẠI", "HIT · −3 S · SHRUNK", "¡IMPACTO! · −3 S", "ATINGIDO · −3 S", "TOUCHÉ · −3 S", "KENA · −3 DTK · MENGECIL"],
 	"endless_next": ["THÀNH PHỐ %d · +%d GIÂY", "CITY %d · +%d S", "CIUDAD %d · +%d S", "CIDADE %d · +%d S", "VILLE %d · +%d S", "KOTA %d · +%d DTK"],
 	"shield_down": ["KHIÊN ĐÃ VỠ!", "SHIELD DOWN!", "¡ESCUDO ROTO!", "ESCUDO QUEBRADO!", "BOUCLIER BRISÉ !", "PERISAI HANCUR!"],
 	"bomb_stun": ["BÙM! CHOÁNG · −3 GIÂY", "BOOM! STUNNED · −3 S", "¡BUM! ATURDIDO · −3 S", "BUM! ATORDOADO · −3 S", "BOUM ! SONNÉ · −3 S", "BUM! PUSING · −3 DTK"],

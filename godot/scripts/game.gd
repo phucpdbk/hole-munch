@@ -1506,7 +1506,7 @@ func update_rival(dt: float) -> void:
 		for item in rival.update(dt, items, items[boss_index], hole_position, radius):
 			start_fall(item, rival.position)
 			item.sink = "rival"
-			rival.grow(bite_size(item))
+			if not fixed_hole(): rival.grow(bite_size(item))
 	rival.position = features.collide(rival.position, rival.radius, EAT_RATIO, rival.heading)
 	if rival.swallowed_by(hole_position, radius):
 		eat_rival()
@@ -1641,7 +1641,7 @@ func swallow(item: Dictionary) -> void:
 	grow(bite_size(item))
 
 func grow(bite_radius: float) -> void:
-	if countryside: return
+	if countryside or fixed_hole(): return
 	target_radius = minf(MAX_RADIUS, sqrt(target_radius*target_radius + bite_radius*bite_radius*GROWTH))
 	var new_tier := int((target_radius-START_RADIUS)/GROWTH_TIER)
 	if new_tier > tier:
@@ -1652,6 +1652,11 @@ func grow(bite_radius: float) -> void:
 		growth_milestone = target_radius/START_RADIUS
 		add_floater(hole_position, I18n.t("bigger"), true)
 		fx.ripple(hole_position, target_radius, Color("b7a2f1"))
+
+# The duck, coin and gold mini-games keep the starting hole all round: the
+# chase is the game, not getting big enough to vacuum the map.
+func fixed_hole() -> bool:
+	return run_kind == "daily" and daily.kind in DailyGames.FIXED_HOLE
 
 # Saucer skills play in campaign and endless cities only.
 func skills_on() -> bool:
@@ -1691,6 +1696,12 @@ func take_hit(from := Vector3.INF) -> bool:
 	saucer_wobble = 1.0
 	fx.shake = maxf(fx.shake, 0.55)
 	var source: Dictionary = defense.last_hit.get("source", {})
+	# A guardian's blow lands with a burst in its attack colour and a harder shake.
+	if not source.is_empty() and source == mechanics.guardian and mechanics.mascot != null:
+		fx.ripple(hole_position, radius*1.8, mechanics.mascot.attack_color())
+		fx.puff(hole_position, radius*0.8, radius)
+		fx.shake = maxf(fx.shake, 0.85)
+		sfx.play("boss")
 	if from == Vector3.INF: from = source.get("position", hole_position - hole_velocity)
 	mechanics.knock_back(hole_position - from, HIT_KNOCK)
 	return true

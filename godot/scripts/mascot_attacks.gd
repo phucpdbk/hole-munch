@@ -17,6 +17,10 @@ const BOLT_SEGMENTS := 7
 const SPLASHES := 3
 const LEAP_TIME := 1.1
 const CHARGE_SPEED := 9.0
+# Seconds a strike zone shows before it lands (scaled by the level's defence).
+const WARNING := 0.9
+# The main zone grows with the hole, so a big hole cannot shrug it off on its rim.
+const ZONE_SHARE := 0.7
 
 var beam: MeshInstance3D
 var bolt: Array[MeshInstance3D] = []
@@ -45,32 +49,33 @@ static func launch(mascot, game, aim: Vector3) -> String:
 	direction = direction.normalized() if direction.length() > 0.01 else Vector3.BACK
 	var side := Vector3(-direction.z, 0, direction.x)
 	var muzzle: Vector3 = mouth(item, direction)
-	var warning: float = 0.9*defense.warning_scale
+	var warning: float = WARNING*defense.warning_scale
+	var grown: float = game.radius*ZONE_SHARE
 	match kind:
 		"fire":
 			# A flame jet at the saucer, licking the ground on both sides of it.
-			defense.add_strike(item, muzzle, aim, 1.5, warning, true, color, "fire")
+			defense.add_strike(item, muzzle, aim, maxf(1.5, grown), warning, true, color, "fire")
 			for offset in [-1.6, 1.6]:
 				defense.add_strike(item, muzzle, aim + side*offset - direction*0.6, 1.0, warning + 0.15, false, color, "flame")
 		"water":
 			# A water cannon at the saucer; the spray then rains down around it.
-			defense.add_strike(item, muzzle, aim, 1.4, warning, true, color, "water")
+			defense.add_strike(item, muzzle, aim, maxf(1.4, grown), warning, true, color, "water")
 			for i in SPLASHES:
 				var angle := i*TAU/SPLASHES + randf()*0.6
 				defense.add_strike(item, aim + Vector3(0, 5.0, 0), aim + Vector3(cos(angle), 0, sin(angle))*2.2, 0.9, warning + 0.55, false, color)
 		"lightning":
 			# A bolt straight up into the saucer, with a smaller arc jumping beside it.
-			defense.add_strike(item, muzzle, aim, 1.3, warning, true, color, "lightning")
+			defense.add_strike(item, muzzle, aim, maxf(1.3, grown), warning, true, color, "lightning")
 			defense.add_strike(item, muzzle, aim + side*(2.0 if randf() < 0.5 else -2.0), 1.0, warning + 0.3, false, color, "lightning")
 		"leap":
 			# Jump up to the saucer's height over the zone and ram it at the peak.
 			var air_time := LEAP_TIME*0.5
-			defense.add_strike(item, item.position, aim, item.radius*0.7 + 0.8, air_time, true, color, "leap")
+			defense.add_strike(item, item.position, aim, maxf(item.radius*0.7 + 0.8, grown), air_time, true, color, "leap")
 			game.sfx.play("shot")
 			return "leap"
 		"charge":
 			var travel: float = maxf(0.4, flat(aim - item.position).length()/CHARGE_SPEED)
-			defense.add_strike(item, muzzle, aim, item.radius*0.7 + 0.5, travel + 0.15, true, color)
+			defense.add_strike(item, muzzle, aim, maxf(item.radius*0.7 + 0.5, grown), travel + 0.15, true, color)
 			game.sfx.play("shot")
 			return "charge"
 		_:
@@ -78,7 +83,7 @@ static func launch(mascot, game, aim: Vector3) -> String:
 			var facing := atan2(direction.z, direction.x)
 			for i in 6:
 				var angle := facing + i*TAU/6.0
-				defense.add_strike(item, item.position + Vector3(0, 0.4, 0), item.position + Vector3(cos(angle), 0, sin(angle))*(item.radius + 1.8), 1.6, warning, true, color)
+				defense.add_strike(item, item.position + Vector3(0, 0.4, 0), item.position + Vector3(cos(angle), 0, sin(angle))*(item.radius + 1.8), maxf(1.6, grown), warning, true, color)
 			mascot.squash = 1.0
 			game.fx.ripple(item.position, item.radius + 1.0, color)
 	game.fx.puff(muzzle, 0.6, 1.2)

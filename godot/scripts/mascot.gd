@@ -7,7 +7,7 @@ extends Node3D
 # hole closes in on the landmark. A long detour round a block makes it hop over
 # the roofs to land beside the hole and strike at once. It keeps circling at its
 # style's range, leads a moving saucer, and winds up and attacks (mascot_attacks.gd); once
-# the hole can eat it, it runs off in short sprints instead. It takes three bites:
+# the hole can eat it, it runs off in short sprints and strikes back between them. It takes three bites:
 # the first two throw it out of the hole, so the fight cannot be skipped by a passing sweep.
 # Attacks are telegraphed defence strikes, so hits go through game.take_hit().
 # The game sets this node's transform from the guardian item; the look and the
@@ -26,8 +26,11 @@ const HUNT_RANGE := 22.0
 const LOSE_RANGE := 32.0
 const WALK_SPEED := 2.4
 const HUNT_SPEED := 4.4
-# Seconds of the saucer's motion an attack leads it by.
-const LEAD := 0.6
+# The aim follows the hole through the wind-up and leads it by this share of the
+# strike's warning, so a hole that keeps going straight is hit and one that turns
+# or stops dodges. The lead never reaches further than MAX_LEAD.
+const LEAD := 0.85
+const MAX_LEAD := 6.0
 # Distance each style likes to fight from; it circles the hole at about that range.
 const STANDOFF := {"fire":5.5, "water":5.5, "lightning":6.0, "stomp":1.0, "charge":6.5, "leap":6.5}
 const CIRCLE_SPEED := 0.7
@@ -239,7 +242,7 @@ func think(game, dt: float) -> void:
 	var distance := to_hole.length()
 	moving = 0.0
 	var edible: bool = item.radius <= game.radius*game.EAT_RATIO
-	var busy := state in ["charge", "leap", "thrown", "cling", "dropped", "hop"]
+	var busy := state in ["windup", "recover", "charge", "leap", "thrown", "cling", "dropped", "hop"]
 	if edible and not busy and not state.begins_with("flee"):
 		state = "flee_rest"
 		timer = 0.4
@@ -247,6 +250,7 @@ func think(game, dt: float) -> void:
 		"guard", "patrol", "hunt", "home": roam(game, dt, to_hole, distance)
 		"windup":
 			timer -= dt
+			aim = predict(game)
 			face(aim - item.position)
 			if timer <= 0: release(game)
 		"charge":
@@ -257,7 +261,7 @@ func think(game, dt: float) -> void:
 		"recover":
 			timer -= dt
 			if timer <= 0:
-				state = "hunt"
+				state = "flee_rest" if edible else "hunt"
 				cooldown = COOLDOWN*game.defense.cooldown_scale
 		"thrown": thrown(game, dt)
 		"hop": hop(game, dt)
@@ -270,13 +274,19 @@ func think(game, dt: float) -> void:
 				state = "hunt"
 				cooldown = 1.0
 			timer -= dt
-			if timer <= 0 and distance < ALERT + item.radius:
+			# Cornered, it still fights back between its sprints.
+			cooldown -= dt
+			if strike_ready(game, distance):
+				face(to_hole)
+				wind_up(game)
+			elif timer <= 0 and distance < ALERT + item.radius:
 				state = "flee"
 				timer = FLEE_DASH
 				heading = inward(game, -to_hole/maxf(distance, 0.001))
 				waypoint = Roads.project(game.layout, item.position + heading*FLEE_REACH)
 		"flee":
 			timer -= dt
+			cooldown -= dt
 			road_walk(game, waypoint, FLEE_SPEED, dt)
 			if timer <= 0:
 				state = "flee_rest"
@@ -290,8 +300,9 @@ func roam(game, dt: float, to_hole: Vector3, distance: float) -> void:
 	var boss: Dictionary = game.items[game.boss_index]
 	var threat: float = flat(game.hole_position - boss.position).length() - game.boss_radius
 	var away_from_home := flat(home - item.position).length()
+	# Once the opening grace is over it hunts the hole wherever it is in the city.
 	if threat < GUARD_REACH and away_from_home > RANGE*0.5: state = "home"
-	elif distance < HUNT_RANGE: state = "hunt"
+	elif distance < HUNT_RANGE or game.defense.grace <= 0: state = "hunt"
 	elif distance > LOSE_RANGE: state = "patrol"
 	hop_cooldown -= dt
 	match state:
@@ -302,13 +313,24 @@ func roam(game, dt: float, to_hole: Vector3, distance: float) -> void:
 			road_walk(game, waypoint, WALK_SPEED, dt)
 	if state == "hop": return
 	if distance < HUNT_RANGE: face(to_hole)
-	if cooldown <= 0 and distance < RANGE + item.radius and game.defense.grace <= 0: wind_up(game)
+	if strike_ready(game, distance): wind_up(game)
+
+func strike_ready(game, distance: float) -> bool:
+	return cooldown <= 0 and distance < RANGE + item.radius and game.defense.grace <= 0
 
 func wind_up(game) -> void:
 	state = "windup"
 	timer = WINDUP
-	aim = game.hole_position + game.hole_velocity*LEAD
-	aim.y = 0
+	aim = predict(game)
+
+# Where the hole will be when the strike lands, if it keeps its course.
+func predict(game) -> Vector3:
+	var warning: float = MascotAttacks.WARNING*game.defense.warning_scale
+	var ahead: Vector3 = flat(game.hole_velocity*warning*LEAD).limit_length(MAX_LEAD)
+	var target: Vector3 = flat(game.hole_position) + ahead
+	target.x = clampf(target.x, -game.layout.move_x, game.layout.move_x)
+	target.z = clampf(target.z, -game.layout.move_z, game.layout.move_z)
+	return target
 
 # Circle the hole at the style's range along the shortest street route, or hop
 # over the roofs when the streets go the long way round.
@@ -318,6 +340,10 @@ func hunt(game, dt: float, to_hole: Vector3, distance: float) -> void:
 	var back := -to_hole/distance if distance > 0.01 else Vector3.BACK
 	var spot: Vector3 = game.hole_position + back.rotated(Vector3.UP, sin(circle)*CIRCLE_SWING)*standoff
 	spot.y = home.y
+	# A hole far across the city is closed on with long hops over the roofs.
+	if hop_cooldown <= 0.0 and distance >= HOP_REACH:
+		start_hop(game, item.position + to_hole/distance*minf(HOP_REACH, distance - standoff))
+		return
 	if hop_cooldown <= 0.0 and distance < HOP_REACH and distance > standoff + 2.0 \
 			and Roads.plan(game.layout, item.position, game.hole_position).length > distance*HOP_DETOUR:
 		start_hop(game, spot)
