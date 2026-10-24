@@ -1,67 +1,86 @@
 extends Node3D
 
-# Daily mini-game "beam" (daily_games.gd), lift and drop: a board of pads on
-# the plaza of a toy depot (beam_yard.gd) shows a ghost of the toy each pad
-# wants, one of SHAPES shapes in one of COLORS. The toys sit in piles round
-# the depot. Tap (or Space) over a pile and the saucer's tractor beam lifts
-# its top toy; carry it over the pad that wants it and tap again to drop it
-# in. A wrong or full pad throws the toy back up and costs WRONG_COST seconds.
-# Dropped anywhere else a toy lands on the ground, or on a pile in reach up to
-# MAX_STACK high, so a toy buried in a pile is dug out by moving the ones on
-# top. A full board adds BOARD_BONUS seconds and the next, bigger board
-# (BOARDS) comes up, with decoys no pad wants and taller piles.
+# Daily mini-game "beam" (daily_games.gd), landmarks home: the map is the
+# whole world (beam_yard.gd) and each board pins a few cities on it, each pin
+# with the city's name. Their landmarks float out at sea round the saucer,
+# with decoys whose city has no pin. Tap (or Space) over a landmark and the
+# saucer's tractor beam lifts it; carry it to its city's pin and tap again to
+# set it down. A wrong pin throws it back up, costs WRONG_COST seconds and
+# makes the right pin blink for HINT_TIME. Dropped anywhere else a landmark
+# stays where it lands, at least LOOSE_GAP from the next. Pins only light up
+# under the saucer, never green or red, so the map must be known (or learnt
+# from the blinks). A full board adds BOARD_BONUS seconds and the next, bigger
+# board (BOARDS) comes up with new cities.
 const I18n = preload("res://scripts/i18n.gd")
-const SHAPES := 4
-const COLORS := [Color("ff5a5a"), Color("ffd23f"), Color("3a8dff"), Color("3ddc84")]
-# [columns, rows, decoys, tallest pile] for each board; the last repeats.
-const BOARDS := [[2, 2, 0, 1], [3, 2, 2, 2], [3, 3, 3, 2], [4, 3, 4, 3]]
-const PAD := 2.2
-const TOY := 0.5
-const GROUND_Y := 0.16
-const PAD_TOP := 0.25
-const MAX_STACK := 3
-# How far from the hole's centre a pile can be beamed from or dropped on.
+const Campaign = preload("res://scripts/campaign.gd")
+const Landmarks = preload("res://scripts/landmarks.gd")
+const UiStyle = preload("res://scripts/ui_style.gd")
+# [pins, decoys] for each board; the last repeats.
+const BOARDS := [[3, 0], [4, 1], [5, 2], [6, 2]]
+# Pinned cities stand at least this far apart, and decoys come from cities at
+# least this far from every pin (so Hanoi's second landmark is never a decoy
+# next to Hanoi's pin).
+const PIN_GAP := 5.0
+const PIN_RADIUS := 0.8
+const PIN_TOP := 0.14
+# A landmark fits a box this wide across and this tall.
+const LANDMARK_SIZE := Vector2(1.5, 1.7)
+# How far from the hole's centre a landmark can be beamed from or a pin hit.
 const REACH := 1.3
-# Piles lie this far from the board, at least PILE_GAP apart.
-const SPREAD := Vector2(7.0, 16.0)
-const PILE_GAP := 3.2
-const CARRY_HEIGHT := 2.4
+# Loose landmarks float this far from the saucer, at least LOOSE_GAP apart
+# and SEA_CLEAR off any coast.
+const SPREAD := Vector2(4.0, 14.0)
+const LOOSE_GAP := 2.2
+const SEA_CLEAR := 0.9
+const CARRY_HEIGHT := 1.7
 const LIFT_TIME := 0.35
 const DROP_TIME := 0.3
 const WRONG_COST := 2.0
+const HINT_TIME := 2.0
 const BOARD_BONUS := 6.0
 const BOARD_PAUSE := 1.0
-const CARRY_SLOW := 0.85
+const CARRY_SLOW := 0.9
+# The camera stands further back to show more of the map.
+const ZOOM := 1.3
 # A touch let go this soon, this close to where it began, is a tap.
 const TAP_TIME := 0.3
 const TAP_MOVE := 14.0
+const PLINTH := Color("fff4e0")
+const HOVER := Color("9fe8ff")
+const BLINK := Color("ff9a3c")
+const GOLD := Color("ffd23f")
 
 var rng := RandomNumberGenerator.new()
 var seed_value := 0
 var board := 0
-# {at, shape, color, tile, ghost, toy ({} until filled)}.
-var pads: Array = []
-# {at, stack (bottom first)}.
-var piles: Array = []
-# {node, shape, color}: every toy of the board, wherever it is.
-var toys: Array = []
+# {at, id, city, plinth, stick, label, landmark ({} until filled), hint}.
+var pins: Array = []
+# {node, id, at}: every landmark of the board, wherever it is.
+var landmarks: Array = []
+# The landmarks lying on the map, free to be beamed up.
+var loose: Array = []
 var carried := {}
-# "lift" or "drop" while the beam moves a toy, else "".
+# "lift" or "drop" while the beam moves a landmark, else "".
 var motion := ""
 var motion_t := 0.0
 var motion_from := Vector3.ZERO
 var motion_to := Vector3.ZERO
-var target_pad := {}
-var target_pile := {}
+var target_pin := {}
 var placed := 0
 var next_board := -1.0
 var clock := 0.0
 var press_at := Vector2.ZERO
 var press_time := -1.0
-var toy_meshes := {}
-var ghost_meshes := {}
-var ghost_materials: Array[StandardMaterial3D] = []
+# Landmarks pinned earlier this round, not pinned again while others are left.
+var used: Array = []
+# {mesh, material, scale, offset} per landmark id.
+var looks := {}
 var column: MeshInstance3D
+var plinth_mesh := CylinderMesh.new()
+var stick_mesh := CylinderMesh.new()
+var stand_mesh := CylinderMesh.new()
+var stand_material := StandardMaterial3D.new()
+var stick_material := StandardMaterial3D.new()
 
 func _ready() -> void:
 	column = MeshInstance3D.new()
@@ -74,7 +93,17 @@ func _ready() -> void:
 	column.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	column.visible = false
 	add_child(column)
-	for color in COLORS: ghost_materials.append(glow(Color(color, 0.58)))
+	plinth_mesh.top_radius = PIN_RADIUS
+	plinth_mesh.bottom_radius = PIN_RADIUS*1.08
+	plinth_mesh.height = PIN_TOP
+	stick_mesh.top_radius = 0.05
+	stick_mesh.bottom_radius = 0.05
+	stick_mesh.height = 1.3
+	stand_mesh.top_radius = 0.72
+	stand_mesh.bottom_radius = 0.78
+	stand_mesh.height = 0.1
+	stand_material.albedo_color = Color("e9eef2")
+	stick_material.albedo_color = Color("e5566e")
 
 static func glow(color: Color) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
@@ -92,49 +121,43 @@ func reset(game) -> void:
 	placed = 0
 	next_board = -1.0
 	press_time = -1.0
-	start_board(game)
+	used.clear()
+	# The hole is put back on its spawn only after the daily resets.
+	start_board(game, game.SPAWN)
 
 func clear() -> void:
 	clear_board()
 	column.visible = false
 
 func clear_board() -> void:
-	for toy in toys: toy.node.queue_free()
-	for pad in pads: pad.tile.queue_free()
-	toys.clear()
-	pads.clear()
-	piles.clear()
+	for landmark in landmarks: landmark.node.queue_free()
+	for pin in pins: pin.plinth.queue_free()
+	landmarks.clear()
+	pins.clear()
+	loose.clear()
 	carried = {}
 	motion = ""
-	target_pad = {}
-	target_pile = {}
+	target_pin = {}
 
 # --- boards ------------------------------------------------------------------------
 
 func spec() -> Array:
 	return BOARDS[mini(board, BOARDS.size() - 1)]
 
-func start_board(game) -> void:
+func start_board(game, near: Vector3) -> void:
 	clear_board()
-	var cols: int = spec()[0]
-	var rows: int = spec()[1]
-	var looks: Array = []
-	for shape in SHAPES:
-		for color in COLORS.size(): looks.append(Vector2i(shape, color))
-	shuffle(looks)
-	for i in cols*rows:
-		var at := Vector3((i % cols - (cols - 1)/2.0)*PAD, GROUND_Y, (i / cols - (rows - 1)/2.0)*PAD)
-		pads.append(make_pad(game, at, looks[i]))
-	var wanted: Array = looks.slice(0, cols*rows + int(spec()[2]))
+	var cities: Array = game.countryside.cities
+	var pinned := pick_pins(cities, int(spec()[0]))
+	for city in pinned: pins.append(make_pin(city))
+	var decoys: Array = cities.filter(func(city): return pins.all(func(pin): return flat_gap(pin.at, city.at) >= PIN_GAP))
+	shuffle(decoys)
+	var wanted: Array = pinned + decoys.slice(0, int(spec()[1]))
 	shuffle(wanted)
-	while not wanted.is_empty():
-		var pile := {"at":pile_spot(game), "stack":[]}
-		piles.append(pile)
-		for k in mini(wanted.size(), rng.randi_range(1, spec()[3])):
-			var look: Vector2i = wanted.pop_back()
-			var toy := make_toy(game, look)
-			toy.node.position = Vector3(pile.at.x, toy_y(pile.stack.size()), pile.at.z)
-			pile.stack.append(toy)
+	for city in wanted:
+		var landmark := make_landmark(game.models, city.id)
+		landmark.at = sea_spot(game, near)
+		landmark.node.position = landmark.at
+		loose.append(landmark)
 
 func shuffle(list: Array) -> void:
 	for i in range(list.size() - 1, 0, -1):
@@ -143,68 +166,109 @@ func shuffle(list: Array) -> void:
 		list[i] = list[j]
 		list[j] = swap
 
-# A spot round the board, clear of the other piles and of the spawn street.
-func pile_spot(game) -> Vector3:
-	var at := Vector3.ZERO
-	for attempt in 60:
+# Cities at least PIN_GAP apart, those not pinned yet this round first.
+func pick_pins(cities: Array, count: int) -> Array:
+	var fresh: Array = cities.filter(func(city): return not city.id in used)
+	var rest: Array = cities.filter(func(city): return city.id in used)
+	shuffle(fresh)
+	shuffle(rest)
+	var chosen: Array = []
+	for city in fresh + rest:
+		if chosen.size() == count: break
+		if chosen.all(func(other): return flat_gap(other.at, city.at) >= PIN_GAP): chosen.append(city)
+	for city in chosen: used.append(city.id)
+	return chosen
+
+# Open sea round `near`, clear of the pins and the other loose landmarks; the
+# ring widens while no such spot turns up (the saucer may be inland).
+func sea_spot(game, near: Vector3) -> Vector3:
+	var map = game.countryside
+	var at := Vector2(near.x, near.z)
+	for attempt in 160:
 		var angle := rng.randf_range(0, TAU)
-		var reach := rng.randf_range(SPREAD.x, SPREAD.y)
-		at = Vector3(clampf(cos(angle)*reach, -game.layout.move_x, game.layout.move_x), GROUND_Y, clampf(sin(angle)*reach, -game.layout.move_z, game.layout.move_z))
-		if flat_gap(at, game.SPAWN) < PILE_GAP: continue
-		if piles.all(func(pile): return flat_gap(pile.at, at) >= PILE_GAP): break
-	return at
+		var reach := rng.randf_range(SPREAD.x, SPREAD.y + attempt*0.25)
+		at = Vector2(clampf(near.x + cos(angle)*reach, -game.layout.move_x, game.layout.move_x), clampf(near.z + sin(angle)*reach, -game.layout.move_z, game.layout.move_z))
+		if not map.at_sea(at, SEA_CLEAR): continue
+		var spot := Vector3(at.x, 0, at.y)
+		if pins.any(func(pin): return flat_gap(pin.at, spot) < LOOSE_GAP): continue
+		if loose.all(func(other): return flat_gap(other.at, spot) >= LOOSE_GAP): break
+	return Vector3(at.x, map.height_at(at), at.y)
 
-func toy_y(index: int) -> float:
-	return GROUND_Y + TOY + index*TOY*2.0
-
-func make_toy(game, look: Vector2i) -> Dictionary:
-	var node := MeshInstance3D.new()
-	node.mesh = toy_mesh(game.models, look)
-	node.rotation.y = rng.randf_range(0, TAU)
+# A landmark on a little round stand, its origin at the stand's foot.
+func make_landmark(m, id: String) -> Dictionary:
+	var look := landmark_look(m, id)
+	var node := Node3D.new()
+	var stand := MeshInstance3D.new()
+	stand.mesh = stand_mesh
+	stand.material_override = stand_material
+	stand.position.y = 0.05
+	node.add_child(stand)
+	var model := MeshInstance3D.new()
+	model.mesh = look.mesh
+	model.material_override = look.material
+	model.scale = Vector3.ONE*look.scale
+	model.position = look.offset + Vector3(0, 0.1, 0)
+	node.add_child(model)
 	add_child(node)
-	var toy := {"node":node, "shape":look.x, "color":look.y}
-	toys.append(toy)
-	return toy
+	var landmark := {"node":node, "id":id, "at":Vector3.ZERO}
+	landmarks.append(landmark)
+	return landmark
 
-func make_pad(game, at: Vector3, look: Vector2i) -> Dictionary:
-	var tile := MeshInstance3D.new()
-	var slab := BoxMesh.new()
-	slab.size = Vector3(PAD*0.88, 0.1, PAD*0.88)
-	tile.mesh = slab
-	tile.material_override = StandardMaterial3D.new()
-	tile.position = at + Vector3(0, PAD_TOP - GROUND_Y - 0.05, 0)
-	add_child(tile)
-	var ghost := MeshInstance3D.new()
-	if not ghost_meshes.has(look.x): ghost_meshes[look.x] = game.models.bake(toy_parts(game.models, look.x, Color.WHITE))
-	ghost.mesh = ghost_meshes[look.x]
-	ghost.material_override = ghost_materials[look.y]
-	ghost.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	ghost.position = Vector3(0, 0.05 + TOY + 0.15, 0)
-	tile.add_child(ghost)
-	return {"at":at, "shape":look.x, "color":look.y, "tile":tile, "ghost":ghost, "toy":{}}
+# The Meshy bake when there is one, else the primitive model (as the journey
+# map), with the object shader's hole moved far away so nothing is cut.
+func landmark_look(m, id: String) -> Dictionary:
+	if looks.has(id): return looks[id]
+	var material := ShaderMaterial.new()
+	material.shader = m.material.shader
+	material.set_shader_parameter("hole_center", Vector2(1e5, 1e5))
+	material.set_shader_parameter("hole_radius", 0.0)
+	var mesh: ArrayMesh
+	var path := "res://assets/landmarks/%s.res" % id
+	var texture_path := "res://assets/landmarks/%s_albedo.res" % id
+	if ResourceLoader.exists(path) and ResourceLoader.exists(texture_path):
+		mesh = load(path)
+		material.set_shader_parameter("albedo_tex", load(texture_path))
+	else:
+		mesh = m.bake(Landmarks.new().build(m, id))
+	var box := mesh.get_aabb()
+	var k := minf(LANDMARK_SIZE.x/maxf(maxf(box.size.x, box.size.z), 0.01), LANDMARK_SIZE.y/maxf(box.size.y, 0.01))
+	var centre := box.get_center()
+	looks[id] = {"mesh":mesh, "material":material, "scale":k, "offset":Vector3(-centre.x*k, -box.position.y*k, -centre.z*k)}
+	return looks[id]
 
-func toy_mesh(m, look: Vector2i) -> ArrayMesh:
-	var key := look.x*10 + look.y
-	if not toy_meshes.has(key): toy_meshes[key] = m.bake(toy_parts(m, look.x, COLORS[look.y]))
-	return toy_meshes[key]
-
-# A toy about 2*TOY across, centred on its middle: a block, a ball, a cone
-# or a drum.
-static func toy_parts(m, shape: int, color: Color) -> Array:
-	var trim := color.lightened(0.45)
-	match shape:
-		0:
-			return [m.piece("box", Vector3.ZERO, Vector3.ONE*0.92, color),
-				m.piece("box", Vector3(0, 0.47, 0), Vector3(0.62, 0.04, 0.62), trim)]
-		1:
-			return [m.piece("ball", Vector3.ZERO, Vector3.ONE*0.5, color),
-				m.piece("cyl", Vector3.ZERO, Vector3(0.51, 0.12, 0.51), trim)]
-		2:
-			return [m.piece("point", Vector3(0, -0.05, 0), Vector3(0.55, 0.9, 0.55), color),
-				m.piece("ball", Vector3(0, 0.42, 0), Vector3.ONE*0.1, trim)]
-	return [m.piece("cyl", Vector3.ZERO, Vector3(0.46, 0.9, 0.46), color),
-		m.piece("cyl", Vector3(0, 0.4, 0), Vector3(0.5, 0.1, 0.5), trim),
-		m.piece("cyl", Vector3(0, -0.4, 0), Vector3(0.5, 0.1, 0.5), trim)]
+# A round plinth on the city's spot with a map pin and the city's name.
+func make_pin(city: Dictionary) -> Dictionary:
+	var plinth := MeshInstance3D.new()
+	plinth.mesh = plinth_mesh
+	plinth.material_override = StandardMaterial3D.new()
+	plinth.position = city.at + Vector3(0, PIN_TOP/2, 0)
+	add_child(plinth)
+	var stick := MeshInstance3D.new()
+	stick.mesh = stick_mesh
+	stick.material_override = stick_material
+	stick.position.y = 0.65
+	plinth.add_child(stick)
+	var head := MeshInstance3D.new()
+	var ball := SphereMesh.new()
+	ball.radius = 0.2
+	ball.height = 0.4
+	head.mesh = ball
+	head.material_override = stick_material
+	head.position.y = 0.7
+	stick.add_child(head)
+	var label := Label3D.new()
+	label.text = city.city
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.font = UiStyle.font(800)
+	label.font_size = 110
+	label.outline_size = 28
+	label.pixel_size = 0.011
+	label.outline_modulate = Color("1b3048")
+	label.no_depth_test = true
+	label.position.y = 2.5
+	label.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	plinth.add_child(label)
+	return {"at":city.at, "id":city.id, "city":city.city, "plinth":plinth, "stick":stick, "label":label, "landmark":{}, "hint":0.0}
 
 # --- round -------------------------------------------------------------------------
 
@@ -214,22 +278,24 @@ func update(game, dt: float) -> void:
 		next_board -= dt
 		if next_board < 0:
 			board += 1
-			start_board(game)
+			start_board(game, game.hole_position)
 	if motion != "": move_beamed(game, dt)
 	elif not carried.is_empty():
 		carried.node.position = carry_at(game) + Vector3(0, sin(clock*4.0)*0.12, 0)
 		carried.node.rotation.y += dt*1.6
-	var over: Dictionary = pad_under(game.hole_position)
-	for pad in pads:
-		pad.ghost.visible = pad.toy.is_empty()
-		pad.ghost.position.y = 0.05 + TOY + 0.15 + sin(clock*2.5 + pad.at.x)*0.08
-		pad.ghost.rotation.y = clock*0.8
-		var tint := Color("2d3550")
-		if not pad.toy.is_empty(): tint = COLORS[pad.color].darkened(0.35)
-		elif not carried.is_empty() and pad == over: tint = Color("3ddc84") if fits(pad, carried) else Color("ff4d4d")
-		pad.tile.material_override.albedo_color = tint
+	var over: Dictionary = pin_under(game.hole_position)
+	for pin in pins:
+		pin.hint = maxf(0.0, pin.hint - dt)
+		var filled: bool = not pin.landmark.is_empty()
+		var tint := PLINTH
+		if filled: tint = GOLD
+		elif pin.hint > 0 and fmod(pin.hint, 0.4) > 0.2: tint = BLINK
+		elif not carried.is_empty() and pin == over: tint = HOVER
+		pin.plinth.material_override.albedo_color = tint
+		pin.stick.visible = not filled
+		pin.label.modulate = GOLD if filled else Color.WHITE
 	column.visible = not carried.is_empty()
-	var top := CARRY_HEIGHT + 0.8
+	var top := CARRY_HEIGHT + 1.6
 	column.position = Vector3(game.hole_position.x, top/2, game.hole_position.z)
 	column.scale = Vector3(1, top, 1)
 
@@ -247,47 +313,47 @@ func move_beamed(game, dt: float) -> void:
 	motion = ""
 	if not lifting: land(game)
 
-func fits(pad: Dictionary, toy: Dictionary) -> bool:
-	return pad.toy.is_empty() and pad.shape == toy.shape and pad.color == toy.color
+func fits(pin: Dictionary, landmark: Dictionary) -> bool:
+	return pin.landmark.is_empty() and pin.id == landmark.id
 
-# Whether some empty pad still wants a toy of this look.
-func wanted(toy: Dictionary) -> bool:
-	return pads.any(func(pad): return fits(pad, toy))
+# Whether some empty pin still wants this landmark.
+func wanted(landmark: Dictionary) -> bool:
+	return pins.any(func(pin): return fits(pin, landmark))
 
-func pad_under(at: Vector3) -> Dictionary:
-	var best := {}
-	var gap := PAD*0.75
-	for pad in pads:
-		var here := flat_gap(pad.at, at)
-		if here < gap:
-			gap = here
-			best = pad
-	return best
-
-func pile_near(at: Vector3) -> Dictionary:
+func pin_under(at: Vector3) -> Dictionary:
 	var best := {}
 	var gap := REACH
-	for pile in piles:
-		var here := flat_gap(pile.at, at)
+	for pin in pins:
+		var here := flat_gap(pin.at, at)
 		if here < gap:
 			gap = here
-			best = pile
+			best = pin
+	return best
+
+func loose_near(at: Vector3) -> Dictionary:
+	var best := {}
+	var gap := REACH
+	for landmark in loose:
+		var here := flat_gap(landmark.at, at)
+		if here < gap:
+			gap = here
+			best = landmark
 	return best
 
 static func flat_gap(a: Vector3, b: Vector3) -> float:
 	return Vector2(a.x - b.x, a.z - b.z).length()
 
-# A tap lifts the top toy of the pile under the hole, or drops the toy carried.
+# A tap lifts the landmark under the hole, or drops the one carried.
 func tap(game) -> void:
 	if motion != "" or next_board >= 0: return
 	if carried.is_empty(): lift(game)
 	else: drop(game)
 
 func lift(game) -> void:
-	var pile := pile_near(game.hole_position)
-	if pile.is_empty(): return
-	carried = pile.stack.pop_back()
-	if pile.stack.is_empty(): piles.erase(pile)
+	var landmark := loose_near(game.hole_position)
+	if landmark.is_empty(): return
+	loose.erase(landmark)
+	carried = landmark
 	motion = "lift"
 	motion_t = 0.0
 	motion_from = carried.node.position
@@ -295,57 +361,55 @@ func lift(game) -> void:
 
 func drop(game) -> void:
 	var at: Vector3 = game.hole_position
-	var pad := pad_under(at)
-	target_pad = {}
-	target_pile = {}
-	if not pad.is_empty():
-		if not fits(pad, carried):
+	var pin := pin_under(at)
+	target_pin = {}
+	if not pin.is_empty() and pin.landmark.is_empty():
+		if not fits(pin, carried):
 			reject(game)
 			return
-		target_pad = pad
-		motion_to = Vector3(pad.at.x, PAD_TOP + TOY, pad.at.z)
+		target_pin = pin
+		motion_to = pin.at + Vector3(0, PIN_TOP, 0)
+	elif not pin.is_empty() or loose.any(func(other): return flat_gap(other.at, at) < LOOSE_GAP*0.6):
+		game.add_floater(at, I18n.t("beam_full"), false)
+		game.sfx.play("tick", 0.6)
+		return
 	else:
-		var pile := pile_near(at)
-		if not pile.is_empty() and pile.stack.size() >= MAX_STACK:
-			game.add_floater(at, I18n.t("beam_full"), false)
-			game.sfx.play("tick", 0.6)
-			return
-		if pile.is_empty():
-			pile = {"at":Vector3(at.x, GROUND_Y, at.z), "stack":[]}
-			piles.append(pile)
-		target_pile = pile
-		motion_to = Vector3(pile.at.x, toy_y(pile.stack.size()), pile.at.z)
+		motion_to = Vector3(at.x, game.countryside.height_at(Vector2(at.x, at.z)), at.z)
 	motion = "drop"
 	motion_t = 0.0
 	motion_from = carried.node.position
 	game.sfx.play("click", 1.2)
 
-# A wrong pad throws the toy back up the beam and takes time off the clock.
+# A wrong pin throws the landmark back up the beam, takes time off the clock
+# and makes its own pin blink (a decoy has none).
 func reject(game) -> void:
 	game.remaining = maxf(0.0, game.remaining - WRONG_COST)
-	game.add_floater(game.hole_position, I18n.t("beam_wrong", int(WRONG_COST)), false)
+	var home: Array = pins.filter(func(pin): return fits(pin, carried))
+	for pin in home: pin.hint = HINT_TIME
+	game.add_floater(game.hole_position, I18n.t("beam_wrong" if not home.is_empty() else "beam_decoy", int(WRONG_COST)), false)
 	game.fx.shake = maxf(game.fx.shake, 0.3)
 	game.sfx.play("shot")
 
 func land(game) -> void:
-	var toy := carried
+	var landmark := carried
 	carried = {}
-	if target_pad.is_empty():
-		target_pile.stack.append(toy)
+	landmark.at = motion_to
+	if target_pin.is_empty():
+		loose.append(landmark)
 		return
-	target_pad.toy = toy
+	target_pin.landmark = landmark
 	placed += 1
-	game.add_floater(target_pad.at, "+1", true)
-	game.fx.ripple(target_pad.at + Vector3(0, PAD_TOP, 0), PAD*0.5, COLORS[toy.color])
+	game.add_floater(target_pin.at, "+1", true)
+	game.fx.ripple(target_pin.at + Vector3(0, PIN_TOP, 0), PIN_RADIUS*1.4, GOLD)
 	game.sfx.play("grow")
-	if pads.any(func(pad): return pad.toy.is_empty()): return
+	if pins.any(func(pin): return pin.landmark.is_empty()): return
 	game.remaining += BOARD_BONUS
-	game.add_floater(Vector3.ZERO, I18n.t("beam_board", int(BOARD_BONUS)), true)
+	game.add_floater(game.hole_position, I18n.t("beam_board", int(BOARD_BONUS)), true)
 	game.sfx.play("grow", 1.4)
 	next_board = BOARD_PAUSE
 
 func on_board() -> int:
-	return pads.filter(func(pad): return not pad.toy.is_empty()).size()
+	return pins.filter(func(pin): return not pin.landmark.is_empty()).size()
 
 # Quick taps (touch, mouse or Space) work the beam; drags still steer.
 func input(game, event: InputEvent) -> void:
@@ -365,12 +429,14 @@ func input(game, event: InputEvent) -> void:
 func speed_scale() -> float:
 	return CARRY_SLOW if not carried.is_empty() else 1.0
 
+# Empty-handed: the board's progress. Carrying: the landmark's name.
 func note() -> String:
-	return I18n.t("beam_note_lift" if carried.is_empty() else "beam_note_drop", [board + 1, on_board(), pads.size()])
+	if carried.is_empty(): return I18n.t("beam_note_lift", [board + 1, on_board(), pins.size()])
+	return I18n.t("beam_note_drop", Campaign.boss_name(carried.id))
 
-# Minimap dots: the piles holding a toy some pad still wants.
+# Minimap dots: the loose landmarks some pin still wants, or while carrying
+# the empty pins.
 func dots() -> Array:
-	var list: Array = []
-	for pile in piles:
-		if pile.stack.any(func(toy): return wanted(toy)): list.append(Vector2(pile.at.x, pile.at.z))
-	return list
+	if not carried.is_empty():
+		return pins.filter(func(pin): return pin.landmark.is_empty()).map(func(pin): return Vector2(pin.at.x, pin.at.z))
+	return loose.filter(func(landmark): return wanted(landmark)).map(func(landmark): return Vector2(landmark.at.x, landmark.at.z))

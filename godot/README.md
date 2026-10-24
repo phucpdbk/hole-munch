@@ -270,21 +270,24 @@ its landmark to conquer it, while dodging independent military defenders.
   1.5–3 s (greens shorten and reds lengthen as fruit goes down); moving on red
   after a 0.3 s grace costs 3 points and a 1.2 s freeze, three strikes end the
   run; target 30.
-  **Beam & drop** (`beam_drop.gd`, 90 s, clear weather, fixed hole, a toy
-  depot from `beam_yard.gd`: sand paths, lawns with sandboxes and bushes, a dark
-  puzzle deck on the plaza; checked in `beam_smoke.gd`) — a lift-and-drop
-  puzzle. Each pad on the deck shows a ghost of the toy it wants (a block,
-  ball, cone or drum in red, yellow, blue or green). Toys sit in piles 7–16
-  from the deck. A quick tap (touch let go within 0.3 s and 14 px, a mouse
-  click or Space) beams the top toy of the pile under the saucer up (the
-  saucer slows to 0.85 while carrying); a second tap drops it. Over a pad it
-  goes in only if the pad wants it (the pad lights green, else red; a wrong
-  pad costs 2 s), elsewhere it lands on the ground or on a pile in reach, up
-  to 3 high, so a buried toy is dug out by moving the ones on top. A full board
-  adds 6 s and brings the next: 2×2, then 3×2 with 2 decoys and piles of 2,
-  3×3 with 3 decoys, then 4×3 with 4 decoys and piles of 3 (repeating). Target
-  12 toys, 5 coins each. `-- --capture --beam-capture` shoots
-  `test-output/beam-*.png`. The daily rotation shuffles every mini-game into
+  **Beam & drop** (`beam_drop.gd`, 90 s, clear weather, fixed hole, a world
+  map from `beam_yard.gd` on a 5×3 field: ocean, with the continents of the
+  `world` region of `world_map_data.gd` (`tools/geo/make_world_map.cjs`) as
+  low slabs, and the 48 regular campaign cities at their real longitude and
+  Mercator latitude; the minimap draws the land; the camera stands 1.3× back;
+  checked in `beam_smoke.gd`) — a geography lift-and-drop. Each map pins a
+  few cities at least 5 apart (a plinth, a map pin and the city's name), not
+  pinned before this round while others are left. Their landmarks (Meshy
+  bake or primitive model, on a little stand) float at sea 4–14 from the
+  saucer. A quick tap (touch let go within 0.3 s and 14 px, a mouse click or
+  Space) beams up the landmark under the saucer (the saucer slows to 0.9
+  while carrying; the HUD names it); a second tap sets it down. On a pin it
+  stays only if it is that city's landmark: a wrong pin costs 2 s and blinks
+  the right one for 2 s (pins only light up under the saucer, never green or
+  red). Anywhere else it stays where it lands. A full map adds 6 s and brings
+  the next: 3 pins, then 4 with a decoy, 5 with 2, then 6 with 2 (repeating);
+  a decoy's city is at least 5 from every pin. Target 12 landmarks, 5 coins
+  each. `-- --capture --beam-capture` shoots `test-output/beam-*.png`. The daily rotation shuffles every mini-game into
   each cycle of `DAILY_TYPES.size()` days (`Campaign.daily_type`), so each
   comes up once per cycle.
   **Checkpoints**: the ladder games keep their furthest point for good

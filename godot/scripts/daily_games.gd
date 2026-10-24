@@ -11,7 +11,7 @@ extends Node3D
 #   snake    - catch roaming pets to grow a line; monsters bite it (snake_trail.gd).
 #   mole     - moles pop out of manholes for a moment: whack-a-mole (mole_patch.gd).
 #   redlight - red light, green light: eat on green, stand still on red (red_light.gd).
-#   beam     - beam toys up and drop each on the pad that wants it (beam_drop.gd).
+#   beam     - beam landmarks up and drop each on its city on the world map (beam_drop.gd).
 # The landmark, its guardian and the defence squads sit the round out. game.gd
 # owns the items; this node adds the game's own items when the city is built,
 # moves them, counts catches and draws the shadows of falling coins.
@@ -627,8 +627,10 @@ func note() -> String:
 	if kind == "beam": return beam.note()
 	return hunt.note() if kind == "findcow" else ""
 
-# Camera zoom: the snake garden is seen closer up.
+# Camera zoom: the snake garden is seen closer up, the beam's world map
+# further out.
 func zoom_scale() -> float:
+	if kind == "beam": return BeamDrop.ZOOM
 	return SnakeTrail.ZOOM if kind == "snake" else 1.0
 
 # Movement scale: a wrong cow is chewed slowly; carried gold weighs the hole down.

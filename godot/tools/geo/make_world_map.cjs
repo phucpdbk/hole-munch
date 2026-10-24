@@ -14,7 +14,9 @@ const MIN_AREA = 1.5;
 // past the edge of the camera frame instead of ending in a straight cut.
 const PAD = 0.35;
 
-// View boxes [west, south, east, north]; Oceania uses 0..360 longitudes.
+// View boxes [west, south, east, north]; Oceania uses 0..360 longitudes. The
+// whole-world map of the beam daily (beam_yard.gd) is cut at its box (pad 0)
+// and simplified harder, since it is drawn small.
 const REGIONS = {
   asia: { box: [60, -9, 150, 53] },
   europe: { box: [-14, 33, 48, 63] },
@@ -22,6 +24,7 @@ const REGIONS = {
   namerica: { box: [-130, 12, -56, 57] },
   samerica: { box: [-86, -56, -32, 14] },
   oceania: { box: [108, -48, 186, -8], wrap: true },
+  world: { box: [-180, -50, 180, 66], pad: 0, tolerance: 0.6, minArea: 2.5 },
 };
 // Campaign stops in campaign.gd order: [longitude, latitude].
 const STOPS = {
@@ -31,6 +34,7 @@ const STOPS = {
   namerica: [[-74.04, 40.69], [-87.64, 41.88], [-73.99, 40.75], [-79.39, 43.64], [-122.35, 47.62], [-118.32, 34.13], [-88.57, 20.68], [-77.01, 38.89]],
   samerica: [[-43.21, -22.95], [-46.66, -23.56], [-72.55, -13.16], [-77.03, -12.05], [-58.38, -34.6], [-74.06, 4.61], [-43.16, -22.95], [-70.61, -33.42]],
   oceania: [[151.21, -33.86], [144.97, -37.82], [131.04, -25.34], [115.86, -31.96], [174.76, -36.85], [177.44, -17.8], [-109.35, -27.12], [149.12, -35.31]],
+  world: [],
 };
 
 const mercator = (lat) => (180 / Math.PI) * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
@@ -119,8 +123,9 @@ source += 'const REGIONS = {\n';
 for (const [id, region] of Object.entries(REGIONS)) {
   const [w, s, e, n] = region.box;
   const box = [w, mercator(s), e, mercator(n)];
-  const padX = (box[2] - box[0]) * PAD;
-  const padY = (box[3] - box[1]) * PAD;
+  const pad = region.pad ?? PAD;
+  const padX = (box[2] - box[0]) * pad;
+  const padY = (box[3] - box[1]) * pad;
   const clipBox = [box[0] - padX, box[1] - padY, box[2] + padX, box[3] + padY];
   const polygons = [];
   for (const raw of outerRings()) {
@@ -128,8 +133,8 @@ for (const [id, region] of Object.entries(REGIONS)) {
       const projected = raw.map(([lon, lat]) => [lon + shift, mercator(Math.max(-85, Math.min(85, lat)))]);
       let ring = clip(projected, clipBox);
       if (ring.length < 3) continue;
-      ring = simplify([...ring, ring[0]], TOLERANCE).slice(0, -1);
-      if (ring.length < 3 || area(ring) < MIN_AREA) continue;
+      ring = simplify([...ring, ring[0]], region.tolerance ?? TOLERANCE).slice(0, -1);
+      if (ring.length < 3 || area(ring) < (region.minArea ?? MIN_AREA)) continue;
       polygons.push(ring);
     }
   }

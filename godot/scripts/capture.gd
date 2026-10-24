@@ -165,31 +165,30 @@ func run(game, campaign_mode: bool) -> void:
 		await snapshot("gold-bank")
 		g.get_tree().quit()
 		return
-	# The beam daily's depot with a toy in the beam over its pad
-	# (test-output/beam-carry.png) and a board part filled (beam-board.png).
+	# The beam daily's world map: its landmarks afloat round the spawn
+	# (test-output/beam-start.png), one in the beam near its city
+	# (beam-carry.png) and one set down on its pin (beam-board.png).
 	if "--beam-capture" in OS.get_cmdline_user_args():
 		g.campaign.daily = {}
 		g.daily_override = "beam"
 		g.start_daily()
 		g.started = true
 		var beam = g.daily.beam
-		for pad in beam.pads.slice(0, 2):
-			var pile: Dictionary = beam.piles.filter(func(p): return beam.fits(pad, p.stack[-1]))[0]
-			for at in [pile.at, pad.at]:
-				g.hole_position = at
-				beam.tap(g)
-				await frames(30)
-		var last: Dictionary = beam.pads[2]
-		g.hole_position = beam.piles.filter(func(p): return beam.fits(last, p.stack[-1]))[0].at
+		await frames(30)
+		await snapshot("beam-start")
+		var first: Dictionary = beam.pins[0]
+		for at in [beam.loose.filter(func(l): return beam.fits(first, l))[0].at, first.at]:
+			g.hole_position = at
+			beam.tap(g)
+			await frames(30)
+		var last: Dictionary = beam.pins[1]
+		g.hole_position = beam.loose.filter(func(l): return beam.fits(last, l))[0].at
 		beam.tap(g)
 		await frames(30)
 		g.hole_position = last.at + Vector3(0.6, 0, 1.4)
 		await frames(20)
 		await snapshot("beam-carry")
-		g.hole_position = last.at
-		beam.tap(g)
-		await frames(30)
-		g.hole_position = Vector3(0, 0, 6.5)
+		g.hole_position = first.at + Vector3(0, 0, 3.0)
 		await frames(20)
 		await snapshot("beam-board")
 		g.get_tree().quit()
@@ -834,6 +833,9 @@ func snapshot(name: String) -> void:
 	g.get_viewport().get_texture().get_image().save_png("res://test-output/" + name + ".png")
 
 func single() -> void:
+	# `--levels=8` shoots another city (0-based), e.g. Paris for store screenshots.
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--levels="): g.load_level(int(arg.trim_prefix("--levels=").split(",")[0]))
 	await frames(45)
 	await snapshot("menu")
 	g.on_play()

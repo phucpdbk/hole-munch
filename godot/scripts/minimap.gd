@@ -14,6 +14,13 @@ static func draw(canvas: CanvasItem, top_right: Vector2, data: Dictionary) -> vo
 	var rect := Rect2(top_right - Vector2(area.x, 0), area)
 	canvas.draw_style_box(UiStyle.flat(Color("1b3048d9"), 12, 1, Color(UiStyle.PANEL_EDGE, 0.7)), rect.grow(6))
 	canvas.draw_rect(rect, Color("6f9d6e"))
+	# A world map (beam_yard.gd): ocean, with its land polygons on top.
+	if data.has("land"):
+		canvas.draw_rect(rect, Color("3483b3"))
+		for polygon in data.land:
+			var points := PackedVector2Array()
+			for point in polygon: points.append(to_map(rect, half, scale, point))
+			canvas.draw_colored_polygon(points, Color("9fd27e"))
 	# Gold and danger districts (map_features.gd).
 	for zone in data.get("zones", []):
 		var block: Rect2 = zone.rect

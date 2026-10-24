@@ -412,8 +412,12 @@ func load_level(index: int) -> void:
 		# The sky hop and the puzzle sit above the weather, and fog would hide the
 		# siege's planes, so all three play in clear skies; so do the snake and the
 		# red light, where a slippery or windy hole could not steer or stop on cue,
-		# and the beam, whose toys must stop right over their pads.
+		# and the beam, whose landmarks must stop right over their pins.
 		if daily_kind in ["skyhop", "slide", "siege", "snake", "redlight", "beam"]: level.weather = "clear"
+		# The beam's world map (beam_yard.gd) wants a wide field, whatever the city.
+		if daily_kind == "beam":
+			level.cols = BeamYard.COLS
+			level.rows = BeamYard.ROWS
 	var run := run_kind == "runner"
 	if run:
 		level.rival = false
@@ -1218,7 +1222,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		slide_input(event)
 		return
 	var tapped: bool = (event is InputEventScreenTouch or event is InputEventMouseButton) and event.pressed
-	# The beam daily lifts and drops its toys on quick taps; drags still steer.
+	# The beam daily lifts and drops its landmarks on quick taps; drags still steer.
 	if run_kind == "daily" and daily.kind == "beam": daily.beam.input(self, event)
 	# The skill button takes its presses (and the mouse copy of a touch) before the stick.
 	if tapped and hud.skill_hit(event.position):
@@ -1907,6 +1911,11 @@ func minimap_data() -> Dictionary:
 		data.guardian_color = mechanics.mascot.attack_color() if mechanics.mascot != null else Color("9fdcff")
 	if run_kind == "daily": data.dots = daily.dots()
 	data.merge(features.minimap(layout))
+	# The beam's world map shows its continents instead of streets.
+	if countryside and countryside.has_method("minimap_land"):
+		data.land = countryside.minimap_land()
+		data.streets_x = []
+		data.streets_z = []
 	data.water = layout.water_rects
 	data.bridges = layout.bridges.keys().map(func(key): return bridge_ends(str(key)))
 	for bomb in mechanics.bombs:
