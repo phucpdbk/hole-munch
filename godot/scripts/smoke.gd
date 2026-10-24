@@ -211,9 +211,30 @@ func check_growth_route() -> void:
 	g.remaining = ROUTE_LIMIT
 	route_seconds = 0.0
 	var boss: Dictionary = g.items[g.boss_index]
+	# Food it could not get closer to (a boat out on the water) is given up on.
+	var skipped: Array = []
+	var chased: Dictionary = {}
+	var chase_gap := INF
+	var chase_time := 0.0
 	while g.playing and not g.boss_down and route_seconds < ROUTE_LIMIT:
 		var target: Dictionary = g.Rival.best_target(g.items, boss, g.hole_position, g.radius)
+		if skipped.any(func(item): return is_same(item, target)):
+			target = g.Rival.best_target(g.items.filter(func(item): return not skipped.any(func(skip): return is_same(skip, item))), boss, g.hole_position, g.radius)
+		# Like a player, it goes after the guardian as soon as it can bite it,
+		# since each bite sends it far across the city.
+		var guardian: Dictionary = g.mechanics.guardian
+		if g.mechanics.shield_up() and guardian.radius <= g.radius*g.EAT_RATIO: target = guardian
 		if not target.is_empty():
+			var gap := Vector2(target.position.x - g.hole_position.x, target.position.z - g.hole_position.z).length()
+			if not is_same(target, chased):
+				chased = target
+				chase_gap = gap
+				chase_time = 0.0
+			chase_time += ROUTE_STEP
+			if chase_time >= 2.0:
+				if gap > chase_gap - 1.0 and not is_same(target, guardian) and not is_same(target, boss): skipped.append(target)
+				chase_gap = gap
+				chase_time = 0.0
 			var aim: Vector3 = g.layout.steer(g.hole_position, target.position)
 			var offset := Vector3(aim.x-g.hole_position.x, 0, aim.z-g.hole_position.z)
 			var speed: float = (5.8+minf(g.radius,4.0)*0.45)*float(g.stats.speed)
@@ -353,8 +374,8 @@ func check_guardian_fight() -> void:
 	check(bites == mascot.HP and not g.mechanics.shield_up(), "the guardian falls on the third bite (%d bites)" % bites)
 	g.reset_round()
 	check(mascot.hp == mascot.HP and is_equal_approx(g.mechanics.guardian.radius, full), "a new round heals the guardian")
-	# A bite throws the guardian clear of the rim, even from the dead end of a
-	# street by the map edge, and it lands back on a street.
+	# A bite shoots the guardian into the sky, even from the dead end of a street
+	# by the map edge, and it drops onto a random street far from the hole.
 	g.playing=true; g.mode="playing"; g.started=true; g.remaining=60.0
 	var street: float = g.layout.crossings_z[-1]
 	var corner := Vector3(g.layout.move_x - 0.5, guardian.position.y, street)
@@ -365,16 +386,16 @@ func check_guardian_fight() -> void:
 	check(mascot.hp == mascot.HP - 1 and mascot.state == "thrown" and not mascot.can_be_bitten(), "a bitten guardian is thrown and cannot be bitten mid-air")
 	for i in int(mascot.THROW_TIME/0.02) + 2: g.step(0.02, Vector2.ZERO)
 	var gap := Vector2(guardian.position.x - g.hole_position.x, guardian.position.z - g.hole_position.z).length()
-	check(gap >= g.radius + guardian.radius and is_equal_approx(guardian.position.y, mascot.home.y) and g.Mechanics.Mascot.Roads.walkable(g.layout, guardian.position) and not mascot.can_be_bitten(),
-		"a cornered guardian lands on a street clear of the hole, still protected (gap %.1f, hole %.1f)" % [gap, g.radius])
-	# A big hole must not swallow its three hearts in a row: the throw clears its rim too.
+	check(gap >= mascot.RESPAWN_GAP and is_equal_approx(guardian.position.y, mascot.home.y) and g.Mechanics.Mascot.Roads.walkable(g.layout, guardian.position) and not mascot.can_be_bitten(),
+		"a bitten guardian reappears on a street far from the hole, still protected (gap %.1f, hole %.1f)" % [gap, g.radius])
+	# A big hole must not swallow its three hearts in a row: it reappears far away again.
 	for i in int(mascot.STAGGER/0.02) + 2: g.step(0.02, Vector2.ZERO)
 	g.radius = 5.0; g.target_radius = 5.0
 	g.hole_position = Vector3(guardian.position.x, 0, guardian.position.z)
 	for i in 3: g.step(0.02, Vector2.ZERO)
 	for i in int(mascot.THROW_TIME/0.02) + 2: g.step(0.02, Vector2.ZERO)
 	gap = Vector2(guardian.position.x - g.hole_position.x, guardian.position.z - g.hole_position.z).length()
-	check(mascot.hp == mascot.HP - 2 and gap >= g.radius + guardian.radius, "a big hole throws the guardian past its rim (gap %.1f)" % gap)
+	check(mascot.hp == mascot.HP - 2 and gap >= maxf(mascot.RESPAWN_GAP, g.radius + guardian.radius + 8.0), "a big hole sends the guardian far across the city (gap %.1f)" % gap)
 	check_showtime()
 	check_street_events()
 	g.reset_round()

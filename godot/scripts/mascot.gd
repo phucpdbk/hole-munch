@@ -8,7 +8,8 @@ extends Node3D
 # the roofs to land beside the hole and strike at once. It keeps circling at its
 # style's range, leads a moving saucer, and winds up and attacks (mascot_attacks.gd); once
 # the hole can eat it, it runs off in short sprints and strikes back between them. It takes three bites:
-# the first two throw it out of the hole, so the fight cannot be skipped by a passing sweep.
+# the first two shoot it into the sky and drop it on a random street far from the
+# hole, so the fight cannot be skipped by a passing sweep.
 # Attacks are telegraphed defence strikes, so hits go through game.take_hit().
 # The game sets this node's transform from the guardian item; the look and the
 # animation live in mascot_rig.gd.
@@ -52,11 +53,14 @@ const ALERT := 8.0
 const GUARD_REACH := 5.0
 const HP := 3
 const STAGGER := 1.2
-# A bite throws the guardian up and out over the rim: it lands on a street at
-# least THROW_GAP beyond the hole's edge and stays unbiteable for STAGGER after.
-const THROW_TIME := 0.7
-const THROW_HEIGHT := 3.0
-const THROW_GAP := 2.5
+# A bite shoots the guardian up out of sight; it drops back onto a random street
+# at least RESPAWN_GAP from the hole (more for a big hole) and stays unbiteable
+# for STAGGER after.
+const THROW_TIME := 1.1
+const THROW_HEIGHT := 14.0
+const RESPAWN_GAP := 14.0
+const RESPAWN_SPREAD := 8.0
+const RESPAWN_TRIES := 24
 const BITE_SHRINK := 0.92
 # How far ahead an escape looks for a street to run along.
 const FLEE_REACH := 8.0
@@ -136,7 +140,7 @@ func bite(game) -> bool:
 	item.full_radius = item.get("full_radius", item.radius)
 	item.radius *= BITE_SHRINK
 	leap_start = item.position
-	aim = throw_landing(game)
+	aim = respawn_spot(game)
 	state = "thrown"
 	timer = 0.0
 	squash = 1.0
@@ -146,39 +150,47 @@ func bite(game) -> bool:
 	game.sfx.play("boss")
 	return false
 
-# A street (or plaza) spot clear of the hole's rim: straight away from the hole
-# first, then turning further round, bent toward the middle near the map edge.
-func throw_landing(game) -> Vector3:
-	var away := flat(item.position - game.hole_position)
-	var direction := inward(game, away.normalized() if away.length() > 0.05 else Vector3.FORWARD)
-	var clear: float = game.radius + item.radius + THROW_GAP
+# A random street (or plaza) spot far from the hole, but within RESPAWN_SPREAD
+# beyond that gap so a big city never sends it out of reach; the farthest one
+# tried when the map is too small for the full gap.
+func respawn_spot(game) -> Vector3:
+	var clear: float = maxf(RESPAWN_GAP, game.radius + item.radius + 8.0)
 	var best: Vector3 = item.position
 	var best_gap := -1.0
-	for reach in [clear, clear + 3.0, clear + 6.0]:
-		for turn in [0.0, 0.5, -0.5, 1.0, -1.0, 1.6, -1.6, PI]:
-			var spot: Vector3 = game.hole_position + direction.rotated(Vector3.UP, turn)*reach
-			spot.x = clampf(spot.x, -game.layout.move_x, game.layout.move_x)
-			spot.z = clampf(spot.z, -game.layout.move_z, game.layout.move_z)
-			spot = Roads.project(game.layout, Vector3(spot.x, home.y, spot.z))
-			var gap := flat(spot - game.hole_position).length()
-			if gap >= clear: return spot
-			if gap > best_gap:
-				best = spot
-				best_gap = gap
+	for i in RESPAWN_TRIES:
+		var angle := rng.randf()*TAU
+		var spot: Vector3 = game.hole_position + Vector3(cos(angle), 0, sin(angle))*(clear + rng.randf()*RESPAWN_SPREAD)
+		spot.x = clampf(spot.x, -game.layout.move_x, game.layout.move_x)
+		spot.z = clampf(spot.z, -game.layout.move_z, game.layout.move_z)
+		spot = Roads.project(game.layout, Vector3(spot.x, home.y, spot.z))
+		if not Roads.walkable(game.layout, spot): continue
+		var gap := flat(spot - game.hole_position).length()
+		if gap >= clear and gap <= clear + RESPAWN_SPREAD + 4.0: return spot
+		if gap > best_gap:
+			best = spot
+			best_gap = gap
 	return best
 
-# The throw arc; the landing squashes it and it runs (or hunts) from there.
+# Straight up out of the hole and out of sight, then down onto the new spot;
+# the landing squashes it and it runs (or hunts) from there.
 func thrown(game, dt: float) -> void:
 	timer += dt
 	var t := clampf(timer/THROW_TIME, 0.0, 1.0)
-	item.position = leap_start.lerp(aim, t*t*(3.0 - 2.0*t))
-	air = sin(t*PI)
-	item.position.y = home.y + air*maxf(THROW_HEIGHT, item.radius*2.0)
+	var height: float = maxf(THROW_HEIGHT, item.radius*4.0)
+	if t < 0.5:
+		var rise := t*2.0
+		item.position = Vector3(leap_start.x, home.y + height*(1.0 - (1.0 - rise)*(1.0 - rise)), leap_start.z)
+	else:
+		var fall := (t - 0.5)*2.0
+		item.position = Vector3(aim.x, home.y + height*(1.0 - fall*fall), aim.z)
+	air = maxf(0.31, sin(t*PI)) if t < 1.0 else 0.0
 	if t < 1.0: return
 	item.position.y = home.y
 	air = 0.0
 	squash = 1.0
-	game.fx.ripple(item.position, item.radius*1.4, attack_color())
+	game.fx.ripple(item.position, item.radius*2.0, attack_color())
+	game.fx.puff(item.position, item.radius*0.8, 1.0)
+	game.fx.shake = maxf(game.fx.shake, 0.3)
 	var edible: bool = item.radius <= game.radius*game.EAT_RATIO
 	state = "flee_rest" if edible else "hunt"
 	timer = 0.3
