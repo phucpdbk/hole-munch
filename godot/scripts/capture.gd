@@ -215,6 +215,17 @@ func run(game, campaign_mode: bool) -> void:
 		monster.holder.position = snake.orb_at(7) + Vector3(-3.0, 0.16, 1.5)
 		await frames(20)
 		await snapshot("classic-snake")
+		# What a long line costs: draw calls and triangles with 40 pets in it.
+		var before_calls := Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
+		var before_tris := Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)
+		for i in 32:
+			var pet = snake.take_critter(g)
+			pet.visible = true
+			pet.position = snake.orb_at(snake.line.size())
+			snake.line.append(pet)
+		await frames(10)
+		print("PERF 40 pets: draw calls %d -> %d, primitives %d -> %d" % [before_calls, Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+			before_tris, Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)])
 		# Pets roaming and running, close up (classic-pets.png).
 		g.bot_input = Vector2.ZERO
 		monster.wait = 99.0

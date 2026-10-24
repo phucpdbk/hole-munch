@@ -187,9 +187,21 @@ func hedge_ring(g, cell: Vector2, half: Vector2, gap: float) -> void:
 		hedge(g, cell + Vector2(side*half.x, -half.y), cell + Vector2(side*half.x, -gap/2))
 		hedge(g, cell + Vector2(side*half.x, gap/2), cell + Vector2(side*half.x, half.y))
 
-func bed(g, at: Vector2, variant: int) -> void:
-	decor(g, "theme_garden", Vector3(at.x, 0.16, at.y), variant)
-	add_circle(at, 1.1)
+# A solid prop: a POLYGON Farm model (models.gd "deco_*") with its solid circle.
+func prop(g, id: String, at: Vector2, radius: float, yaw := 0.0) -> void:
+	decor(g, "deco_" + id, Vector3(at.x, 0.16, at.y), 0, yaw)
+	if radius > 0.0: add_circle(at, radius)
+
+# A straight run of 2 m fence panels from `a` to `b` (along x or z), one solid box.
+func fence(g, id: String, a: Vector2, b: Vector2) -> void:
+	var length := a.distance_to(b)
+	if length < 1.0: return
+	var along_x := absf(b.x - a.x) >= absf(b.y - a.y)
+	var count := maxi(1, roundi(length/2.0))
+	for i in count:
+		var at := a.lerp(b, (i + 0.5)/count)
+		decor(g, "deco_" + id, Vector3(at.x, 0.16, at.y), 0, 0.0 if along_x else PI/2)
+	add_box((a + b)/2, Vector2(length/2, 0.15) if along_x else Vector2(0.15, length/2))
 
 func garden(g, rng: RandomNumberGenerator, cell: Vector2, inner: Vector2) -> void:
 	var half := inner/2
@@ -199,26 +211,27 @@ func garden(g, rng: RandomNumberGenerator, cell: Vector2, inner: Vector2) -> voi
 		maze(g, rng, cell, half)
 		return
 	if style == "ponds":
+		# The primitive pond: POLYGON Farm's water bakes dark without its own shader.
 		decor(g, "theme_garden", Vector3(cell.x, 0.16, cell.y), 4)
 		add_circle(cell, 2.8)
-	elif cell == Vector2.ZERO:
-		decor(g, "theme_garden", Vector3(0, 0.16, 0), 2)
-		add_circle(cell, 2.6)
-	else:
-		g.add_item("farm_tree_oak", Vector3(cell.x, 0.16, cell.y), DECOR, 0, rng.randf_range(0, TAU))
-		add_circle(cell, 0.6)
+	elif cell == Vector2.ZERO: prop(g, "well", cell, 1.2)
+	else: prop(g, "tree%d" % rng.randi_range(0, 3), cell, 0.5, rng.randf_range(0, TAU))
+	# Flower patches in the corners, sunflowers and a bench or a barrow by them.
 	for dx in [-1, 1]:
 		for dz in [-1, 1]:
-			bed(g, cell + Vector2(dx*(half.x - 2.2), dz*(half.y - 2.2)), 0 if (dx + dz) == 0 else 3)
+			var corner := cell + Vector2(dx*(half.x - 2.2), dz*(half.y - 2.2))
+			prop(g, "flowers%d" % rng.randi_range(0, 2), corner, 0.9, rng.randf_range(0, TAU))
+			for k in 3: decor(g, "deco_sunflower", Vector3(corner.x - dx*(1.6 + k*0.7), 0.16, corner.y), 0, rng.randf_range(0, TAU))
 	if style == "open":
 		# Hedges along the north and south edges only, broken in the middle.
 		for dz in [-half.y, half.y]:
 			hedge(g, cell + Vector2(-half.x + 2.0, dz), cell + Vector2(-2.5, dz))
 			hedge(g, cell + Vector2(2.5, dz), cell + Vector2(half.x - 2.0, dz))
-		for i in 2:
-			decor(g, "bench", Vector3(cell.x + rng.randf_range(-half.x/2, half.x/2), 0.16, cell.y + (half.y - 2.4)*(1 if i == 0 else -1)), 0, PI if i == 0 else 0.0)
-		return
-	hedge_ring(g, cell, half, 4.0 if style == "hedges" else 3.0)
+	else:
+		hedge_ring(g, cell, half, 4.0 if style == "hedges" else 3.0)
+	prop(g, "bench", cell + Vector2(rng.randf_range(-half.x/3, half.x/3), half.y - 1.6), 0.45, PI)
+	if rng.randf() < 0.5: prop(g, "barrow", cell + Vector2(-half.x + 4.5, rng.randf_range(-2.0, 2.0)), 0.45, rng.randf_range(0, TAU))
+	else: decor(g, "deco_can", Vector3(cell.x + half.x - 4.0, 0.16, cell.y + rng.randf_range(-2.0, 2.0)), 0, rng.randf_range(0, TAU))
 
 # A perfect maze of MAZE_CELL rooms inside the block's hedge ring: every room
 # reachable, the ring's gaps opening onto the middle rooms of each side.
@@ -255,44 +268,83 @@ func maze(g, rng: RandomNumberGenerator, cell: Vector2, half: Vector2) -> void:
 				var wall_z := corner.y + (z + 1)*size.y
 				hedge(g, Vector2(corner.x + x*size.x + 0.4, wall_z), Vector2(corner.x + (x + 1)*size.x - 0.4, wall_z))
 
+# Vegetable rows tile the block with walkable aisles between them; a
+# scarecrow, a produce stand, hay, a barrow and loose veg dot the aisles,
+# and a wooden fence runs along the north edge with a gate gap.
 func veggie(g, rng: RandomNumberGenerator, cell: Vector2, inner: Vector2) -> void:
 	var half := inner/2
-	var z := -half.y + 0.8
-	var row := 0
-	while z <= half.y - 0.8:
-		var x := -half.x + 0.8
-		while x <= half.x - 0.8:
-			if absf(x) > 1.6: decor(g, "theme_veggie", Vector3(cell.x + x, 0.16, cell.y + z), row % 2, rng.randf_range(0, TAU))
-			x += 1.4
-		z += 1.6
-		row += 1
-	if rng.randf() < 0.6 or cell == Vector2.ZERO:
-		decor(g, "theme_veggie", Vector3(cell.x, 0.16, cell.y), 2, rng.randf_range(-0.4, 0.4))
-		add_circle(cell, 0.4)
-	var fence_z := cell.y - half.y - 0.6
-	for along in range(int(-half.x), int(half.x) + 1, 2):
-		if absf(along) < 3: continue
-		g.add_item("farm_fence_simple", Vector3(cell.x + along, 0.18, fence_z), DECOR)
-	for side in [-1, 1]:
-		add_box(Vector2(cell.x + side*(half.x + 3.0)/2, fence_z), Vector2((half.x - 3.0)/2 + 0.6, 0.15))
-	for i in 3:
-		var at := Vector2(cell.x + rng.randf_range(-half.x, half.x), cell.y + half.y + 0.4)
-		g.add_item("farm_pumpkin", Vector3(at.x, 0.2, at.y), DECOR)
-		add_circle(at, 0.35)
+	var patches := Vector2i(maxi(1, floori((inner.x + 1.0)/4.6)), maxi(1, floori((inner.y + 1.0)/4.6)))
+	var step := Vector2(inner.x/patches.x, inner.y/patches.y)
+	for px in patches.x:
+		for pz in patches.y:
+			var at := cell - half + Vector2((px + 0.5)*step.x, (pz + 0.5)*step.y)
+			# The middle stays open for the scarecrow.
+			if at.distance_to(cell) < 2.5: continue
+			decor(g, "deco_rows%d" % rng.randi_range(0, 2), Vector3(at.x, 0.16, at.y), 0, [0.0, PI/2, PI, -PI/2][rng.randi() % 4])
+	if rng.randf() < 0.7 or cell == Vector2.ZERO: prop(g, "scarecrow", cell, 0.4, rng.randf_range(-0.4, 0.4))
+	else: prop(g, "stand", cell, 1.2, rng.randf_range(0, TAU))
+	fence(g, "fence", cell + Vector2(-half.x, -half.y - 0.6), cell + Vector2(-2.0, -half.y - 0.6))
+	fence(g, "fence", cell + Vector2(2.0, -half.y - 0.6), cell + Vector2(half.x, -half.y - 0.6))
+	prop(g, "hay", cell + Vector2(half.x - 0.8, half.y + 0.3), 0.55, rng.randf_range(-0.3, 0.3))
+	prop(g, "sign", cell + Vector2(-2.6, -half.y - 0.9), 0.0)
+	for i in 4:
+		var loose: String = ["cabbage", "pumpkin", "lettuce", "carrots"][rng.randi() % 4]
+		prop(g, loose, cell + Vector2(rng.randf_range(-half.x, half.x - 2.0), half.y + 0.4), 0.0, rng.randf_range(0, TAU))
 
+# A white rail fences each field with a gap on every side; a stand on every
+# other field, hay rolls in the corners, cones along the lanes and hurdles.
 func track(g, rng: RandomNumberGenerator, cell: Vector2, inner: Vector2) -> void:
 	var half := inner/2
-	# A stand along the north edge of every other block, flags at the corners.
+	for side in [-1, 1]:
+		fence(g, "rail", cell + Vector2(-half.x, side*half.y), cell + Vector2(-2.0, side*half.y))
+		fence(g, "rail", cell + Vector2(2.0, side*half.y), cell + Vector2(half.x, side*half.y))
+		fence(g, "rail", cell + Vector2(side*half.x, -half.y), cell + Vector2(side*half.x, -2.0))
+		fence(g, "rail", cell + Vector2(side*half.x, 2.0), cell + Vector2(side*half.x, half.y))
 	if not odd(cell):
-		decor(g, "theme_track", Vector3(cell.x, 0.16, cell.y - half.y + 1.0), 0)
-		add_box(Vector2(cell.x, cell.y - half.y + 0.4), Vector2(3.0, 0.95))
+		decor(g, "theme_track", Vector3(cell.x, 0.16, cell.y - half.y + 1.6), 0)
+		add_box(Vector2(cell.x, cell.y - half.y + 1.0), Vector2(3.0, 0.95))
+	else:
+		prop(g, "tree3", cell, 0.5, rng.randf_range(0, TAU))
 	for dx in [-1, 1]:
 		for dz in [-1, 1]:
-			decor(g, "theme_track", Vector3(cell.x + dx*half.x, 0.16, cell.y + dz*half.y), 1 + int(rng.randf() < 0.5))
-			add_circle(cell + Vector2(dx*half.x, dz*half.y), 0.15)
+			prop(g, "hayroll", cell + Vector2(dx*(half.x - 1.0), dz*(half.y - 1.0)), 0.55, rng.randf_range(0, TAU))
+			decor(g, "deco_cone", Vector3(cell.x + dx*(half.x + 0.9), 0.16, cell.y + dz*(half.y + 0.9)), 0)
 	for i in 3:
-		decor(g, "theme_track", Vector3(cell.x + (i - 1)*3.0, 0.16, cell.y + half.y - 2.0), 3)
-		add_box(Vector2(cell.x + (i - 1)*3.0, cell.y + half.y - 2.0), Vector2(0.65, 0.15))
+		decor(g, "theme_track", Vector3(cell.x + (i - 1)*3.0, 0.16, cell.y + half.y - 2.4), 3)
+		add_box(Vector2(cell.x + (i - 1)*3.0, cell.y + half.y - 2.4), Vector2(0.65, 0.15))
+
+# Primitive stand-ins for the POLYGON Farm props, for checkouts without the
+# local model library (models.gd toy "deco_*").
+static func fallback_parts(m, id: String) -> Array:
+	if id.begins_with("flowers"): return garden_parts(m, 0 if id.ends_with("1") else 3)
+	if id.begins_with("rows"): return veggie_rows(m, id)
+	if id.begins_with("tree"): return tree_parts(m)
+	match id:
+		"well": return garden_parts(m, 2)
+		"scarecrow": return veggie_parts(m, 2)
+		"cabbage", "lettuce": return veggie_parts(m, 1)
+		"carrots": return veggie_parts(m, 0)
+		"fence", "rail":
+			var wood := Color("f2f2ee") if id == "rail" else Color("a0723f")
+			return [m.piece("box", Vector3(0, 0.6, 0), Vector3(2.0, 0.08, 0.06), wood), m.piece("box", Vector3(0, 0.3, 0), Vector3(2.0, 0.08, 0.06), wood),
+				m.piece("box", Vector3(-0.95, 0.42, 0), Vector3(0.1, 0.84, 0.1), wood), m.piece("box", Vector3(0.95, 0.42, 0), Vector3(0.1, 0.84, 0.1), wood)]
+		"hay", "hayroll", "stand", "barrow", "bench", "sign":
+			return [m.piece("box", Vector3(0, 0.3, 0), Vector3(1.0, 0.6, 0.7), Color("e0c26a"))]
+		"cone": return [m.piece("point", Vector3(0, 0.3, 0), Vector3(0.2, 0.6, 0.2), Color("ff7a1a"))]
+		"pumpkin": return [m.piece("ball", Vector3(0, 0.3, 0), Vector3(0.4, 0.3, 0.4), Color("ff9a1f"))]
+	return [m.piece("ball", Vector3(0, 0.4, 0), Vector3(0.3, 0.4, 0.3), Color("ffd23f"))]
+
+static func tree_parts(m) -> Array:
+	return [m.piece("cyl", Vector3(0, 0.8, 0), Vector3(0.18, 1.6, 0.18), Color("8a5a2b")),
+		m.piece("ball", Vector3(0, 2.1, 0), Vector3(1.1, 1.0, 1.1), Color("5aa64a"))]
+
+static func veggie_rows(m, id: String) -> Array:
+	var parts: Array = []
+	var leaf: Color = [Color("5aa64a"), Color("8fd16f"), Color("3f8f3c")][int(id.right(1)) % 3]
+	for row in 4:
+		parts.append(m.piece("box", Vector3(0, 0.08, -1.3 + row*0.87), Vector3(3.2, 0.16, 0.45), Color("6e4527")))
+		for i in 6: parts.append(m.piece("ball", Vector3(-1.35 + i*0.54, 0.24, -1.3 + row*0.87), Vector3.ONE*0.2, leaf))
+	return parts
 
 # --- models --------------------------------------------------------------------------
 
@@ -316,8 +368,12 @@ static func garden_parts(m, variant: int) -> Array:
 				parts.append(m.piece("ball", Vector3(cos(a)*0.65, 0.36, sin(a)*0.65), Vector3.ONE*0.17, Color(blooms[i % blooms.size()])))
 			parts.append(m.piece("ball", Vector3(0, 0.5, 0), Vector3(0.35, 0.35, 0.35), Color("5aa64a")))
 		1:
-			parts.append(m.piece("box", Vector3(0, 0.4, 0), Vector3(1.9, 0.8, 0.7), Color("4f9f3c")))
-			parts.append(m.piece("box", Vector3(0, 0.82, 0), Vector3(1.8, 0.08, 0.6), Color("62b64d")))
+			# A clipped hedge: a dark body under three round leafy tops and a few
+			# blooms, kept cheap (about 450 triangles) since a maze holds hundreds.
+			parts.append(m.piece("box", Vector3(0, 0.36, 0), Vector3(2.0, 0.72, 0.66), Color("3f8a35")))
+			for i in 3:
+				parts.append(m.piece("ball", Vector3(-0.66 + i*0.66, 0.74, 0), Vector3(0.42, 0.28, 0.38), Color("58a847").lerp(Color("6fbf55"), float(i % 2))))
+				parts.append(m.piece("box", Vector3(-0.6 + i*0.6, 0.98, 0.16 - (i % 2)*0.32), Vector3.ONE*0.1, Color(["ff8fc8", "ffffff", "ffd23f"][i])))
 		4:
 			# A pond with a stone edge, lily pads and reeds.
 			parts.append(m.piece("cyl", Vector3(0, 0.1, 0), Vector3(2.8, 0.2, 2.8), Color("cfc8b8")))

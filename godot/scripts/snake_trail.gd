@@ -13,6 +13,7 @@ extends Node3D
 # end; reaching the target unlocks the next, harder garden for the next run.
 const I18n = preload("res://scripts/i18n.gd")
 const Critter = preload("res://scripts/critters.gd")
+const PetFlock = preload("res://scripts/pet_flock.gd")
 const MascotRig = preload("res://scripts/mascot_rig.gd")
 const ThemeMaps = preload("res://scripts/theme_maps.gd")
 const MONSTER_ID := "gobbler"
@@ -57,9 +58,17 @@ var crashed := false
 var time := 0.0
 var heading := Vector2.ZERO
 var rng := RandomNumberGenerator.new()
+# The baked Meshy pets drawn as a flipbook crowd (pet_flock.gd), or false for
+# the primitive toy animals.
+var flipbook := false
+var flock: Node3D
 
 func build(game, seed_value: int) -> void:
 	rng.seed = seed_value
+	flipbook = PetFlock.available()
+	if flipbook and not is_instance_valid(flock):
+		flock = PetFlock.new()
+		add_child(flock)
 	tier = game.countryside.tier if game.countryside else 0
 
 func setting(index: int):
@@ -85,6 +94,9 @@ func reset(game) -> void:
 
 func clear() -> void:
 	for critter in roamers + line + pool: critter.visible = false
+	if is_instance_valid(flock):
+		flock.begin()
+		flock.finish()
 	for monster in monsters: monster.holder.visible = false
 
 # --- animals ---------------------------------------------------------------------
@@ -92,7 +104,7 @@ func clear() -> void:
 func take_critter(game) -> Critter:
 	if not pool.is_empty(): return pool.pop_back()
 	var critter := Critter.new()
-	critter.build(game.models, made)
+	critter.build(game.models, made, flipbook)
 	critter.scale = Vector3.ONE*PET_SCALE
 	made += 1
 	add_child(critter)
@@ -302,6 +314,7 @@ func update(game, dt: float) -> void:
 		unlock(game)
 	move_line(dt)
 	for critter in roamers + line: critter.animate(dt)
+	draw_flock()
 	for monster in monsters: animate_monster(monster, dt)
 	if crashed or not game.started: return
 	for i in range(SAFE_ORBS, line.size()):
@@ -362,3 +375,11 @@ static func monster_parts(m) -> Array:
 	parts.append(m.piece("box", Vector3(0, 0.62, 0.66), Vector3(0.7, 0.24, 0.06), Color("2a0f3c")))
 	for i in 4: parts.append(m.piece("roof", Vector3(-0.24 + i*0.16, 0.7, 0.69), Vector3(0.05, 0.1, 0.03), Color("ffffff"), Vector3(PI, 0, 0)))
 	return parts
+
+# Every visible pet into its kind, clip and frame batch.
+func draw_flock() -> void:
+	if not flipbook or not is_instance_valid(flock): return
+	flock.begin()
+	for critter in roamers + line:
+		if critter.visible: flock.add(critter.kind, critter.clip, critter.frame(flock.length(critter.kind, critter.clip)), critter.transform)
+	flock.finish()

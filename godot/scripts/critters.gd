@@ -1,7 +1,10 @@
 extends Node3D
 
-# A toy animal with real moving limbs for the snake daily (snake_trail.gd): a
-# puppy, kitten, piglet, bunny or chick built from primitives, with its legs,
+# A pet for the snake daily (snake_trail.gd): a puppy, kitten, piglet, bunny or
+# chick. With the Meshy pets baked (tools/bake_critters.gd), the node only
+# keeps the pet's place and picks its flipbook clip and frame by speed
+# (idle, walk, run), and pet_flock.gd draws it. Without them it falls back to
+# a toy animal built from primitives, with its legs,
 # head, ears, tail and wings on their own pivots. animate() swings them by
 # gait instead of sliding the whole body: puppies, kittens and piglets trot
 # (diagonal legs together), bunnies hop (front and back pairs together, the
@@ -9,6 +12,11 @@ extends Node3D
 # breathe, wag and look about. Every animal faces +z, about HEIGHT tall.
 const KINDS := ["puppy", "kitten", "piglet", "bunny", "chick"]
 const HEIGHT := 0.8
+# Flipbook frames per clip (tools/bake_critters.gd) and the speeds that pick
+# them: walk above WALK_FROM, run above RUN_FROM, idle below.
+const FLIP_FRAMES := {"idle":4, "walk":6, "run":6}
+const WALK_FROM := 0.25
+const RUN_FROM := 2.2
 
 var kind := "puppy"
 var body: Node3D
@@ -17,12 +25,18 @@ var phase := 0.0
 var clock := 0.0
 var last := Vector3.INF
 var speed := 0.0
+var flip := false
+var clip := "idle"
+var clip_time := 0.0
 
 # --- build -----------------------------------------------------------------------
 
-func build(models, kind_index: int) -> void:
+func build(models, kind_index: int, flipbook := false) -> void:
 	kind = KINDS[kind_index % KINDS.size()]
 	clock = float(kind_index)*1.7
+	clip_time = clock
+	flip = flipbook
+	if flip: return
 	body = Node3D.new()
 	add_child(body)
 	var spec := parts(models)
@@ -195,6 +209,9 @@ func animate(dt: float, override_speed := -1.0) -> void:
 		var moved := 0.0 if last == Vector3.INF else Vector2(position.x - last.x, position.z - last.z).length()/dt
 		speed = lerpf(speed, override_speed if override_speed >= 0 else moved, 1.0 - exp(-dt*12.0))
 	last = position
+	if flip:
+		flip_clip(dt)
+		return
 	var moving := clampf(speed/3.0, 0.0, 1.0)
 	if speed > 0.15: phase += dt*(7.0 + speed*2.0)
 	match kind:
@@ -239,3 +256,14 @@ func waddle(moving: float) -> void:
 	var flap := sin(clock*(22.0 if moving > 0.5 else 3.0))*(0.7*moving + 0.08)
 	if pivots.has("wing_l"): pivots.wing_l.rotation.z = -flap
 	if pivots.has("wing_r"): pivots.wing_r.rotation.z = flap
+
+# Flipbook: the clip by speed, played faster the faster the pet goes.
+func flip_clip(dt: float) -> void:
+	var wanted := "run" if speed > RUN_FROM else "walk" if speed > WALK_FROM else "idle"
+	if wanted != clip: clip = wanted
+	var rate := 1.0 if clip == "idle" else clampf(speed/(RUN_FROM*1.6 if clip == "run" else 1.2), 0.6, 1.6)
+	clip_time += dt*rate
+
+func frame(length: float) -> int:
+	var count: int = FLIP_FRAMES[clip]
+	return int(fposmod(clip_time, length)/length*count) % count

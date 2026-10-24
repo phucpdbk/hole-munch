@@ -9,6 +9,15 @@ Their child meshes (doors, glass, wheels) are included. Palette textures are sam
 into vertex colors, then surfaces are merged, normalized to gameplay size and
 simplified for mobile. Runtime instances share a mesh and the game's swallow shader.
 
+The themed daily maps (`theme_maps.gd`) also use POLYGON Farm props: flower
+patches, fruit trees, a well, sunflowers, benches, a barrow, a watering can,
+vegetable rows, loose veg, a scarecrow, a produce stand, hay, wooden and painted
+fences, a sign and a traffic cone (Starter), plus a tomato, pumpkin and
+watermelon as the fruit (`deco_*.res`, `fruit<n>.res`). They are lifted by
+`Models.DECO_GAIN` on load, since the farm palette reads dark beside the toy
+colours, and fall back to primitive props without the library. The pond and the
+hedges stay primitive: the farm pond's water bakes dark and its bush row is flat.
+
 These are third-party Synty assets, not the CC0 models in `../farm`.
 Source files and derived `.res` files are excluded from Git; the local APK includes
 the derived meshes. Source prefabs/textures are excluded from the APK.

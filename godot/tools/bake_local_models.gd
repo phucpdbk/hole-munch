@@ -11,6 +11,42 @@ const MODELS = {
 	"tree1":["PolygonFarm/Prefabs/Generic/SM_Generic_Tree_02.tscn",0.68],
 	"car0":["PolygonStarter/Prefabs/SM_PolygonCity_Veh_Car_Small_01.tscn",0.82],
 	"car1":["PolygonFarm/Prefabs/Vehicles/SM_Veh_Pickup_01.tscn",0.82],
+	# Themed daily maps (theme_maps.gd): [prefab, footprint radius, keep 1/n of
+	# the triangles]. Small props keep more of their shape than the city models.
+	"deco_flowers0":["PolygonFarm/Prefabs/Environments/SM_Env_Flowers_01.tscn",1.1,3],
+	"deco_flowers1":["PolygonFarm/Prefabs/Environments/SM_Env_Flowers_02.tscn",1.1,3],
+	"deco_flowers2":["PolygonFarm/Prefabs/Environments/SM_Env_Flowers_03.tscn",1.1,3],
+	"deco_bushrow":["PolygonFarm/Prefabs/Plants/SM_Prop_Bush_Round_Row_01.tscn",1.05,3],
+	"deco_well":["PolygonFarm/Prefabs/Props/SM_Prop_Well_01.tscn",1.4,3],
+	"deco_tree0":["PolygonFarm/Prefabs/Environments/SM_Env_Tree_Apple_Grown_01.tscn",1.3,4],
+	"deco_tree1":["PolygonFarm/Prefabs/Environments/SM_Env_Tree_Cherry_Grown_01.tscn",1.3,4],
+	"deco_tree2":["PolygonFarm/Prefabs/Environments/SM_Env_Tree_Orange_Grown_01.tscn",1.3,4],
+	"deco_tree3":["PolygonFarm/Prefabs/Generic/SM_Generic_Tree_03.tscn",1.2,4],
+	"deco_bench":["PolygonFarm/Prefabs/Props/SM_Prop_Bench_01.tscn",0.65,2],
+	"deco_sunflower":["PolygonFarm/Prefabs/Plants/SM_Prop_Sunflower_01.tscn",0.35,2],
+	"deco_planter":["PolygonFarm/Prefabs/Props/SM_Prop_PlantBox_Large_01.tscn",1.1,2],
+	"deco_barrow":["PolygonFarm/Prefabs/Props/SM_Prop_Wheelbarrow_01.tscn",0.6,2],
+	"deco_can":["PolygonFarm/Prefabs/Props/SM_Prop_Watering_Can_01.tscn",0.25,2],
+	"deco_rows0":["PolygonFarm/Prefabs/Environments/SM_Env_Vege_Rows_01.tscn",2.4,3],
+	"deco_rows1":["PolygonFarm/Prefabs/Environments/SM_Env_Vege_Rows_02.tscn",2.4,3],
+	"deco_rows2":["PolygonFarm/Prefabs/Environments/SM_Env_Vege_Rows_03.tscn",2.4,3],
+	"deco_cabbage":["PolygonFarm/Prefabs/Plants/SM_Prop_Cabbage_01_L.tscn",0.35,2],
+	"deco_carrots":["PolygonFarm/Prefabs/Plants/SM_Prop_Carrot_01_Group.tscn",0.4,2],
+	"deco_lettuce":["PolygonFarm/Prefabs/Plants/SM_Prop_Lettuce_01_L.tscn",0.32,2],
+	"deco_tomato":["PolygonFarm/Prefabs/Plants/SM_Prop_Plant_Bush_02_Tomato.tscn",0.45,2],
+	"deco_corn":["PolygonFarm/Prefabs/Plants/SM_Prop_Plant_Corn_01_L.tscn",0.45,2],
+	"deco_pumpkin":["PolygonFarm/Prefabs/Plants/SM_Prop_Pumpkin_01_L.tscn",0.45,2],
+	"deco_scarecrow":["PolygonFarm/Prefabs/Props/SM_Prop_Scarecrow_01.tscn",0.7,2],
+	"deco_fence":["PolygonFarm/Prefabs/Props/SM_Prop_Fence_Wood_01.tscn",1.0,2],
+	"deco_hay":["PolygonFarm/Prefabs/Props/SM_Prop_Hay_Bale_Square_01.tscn",0.7,2],
+	"deco_hayroll":["PolygonFarm/Prefabs/Props/SM_Prop_Hay_Bale_Round_01.tscn",0.7,2],
+	"deco_stand":["PolygonFarm/Prefabs/Buildings/SM_Bld_ProduceStand_01.tscn",1.6,3],
+	"deco_sign":["PolygonFarm/Prefabs/Props/SM_Prop_Sign_Veges_01.tscn",0.5,2],
+	"deco_rail":["PolygonFarm/Prefabs/Props/SM_Prop_Fence_Painted_01.tscn",1.0,2],
+	"deco_cone":["PolygonStarter/Prefabs/SM_PolygonPrototype_Prop_Cone_01.tscn",0.3,2],
+	"fruit0":["PolygonFarm/Prefabs/Plants/SM_Prop_Tomato_01_L.tscn",0.42,2],
+	"fruit1":["PolygonFarm/Prefabs/Plants/SM_Prop_Pumpkin_01_S.tscn",0.42,2],
+	"fruit2":["PolygonFarm/Prefabs/Plants/SM_Prop_Watermelon_01_L.tscn",0.5,2],
 }
 
 func _initialize() -> void:
@@ -63,7 +99,8 @@ func _initialize() -> void:
 		simplified.add_surface(Mesh.PRIMITIVE_TRIANGLES,arrays)
 		simplified.generate_lods(60.0,75.0,[])
 		var chosen := indices
-		var target := maxi(600,indices.size()/15)
+		var keep: int = MODELS[id][2]*3 if MODELS[id].size() > 2 else 15
+		var target := maxi(600,indices.size()/keep)
 		for lod in simplified.get_surface_lod_count(0):
 			var candidate := simplified.get_surface_lod_indices(0,lod)
 			if candidate.size()/3 >= target and candidate.size() < chosen.size(): chosen = candidate

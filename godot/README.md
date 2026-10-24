@@ -236,10 +236,14 @@ its landmark to conquer it, while dodging independent military defenders.
   swallow, with no buildings, traffic or army. `-- --capture --classic-capture`
   shoots all three, the pets close up and each harder garden (`test-output/classic-*.png`).
   **Saucer snake** (`snake_trail.gd`, 90 s, a garden) — the saucer never stops
-  (an idle stick keeps its last direction). Pets (`critters.gd`: puppy, kitten,
-  piglet, bunny, chick, built from primitives with their legs, head, ears, tail
-  and wings on pivots: the four-legged ones trot, bunnies hop, chicks waddle and
-  flap) roam the garden, resting, wandering and bolting from a saucer within
+  (an idle stick keeps its last direction). Pets (puppy, kitten,
+  piglet, bunny, chick: chibi Meshy rigs standing on two legs, the `critters`
+  kind of `tools/meshy/meshy.mjs`, baked by `bake_critters.gd` into flipbook
+  frames of their idle, walk and run clips, about 1,570 triangles each, and drawn
+  by `pet_flock.gd` as one MultiMesh per kind, clip and frame with no shadows, so
+  no skeleton runs in the game; `critters.gd` picks the clip by speed and falls
+  back to primitive animals with swinging legs when the frames are missing) roam
+  the garden, resting, wandering and bolting from a saucer within
   5. Glide over one to catch it and it joins the line, hopping along the hole's
   path 1.1 apart; a new pet appears elsewhere. Monsters, the Meshy "gobbler"
   (`assets/mascots/gobbler.scn`, a rigged villain from the `monsters` kind of
@@ -610,6 +614,7 @@ Then bake (headless Godot, `--script res://tools/<tool>.gd [-- ids]`):
 | Saucers | `assets/crafts_src/<index>.glb` (0–12, `fleet.gd` NAMES) | `bake_crafts.gd` | `assets/crafts/<index>.res` + `_albedo.res` | primitive craft (`fleet.gd`) |
 | Power-ups | `assets/pickups_src/<kind>.glb` (time, magnet, speed, freeze) | `bake_pickups.gd` | `assets/pickups/<kind>.res` + `_albedo.res` | the plain coloured orb (`mechanics.gd`) |
 | Siege aircraft | `assets/aircraft_src/<kind>.glb` (heli, jet, flak, blimp) | `bake_aircraft.gd` | `assets/aircraft/<kind>.res` + `_albedo.res` | block models (`sky_siege.gd`) |
+| Snake pets | `assets/critters_src/<kind>.glb` + `<kind>@<clip>.glb` (idle, walk, run) | `bake_critters.gd` (not headless) | `assets/critters/<kind>_<clip>_<n>.res` + `_albedo.res` | primitive animals (`critters.gd`) |
 
 - **Facing**: models face +z (toward the camera). Fix a bad bake with that tool's
   `YAW` table; for a hand-made guardian GLB, use `CLIP_OVERRIDES` in `mascot_rig.gd`.

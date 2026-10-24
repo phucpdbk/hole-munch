@@ -29,6 +29,9 @@ const ArmyForces = preload("res://scripts/army_forces.gd")
 var army_look: Dictionary = ArmyForces.LOOKS.vn
 const Campaign = preload("res://scripts/campaign.gd")
 const FARM_RADIUS = {"cow":1.0,"pig":0.72,"chicken":0.28,"tree_oak":0.72,"fence_simple":0.65,"crops_cornStageD":0.4,"crops_wheatStageB":0.3,"tent_smallOpen":1.6,"pumpkin":0.3}
+# The POLYGON Farm palette reads dark beside the game's toy colours, so the
+# themed daily props are lifted by this much (models.gd toy "deco_*").
+const DECO_GAIN := 1.7
 
 func _init() -> void:
 	var box := BoxMesh.new()
@@ -138,6 +141,18 @@ func toy(kind: String, variant: int = 0) -> ArrayMesh:
 	if kind == "huntcow":
 		cache[key] = bake(preload("res://scripts/cow_hunt.gd").parts(self, variant))
 		return cache[key]
+	# Themed daily props and fruit: the baked POLYGON Farm model when the local
+	# library was imported (bake_local_models.gd), else a primitive stand-in.
+	if kind.begins_with("deco_") or kind == "fruit":
+		var synty := "res://assets/synty/%s.res" % (kind if kind != "fruit" else "fruit%d" % variant)
+		if ResourceLoader.exists(synty):
+			var baked := brightened(load(synty), DECO_GAIN)
+			baked.surface_set_material(0, material)
+			cache[key] = baked
+			return baked
+		if kind.begins_with("deco_"):
+			cache[key] = bake(preload("res://scripts/theme_maps.gd").fallback_parts(self, kind.trim_prefix("deco_")))
+			return cache[key]
 	if kind.begins_with("theme_"):
 		cache[key] = bake(preload("res://scripts/theme_maps.gd").parts(self, kind.trim_prefix("theme_"), variant))
 		return cache[key]
@@ -373,4 +388,17 @@ func farm_mesh(id: String, scale_value := 1.0) -> ArrayMesh:
 	var result := ArrayMesh.new()
 	result.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
 	result.surface_set_material(0,material)
+	return result
+
+# A copy of `source` with its vertex colours scaled by `gain` (capped at white).
+static func brightened(source: ArrayMesh, gain: float) -> ArrayMesh:
+	var result := ArrayMesh.new()
+	for surface in source.get_surface_count():
+		var arrays := source.surface_get_arrays(surface)
+		var colors: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
+		for i in colors.size():
+			var c := colors[i]
+			colors[i] = Color(minf(c.r*gain, 1.0), minf(c.g*gain, 1.0), minf(c.b*gain, 1.0), c.a)
+		arrays[Mesh.ARRAY_COLOR] = colors
+		result.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return result

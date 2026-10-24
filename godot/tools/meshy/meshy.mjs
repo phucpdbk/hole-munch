@@ -101,6 +101,18 @@ const KINDS = {
 			"no props, no weapons, no fire, smoke, slime drips, sparks or other effects, chunky stylized shapes, rich saturated colors, " +
 			"full body visible and centered, front view facing the camera, plain white background, no text overlay, game asset",
 	},
+	// The snake daily's pets (snake_trail.gd): cute animals standing on two legs so
+	// the auto-rig takes them, low-poly since a line can hold dozens. Only idle
+	// comes from the library; walk and run come with the rig. tools/bake_critters.gd
+	// turns the clips into flipbook frames, so no skeleton runs in the game.
+	critters: {
+		out: "critters_src", polycount: 3000, rig: true,
+		actions: { idle: 0 },
+		style: "cute chibi animal character for a mobile game, standing upright on its two hind legs like a person in a T-pose " +
+			"with front paws spread out to the sides and legs slightly apart, clearly separated arms and legs, big head, big shiny eyes, " +
+			"mouth closed, no clothes, no props, no effects, chunky simplified shapes, bright soft colors, " +
+			"full body visible and centered, front view facing the camera, plain white background, no text overlay, game asset",
+	},
 	crafts: {
 		out: "crafts_src", polycount: 5000, refs: ["0", "1", "2"],
 		style: "stylized toy spaceship, chunky simplified shapes, bright soft colors, whole object fully visible and centered, " +

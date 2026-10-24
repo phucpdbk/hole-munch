@@ -5,8 +5,16 @@ $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $ignore=Join-Path $project 'assets/local_source/.gdignore'
 if(Test-Path -LiteralPath $ignore) { Remove-Item -LiteralPath $ignore }
 $packs=@{
- 'POLYGON_Farm/POLYGON_Farm_Godot_4_6_2_v1_0_0.zip'=@('SM_Bld_Farmhouse_01','SM_Bld_Farmhouse_02','SM_Bld_Barn_02','SM_Generic_Tree_01','SM_Generic_Tree_02','SM_Veh_Pickup_01')
- 'POLYGON_Starter/POLYGON_Starter_Godot_4_6_2_v1_1_0.zip'=@('SM_PolygonCity_Veh_Car_Small_01','SM_Bean_Female_01','SM_Bean_Town_Female_01','SM_Bean_Cowboy_01')
+ 'POLYGON_Farm/POLYGON_Farm_Godot_4_6_2_v1_0_0.zip'=@('SM_Bld_Farmhouse_01','SM_Bld_Farmhouse_02','SM_Bld_Barn_02','SM_Generic_Tree_01','SM_Generic_Tree_02','SM_Veh_Pickup_01',
+  # Themed daily maps (theme_maps.gd) and their fruit.
+  'SM_Env_Flowers_01','SM_Env_Flowers_02','SM_Env_Flowers_03','SM_Prop_Bush_Round_Row_01','SM_Prop_Well_01',
+  'SM_Env_Tree_Apple_Grown_01','SM_Env_Tree_Cherry_Grown_01','SM_Env_Tree_Orange_Grown_01','SM_Prop_Bench_01','SM_Prop_Sunflower_01',
+  'SM_Prop_PlantBox_Large_01','SM_Prop_Wheelbarrow_01','SM_Env_Vege_Rows_01','SM_Env_Vege_Rows_02','SM_Env_Vege_Rows_03',
+  'SM_Prop_Cabbage_01_L','SM_Prop_Carrot_01_Group','SM_Prop_Lettuce_01_L','SM_Prop_Plant_Bush_02_Tomato','SM_Prop_Plant_Corn_01_L',
+  'SM_Prop_Pumpkin_01_L','SM_Prop_Pumpkin_01_S','SM_Prop_Scarecrow_01','SM_Prop_Fence_Wood_01','SM_Prop_Hay_Bale_Square_01',
+  'SM_Prop_Hay_Bale_Round_01','SM_Bld_ProduceStand_01','SM_Prop_Fence_Painted_01','SM_Generic_Tree_03','SM_Prop_Tomato_01_L',
+  'SM_Prop_Watermelon_01_L','SM_Prop_Sign_Veges_01','SM_Prop_Watering_Can_01')
+ 'POLYGON_Starter/POLYGON_Starter_Godot_4_6_2_v1_1_0.zip'=@('SM_PolygonCity_Veh_Car_Small_01','SM_Bean_Female_01','SM_Bean_Town_Female_01','SM_Bean_Cowboy_01','SM_PolygonPrototype_Prop_Cone_01')
 }
 foreach($pack in $packs.Keys) {
  $zip=[IO.Compression.ZipFile]::OpenRead((Join-Path $Library $pack))

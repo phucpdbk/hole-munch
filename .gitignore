@@ -41,3 +41,4 @@ godot/tools/meshy/gemini.local.json
 # Temporary portrait window written by godot/tools/make-ads.ps1.
 godot/override.cfg
 godot/assets/monsters_src/
+godot/assets/critters_src/

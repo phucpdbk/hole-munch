@@ -34,14 +34,25 @@ static func check_snake(smoke, g) -> void:
 	var from: Vector3 = g.hole_position
 	for frame in 40: g.step(0.02, Vector2.ZERO)
 	smoke.check(g.hole_position.distance_to(from) > 2.0, "the snake saucer keeps gliding with the stick let go")
-	# A pet walks with its legs: the front leg swings while it moves.
+	# A pet runs on its legs: the Meshy pets step through their run frames, the
+	# primitive ones swing their front leg.
 	var walker = snake.roamers[0]
-	var swings: Array = []
-	for frame in 12:
-		walker.position += Vector3(0.05, 0, 0)
+	var poses: Array = []
+	for frame in 30:
+		walker.position += Vector3(0.1, 0, 0)
 		walker.animate(0.02)
-		swings.append(walker.pivots.get("fl", walker.pivots.get("leg_l")).rotation.x)
-	smoke.check(swings.max() - swings.min() > 0.2, "a moving pet swings its legs (%.2f)" % (swings.max() - swings.min()))
+		poses.append(walker.frame(snake.flock.length(walker.kind, walker.clip)) if snake.flipbook else walker.pivots.get("fl", walker.pivots.get("leg_l")).rotation.x)
+	if snake.flipbook:
+		var frames := {}
+		for pose in poses.slice(15): frames[pose] = true
+		smoke.check(walker.clip == "run" and frames.size() >= 3, "a running Meshy pet steps through its run frames (%d)" % frames.size())
+		g.step(0.02, Vector2.ZERO)
+		var batches: Array = snake.flock.batches.values().filter(func(b): return b.multimesh.visible_instance_count > 0)
+		var drawn := 0
+		for b in batches: drawn += b.multimesh.visible_instance_count
+		smoke.check(drawn == snake.roamers.size() and batches.size() <= drawn, "every pet is drawn from the flipbook batches (%d pets, %d batches)" % [drawn, batches.size()])
+	else:
+		smoke.check(poses.max() - poses.min() > 0.2, "a moving pet swings its legs (%.2f)" % (poses.max() - poses.min()))
 	# Catching: the saucer over a pet adds it to the line and a new pet appears.
 	var pet = snake.roamers[0]
 	g.hole_position = Vector3(pet.position.x, 0, pet.position.z)
@@ -118,7 +129,7 @@ static func check_maps(smoke, g) -> void:
 		begin(g, type)
 		var map = g.countryside
 		var city: Array = g.items.filter(func(item): return item.kind in ["shop", "tower", "house", "car", "jamcar", "person"] or item.kind.begins_with("army_") or item.get("defender", false))
-		var decor: Array = g.items.filter(func(item): return item.kind.begins_with("theme_"))
+		var decor: Array = g.items.filter(func(item): return item.kind.begins_with("theme_") or item.kind.begins_with("deco_"))
 		smoke.check(map != null and map.theme == g.ThemeMaps.THEME[type] and city.is_empty() and not decor.is_empty(), "%s plays on the %s map with no city" % [type, map.theme if map else "?"])
 		smoke.check(decor.all(func(item): return item.radius > limit), "%s decorations are too big to swallow" % type)
 		g.go_menu()
