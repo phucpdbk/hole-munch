@@ -48,6 +48,13 @@ func zone(at: Vector3) -> String:
 func ground(x: float, z: float) -> Color:
 	return Color(GROUND[cells.get(Vector2(x, z), "meadow")])
 
+func colors() -> Array:
+	return PALETTE
+
+# The fields need no ground details (theme_maps.gd draws its own).
+func ground_parts(_layout, _models) -> Array:
+	return []
+
 # --- build -----------------------------------------------------------------------
 
 func build(g, rng: RandomNumberGenerator) -> void:

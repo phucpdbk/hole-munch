@@ -1,8 +1,9 @@
 extends Node3D
 
-# Daily mini-game "redlight" (daily_games.gd), red light, green light: snacks
-# lie all over the streets and a light ring round the hole says when it may
-# move. Green: eat. Yellow (YELLOW seconds): stop now. Red: the saucer must
+# Daily mini-game "redlight" (daily_games.gd), red light, green light: fruit
+# lies along the lanes of a running track (theme_maps.gd), and a light ring
+# round the hole and a traffic light on every crossing say when it may move.
+# Green: eat. Yellow (YELLOW seconds): stop now. Red: the saucer must
 # stand still; moving faster than STILL after the REACT grace is a strike,
 # costing CAUGHT_COST points and a FREEZE. MAX_STRIKES strikes end the run.
 # The red light comes sooner and stays longer the more the hole has eaten.
@@ -30,6 +31,12 @@ var freeze := 0.0
 var eaten := 0
 var ring: MeshInstance3D
 var ring_material: StandardMaterial3D
+# Traffic lights on every crossing of the track, all showing the same light.
+var poles: Array[Node3D] = []
+var bulbs := {}
+# A big glowing ball on top of every pole in the current light's colour, so the
+# light reads from the camera above whichever way a pole faces.
+var beacon: StandardMaterial3D
 var rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
@@ -55,6 +62,7 @@ func build(game, seed_value: int) -> void:
 			snack.prey = true
 			snack.value = entry[1]
 			snacks.append(snack)
+	make_poles(game)
 
 func reset() -> void:
 	strikes = 0
@@ -62,15 +70,24 @@ func reset() -> void:
 	eaten = 0
 	set_phase("green", rng.randf_range(GREEN.x, GREEN.y))
 	ring.visible = true
+	for pole in poles: pole.visible = true
 
 func clear() -> void:
 	ring.visible = false
+	for pole in poles: pole.visible = false
 
 func set_phase(value: String, seconds: float) -> void:
 	phase = value
 	timer = seconds
 	since = 0.0
 	ring_material.albedo_color = Color(COLORS[phase], 0.85)
+	for key in bulbs:
+		var lit: bool = key == phase
+		bulbs[key].albedo_color = COLORS[key] if lit else COLORS[key].darkened(0.75)
+		bulbs[key].emission_enabled = lit
+	if beacon:
+		beacon.albedo_color = COLORS[phase]
+		beacon.emission = COLORS[phase]
 
 # Later lights: greens shorten and reds lengthen as snacks go down.
 func pressure() -> float:
@@ -127,3 +144,59 @@ func done() -> bool:
 
 func note() -> String:
 	return I18n.t("light_note_" + phase, [MAX_STRIKES - strikes])
+
+# A traffic light on a corner of every crossing, facing down the track.
+func make_poles(game) -> void:
+	for pole in poles: pole.queue_free()
+	poles.clear()
+	if bulbs.is_empty():
+		for key in COLORS:
+			var glass := StandardMaterial3D.new()
+			glass.emission = COLORS[key]
+			glass.emission_energy_multiplier = 0.6
+			bulbs[key] = glass
+		beacon = StandardMaterial3D.new()
+		beacon.emission_enabled = true
+		beacon.emission_energy_multiplier = 0.35
+	var grey := StandardMaterial3D.new()
+	grey.albedo_color = Color("4a5562")
+	var post := CylinderMesh.new()
+	post.top_radius = 0.09
+	post.bottom_radius = 0.12
+	post.height = 3.4
+	var housing := BoxMesh.new()
+	housing.size = Vector3(0.6, 1.5, 0.45)
+	var bulb := SphereMesh.new()
+	bulb.radius = 0.2
+	bulb.height = 0.4
+	var halo := SphereMesh.new()
+	halo.radius = 0.55
+	halo.height = 1.1
+	for spot in game.layout.junctions():
+		var pole := Node3D.new()
+		pole.position = Vector3(spot.x + 1.9, 0.16, spot.y + 1.9)
+		pole.rotation.y = PI/4
+		var stem := MeshInstance3D.new()
+		stem.mesh = post
+		stem.material_override = grey
+		stem.position.y = 1.7
+		pole.add_child(stem)
+		var head := MeshInstance3D.new()
+		head.mesh = housing
+		head.material_override = grey
+		head.position.y = 3.9
+		pole.add_child(head)
+		for i in 3:
+			var lamp := MeshInstance3D.new()
+			lamp.mesh = bulb
+			lamp.material_override = bulbs[["red", "yellow", "green"][i]]
+			lamp.position = Vector3(0, 4.35 - i*0.45, 0.2)
+			pole.add_child(lamp)
+		var top := MeshInstance3D.new()
+		top.mesh = halo
+		top.material_override = beacon
+		top.position.y = 5.05
+		pole.add_child(top)
+		pole.visible = false
+		add_child(pole)
+		poles.append(pole)

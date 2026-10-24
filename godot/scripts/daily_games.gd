@@ -8,7 +8,7 @@ extends Node3D
 #   skyhop   - one-tap flight through gaps high above the city (sky_hop.gd).
 #   slide    - a turn-based sliding puzzle on a block above the city (slide_puzzle.gd).
 #   siege    - the saucer shoots down the army's air force (sky_siege.gd).
-#   snake    - fruit grows a tail of orbs behind the saucer; never bite it (snake_trail.gd).
+#   snake    - fruit brings pets to follow the saucer; a monster chomps the line (snake_trail.gd).
 #   mole     - moles pop out of manholes for a moment: whack-a-mole (mole_patch.gd).
 #   redlight - red light, green light: eat on green, stand still on red (red_light.gd).
 # The landmark, its guardian and the defence squads sit the round out. game.gd
@@ -27,7 +27,7 @@ const SECONDS := {"stampede":45.0, "coinrain":45.0, "goldrush":60.0, "findcow":7
 # The slide puzzle counts boards solved (its first star at 5); the siege counts
 # its stages, so its target is clearing the first one. The puzzle's own board
 # clock replaces SECONDS once a board is up.
-const TARGET := {"stampede":30, "coinrain":24, "goldrush":30, "findcow":1, "skyhop":20, "slide":1, "siege":1, "snake":15, "mole":25, "redlight":30}
+const TARGET := {"stampede":30, "coinrain":24, "goldrush":30, "findcow":1, "skyhop":20, "slide":1, "siege":1, "snake":12, "mole":25, "redlight":30}
 # Coins paid per catch (gold pays per value point, the sky hop per gap, the
 # siege per enemy point plus a stage bonus); the slide puzzle pays a base,
 # this per board solved and SLIDE_PAR_COINS per board solved in par.
@@ -223,6 +223,13 @@ func road_spot(game, clear: float) -> Vector3:
 
 # --- round -------------------------------------------------------------------------
 
+# Back in a city: the classic games' own nodes (pets, mole hills, lights) go.
+func clear() -> void:
+	siege.clear()
+	snake.clear()
+	moles.clear()
+	light.clear()
+
 # The landmark, its guardian and every defender sit out the mini-game.
 func reset(game) -> void:
 	count = 0
@@ -291,6 +298,7 @@ func update(game, dt: float) -> void:
 		count = siege.run_cleared()
 	elif kind == "snake":
 		snake.update(game, dt)
+		count = snake.length
 	elif kind == "mole":
 		moles.update(game, dt)
 	elif kind == "redlight":
@@ -529,7 +537,8 @@ func caught(game, item: Dictionary) -> void:
 		return
 	if not item.get("prey", false): return
 	if kind == "snake":
-		if snake.caught(game, item): count += 1
+		snake.caught(game, item)
+		count = snake.length
 		return
 	if kind == "mole":
 		count += moles.caught(game, item)

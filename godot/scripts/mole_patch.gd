@@ -1,13 +1,13 @@
 extends Node3D
 
-# Daily mini-game "mole" (daily_games.gd), whack-a-mole on city streets:
-# MANHOLES open on the roads and moles pop out of the ones near the hole for
-# a moment, then duck back down. Swallow one while it is up: a brown mole is
+# Daily mini-game "mole" (daily_games.gd), whack-a-mole in a vegetable patch
+# (theme_maps.gd): HILLS mole hills dot the dirt paths, and moles pop out of
+# the ones near the hole for a moment, then duck back down. Swallow one while it is up: a brown mole is
 # worth 1, a golden one GOLD_POINTS (up for less time). Now and then a gas
 # bomb pops up instead (mechanics.gd stuns the hole on a bite). Each catch
 # shortens how long the next moles stay up, and more pop up at once.
 const I18n = preload("res://scripts/i18n.gd")
-const MANHOLES := 16
+const HILLS := 16
 const MOLES := 4
 const BOMBS := 2
 const MOLE_SIZE := 0.55
@@ -19,7 +19,7 @@ const UP_STEP := 0.08
 const RISE := 0.2
 const GOLD_UP := 0.7
 const POP_GAP := Vector2(0.5, 1.1)
-# Moles pop out of manholes this far from the hole, so one is always in reach.
+# Moles pop out of mole hills this far from the hole, so one is always in reach.
 const REACH := Vector2(3.5, 14.0)
 const SPACING := 5.0
 
@@ -37,7 +37,7 @@ func build(game, seed_value: int) -> void:
 	bombs.clear()
 	spots.clear()
 	rng.seed = seed_value
-	for i in MANHOLES:
+	for i in HILLS:
 		var at: Vector3 = game.daily.road_spot(game, 4.0)
 		for attempt in 16:
 			if spots.all(func(other): return other.distance_to(at) >= SPACING): break
@@ -58,30 +58,43 @@ func build(game, seed_value: int) -> void:
 		bombs.append(bomb)
 	make_lids()
 
-# A dark manhole with a rim on every spot.
+# A mole hill on every spot: a mound of fresh dirt round a dark burrow.
 func make_lids() -> void:
 	for lid in lids: lid.queue_free()
 	lids.clear()
-	var disc := CylinderMesh.new()
-	disc.top_radius = 0.75
-	disc.bottom_radius = 0.75
-	disc.height = 0.04
+	var mound := CylinderMesh.new()
+	mound.top_radius = 0.62
+	mound.bottom_radius = 1.0
+	mound.height = 0.28
+	mound.radial_segments = 14
+	var dirt := StandardMaterial3D.new()
+	dirt.albedo_color = Color("a8784a")
+	var hole := CylinderMesh.new()
+	hole.top_radius = 0.5
+	hole.bottom_radius = 0.5
+	hole.height = 0.02
 	var dark := StandardMaterial3D.new()
-	dark.albedo_color = Color("2b2420")
-	var rim := StandardMaterial3D.new()
-	rim.albedo_color = Color("7a6a58")
-	var ring := TorusMesh.new()
-	ring.inner_radius = 0.7
-	ring.outer_radius = 0.88
+	dark.albedo_color = Color("2b1d14")
+	var clod := SphereMesh.new()
+	clod.radius = 0.12
+	clod.height = 0.2
 	for at in spots:
 		var lid := MeshInstance3D.new()
-		lid.mesh = disc
-		lid.material_override = dark
-		lid.position = Vector3(at.x, 0.17, at.z)
-		var edge := MeshInstance3D.new()
-		edge.mesh = ring
-		edge.material_override = rim
-		lid.add_child(edge)
+		lid.mesh = mound
+		lid.material_override = dirt
+		lid.position = Vector3(at.x, 0.3, at.z)
+		var burrow := MeshInstance3D.new()
+		burrow.mesh = hole
+		burrow.material_override = dark
+		burrow.position.y = 0.15
+		lid.add_child(burrow)
+		for i in 3:
+			var lump := MeshInstance3D.new()
+			lump.mesh = clod
+			lump.material_override = dirt
+			var angle := i*2.1 + at.x
+			lump.position = Vector3(cos(angle)*1.15, -0.1, sin(angle)*1.15)
+			lid.add_child(lump)
 		add_child(lid)
 		lids.append(lid)
 
@@ -124,7 +137,7 @@ func update(game, dt: float) -> void:
 		var at: Vector3 = spots[item.spot]
 		# Pops up over RISE, bobs, and sinks back down over the last part.
 		var lift := clampf((item.total - left)/RISE, 0.0, 1.0)*clampf(left/0.25, 0.0, 1.0)
-		item.position = Vector3(at.x, lerpf(-0.6, 0.16, lift) + sin(left*9.0)*0.03, at.z)
+		item.position = Vector3(at.x, lerpf(-0.6, 0.34, lift) + sin(left*9.0)*0.03, at.z)
 		item.yaw += dt*(2.5 if item.get("bomb", false) else 0.8)
 		if left <= 0:
 			if item.get("prey", false):

@@ -138,6 +138,13 @@ func toy(kind: String, variant: int = 0) -> ArrayMesh:
 	if kind == "huntcow":
 		cache[key] = bake(preload("res://scripts/cow_hunt.gd").parts(self, variant))
 		return cache[key]
+	if kind.begins_with("theme_"):
+		cache[key] = bake(preload("res://scripts/theme_maps.gd").parts(self, kind.trim_prefix("theme_"), variant))
+		return cache[key]
+	if kind in ["pet", "monster"]:
+		var snake = preload("res://scripts/snake_trail.gd")
+		cache[key] = bake(snake.pet_parts(self, variant) if kind == "pet" else snake.monster_parts(self))
+		return cache[key]
 	if kind == "boat":
 		cache[key] = bake(Boats.parts(self, variant))
 		return cache[key]

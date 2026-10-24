@@ -41,6 +41,7 @@ const ArmyForces = preload("res://scripts/army_forces.gd")
 const ArmySoldiers = preload("res://scripts/army_soldiers.gd")
 const Runner = preload("res://scripts/runner.gd")
 const Countryside = preload("res://scripts/countryside.gd")
+const ThemeMaps = preload("res://scripts/theme_maps.gd")
 # Seconds a carry-in power from the daily mini-game lasts (time adds seconds).
 const CARRY_SECONDS := 12.0
 const CARRY_TIME := 10.0
@@ -103,7 +104,8 @@ var layout = MapLayout.make(3, 3)
 var city_blocks = CityBlocks.new()
 # Gold districts, roadblocks, shortcuts and danger zones (scripts/map_features.gd).
 var features = MapFeatures.new()
-# The find-the-cow daily's farmland (countryside.gd); null in every other round.
+# A daily map built instead of a city: the cow hunt's farmland (countryside.gd)
+# or a classic game's themed map (theme_maps.gd); null in every other round.
 var countryside = null
 var stats: Dictionary = campaign.stats()
 var palette: Array = level.palette
@@ -413,7 +415,9 @@ func load_level(index: int) -> void:
 	if run:
 		level.rival = false
 		level.weather = "clear"
-	countryside = Countryside.new() if run_kind == "daily" and daily_kind == "findcow" else null
+	countryside = null
+	if run_kind == "daily" and daily_kind == "findcow": countryside = Countryside.new()
+	elif run_kind == "daily" and ThemeMaps.themed(daily_kind): countryside = ThemeMaps.new(daily_kind)
 	goal_list = [] if run else Challenges.goals(level)
 	layout = MapLayout.make(Runner.COLS, Runner.ROWS) if run else MapLayout.make(level.cols, level.rows)
 	if not run: layout.vary_districts(campaign.selected)
@@ -422,7 +426,7 @@ func load_level(index: int) -> void:
 	if run_kind in ["campaign", "endless"]: MapShapes.apply(layout, MapShapes.for_level(level))
 	models.snow_material.set_shader_parameter("snow_amount",0.95 if level.weather == "snow" else 0.0)
 	stats = campaign.stats()
-	palette = Countryside.PALETTE if countryside else level.palette
+	palette = countryside.colors() if countryside else level.palette
 	items.clear()
 	minions.clear()
 	batches.clear()
@@ -453,6 +457,7 @@ func load_level(index: int) -> void:
 		if countryside: make_countryside()
 		else: make_city()
 	if run_kind == "daily": daily.build(self, daily_kind, 7177 + campaign.selected*53)
+	else: daily.clear()
 	make_batches()
 	weather.configure(level.weather, sky_environment, sunlight, Color(palette[5]))
 	# Evening festivals (Mid-Autumn, Halloween): dim violet light under a dusk sky.
@@ -553,7 +558,8 @@ func make_ground() -> void:
 		parts.append(models.piece("box", Vector3(cell.x, 0.075, cell.y), Vector3(block.x, 0.1, block.y), Color(palette[2])))
 		parts.append(models.piece("box", Vector3(cell.x, 0.13, cell.y), Vector3(block.x-2.1, 0.06, block.y-2.1), inner_ground(cell.x, cell.y)))
 	if countryside:
-		# Dirt tracks: no lane dashes or crossings.
+		# Dirt tracks or themed paths: no lane dashes or crossings.
+		parts.append_array(countryside.ground_parts(layout, models))
 		finish_ground(parts)
 		return
 	# Lane dashes only where the street is there (not under a bay or a lake).
@@ -680,8 +686,8 @@ func make_city() -> void:
 	make_boss()
 	mechanics.setup(self, is_landmark() and int(level.index) >= Mechanics.GUARDIAN_FROM, 4819 + campaign.selected*137 + 7)
 
-# The find-the-cow farmland: fields, forest and a farmyard, no city, army or
-# guardian. The boss is still made (hidden by the daily) so its index stays valid.
+# The find-the-cow farmland (fields, forest and a farmyard) or a themed daily
+# map (theme_maps.gd): no city, army or guardian. The boss is still made (hidden by the daily) so its index stays valid.
 func make_countryside() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 4819 + campaign.selected*137

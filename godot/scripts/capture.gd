@@ -165,6 +165,40 @@ func run(game, campaign_mode: bool) -> void:
 		await snapshot("gold-bank")
 		g.get_tree().quit()
 		return
+	# The classic dailies on their themed maps (test-output/classic-snake.png,
+	# classic-mole.png, classic-green.png, classic-red.png).
+	if "--classic-capture" in OS.get_cmdline_user_args():
+		g.campaign.daily = {}
+		g.daily_override = "snake"
+		g.start_daily()
+		g.started = true
+		g.bot_input = Vector2(1, 0.3)
+		await frames(50)
+		g.daily.snake.length = 8
+		g.daily.snake.monster_wait = 0.0
+		g.daily.snake.monster_at = g.daily.snake.orb_at(7) + Vector3(-3.0, 0, 1.5)
+		await frames(20)
+		await snapshot("classic-snake")
+		g.bot_input = Vector2.ZERO
+		g.go_menu()
+		g.campaign.daily = {}
+		g.daily_override = "mole"
+		g.start_daily()
+		g.started = true
+		await frames(150)
+		await snapshot("classic-mole")
+		g.go_menu()
+		g.campaign.daily = {}
+		g.daily_override = "redlight"
+		g.start_daily()
+		g.started = true
+		await frames(30)
+		await snapshot("classic-green")
+		g.daily.light.set_phase("red", 99.0)
+		await frames(10)
+		await snapshot("classic-red")
+		g.get_tree().quit()
+		return
 	# Each sky hop map a few gaps in (test-output/hop-map-0.png ... hop-map-4.png).
 	if "--hopmaps-capture" in OS.get_cmdline_user_args():
 		var hop = g.daily.hop

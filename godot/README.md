@@ -230,19 +230,31 @@ its landmark to conquer it, while dodging independent military defenders.
   rival and one continent tougher defence; the first win of the day pays ×1.5.
   Mini-games by date (ten, `Campaign.DAILY_TYPES`).
   **Classic games with the saucer** (fixed starting hole, checked in
-  `classic_daily_smoke.gd`): **Saucer snake** (`snake_trail.gd`, 90 s) — the
-  saucer never stops (an idle stick keeps its last direction); three fruits sit
-  on the roads, each one eaten adds a glowing orb to a tail that follows the
-  hole's path, and running into the tail past its first 4 orbs ends the run;
-  target 15 fruits, 5 coins each. **Mole munch** (`mole_patch.gd`, 60 s) —
-  whack-a-mole: moles pop out of 16 manholes 3.5–14 from the hole for 3 s
-  (down to 1.3 s as catches add up), two at a time and three from 10 catches;
-  golden moles pay 3 and stay up for less, gas bombs pop up too; target 25.
-  **Red light, green light** (`red_light.gd`, 75 s, clear weather) — 44
-  fruits (watermelons pay 3) and a light ring round the hole: green 2.4–5 s,
-  yellow 0.8 s, red 1.5–3 s (greens shorten and reds lengthen as fruit goes
-  down); moving on red after a 0.3 s grace costs 3 points and a 1.2 s freeze,
-  three strikes end the run; target 30.
+  `classic_daily_smoke.gd`). Each plays on its own themed map instead of a city
+  (`theme_maps.gd`, like the cow hunt's farmland): the street grid stays as
+  paths and the blocks are decorated by theme, every decoration too big to
+  swallow, with no buildings, traffic or army. `-- --capture --classic-capture`
+  shoots all three (`test-output/classic-*.png`).
+  **Saucer snake** (`snake_trail.gd`, 90 s, a flower garden: lawns, sand
+  paths, flower beds, hedges, a fountain) — the saucer never stops (an idle
+  stick keeps its last direction); three fruits sit on the paths, and each one
+  eaten brings a pet (chick, bunny, piglet, kitten) hopping along the hole's
+  path behind it. A purple monster naps 3 s in a far corner, then chases the
+  line (3.4 rising to 5.6 a second as it grows) and chomps the last pet, then
+  chews 1.4 s; with no pets left it bites 3 s off the clock. Running into the
+  line past its first 4 pets ends the run. The score is the line at the end;
+  target 12 pets, 5 coins each. **Mole munch** (`mole_patch.gd`, 60 s, a
+  vegetable patch: furrowed soil, carrot and cabbage rows, scarecrows) —
+  whack-a-mole: moles pop out of 16 mole hills on the dirt paths 3.5–14 from
+  the hole for 3 s (down to 1.3 s as catches add up), two at a time and three
+  from 10 catches; golden moles pay 3 and stay up for less, gas bombs pop up
+  too; target 25. **Red light, green light** (`red_light.gd`, 75 s, clear
+  weather, a blue running track with striped turf, stands and flags) — 44
+  fruits (watermelons pay 3), a light ring round the hole and a traffic light
+  with a coloured beacon on every crossing: green 2.4–5 s, yellow 0.8 s, red
+  1.5–3 s (greens shorten and reds lengthen as fruit goes down); moving on red
+  after a 0.3 s grace costs 3 points and a 1.2 s freeze, three strikes end the
+  run; target 30.
   **Checkpoints**: the ladder games keep their furthest point for good
   (`Campaign.checkpoints`, `reach_checkpoint`): the slide puzzle's board, the
   siege's stage, the sky hop every 10 gaps and the cow hunt's level. A run

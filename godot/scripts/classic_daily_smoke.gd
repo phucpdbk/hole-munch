@@ -7,6 +7,7 @@ static func run(smoke, g) -> void:
 	check_snake(smoke, g)
 	check_mole(smoke, g)
 	check_red_light(smoke, g)
+	check_maps(smoke, g)
 
 static func begin(g, type: String) -> void:
 	g.campaign.daily = {}
@@ -14,14 +15,16 @@ static func begin(g, type: String) -> void:
 	g.start_daily()
 	g.defense.grace = INF
 
-# Saucer snake (snake_trail.gd): fruit on the roads, a tail that grows by one
-# orb a fruit and follows the hole's path, a saucer that keeps gliding, and a
-# bite into the tail that ends the run.
+# Saucer snake (snake_trail.gd): fruit on the garden paths, a line of pets
+# that grows by one a fruit and follows the hole's path, a saucer that keeps
+# gliding, a monster that chomps the last pet, and running into the line that
+# ends the run.
 static func check_snake(smoke, g) -> void:
 	begin(g, "snake")
 	var snake = g.daily.snake
 	var limit: float = Campaign.START_RADIUS*g.EAT_RATIO
-	smoke.check(g.mode == "playing" and snake.fruits.size() == snake.FRUITS and snake.fruits.all(func(f): return not f.hidden and f.radius < limit), "the snake starts with fruit on the roads, each fits the hole")
+	smoke.check(g.mode == "playing" and snake.fruits.size() == snake.FRUITS and snake.fruits.all(func(f): return not f.hidden and f.radius < limit), "the snake starts with fruit on the paths, each fits the hole")
+	smoke.check(snake.monster.visible and snake.monster_wait > 0 and snake.flat_gap(snake.monster_at, g.hole_position) > 10.0, "the monster naps far from the saucer at the start")
 	g.step(0.02, Vector2(1, 0))
 	var from: Vector3 = g.hole_position
 	for frame in 40: g.step(0.02, Vector2.ZERO)
@@ -32,13 +35,27 @@ static func check_snake(smoke, g) -> void:
 		if fruit.fall >= 0 or fruit.hidden: continue
 		g.swallow(fruit)
 		bitten += 1
-	smoke.check(bitten > 0 and snake.length == g.daily.count and g.daily.count == before + bitten and is_equal_approx(g.target_radius, float(g.stats.start_radius)), "each fruit adds an orb to the tail and scores, and the hole keeps its size")
+	smoke.check(bitten > 0 and snake.length == g.daily.count and g.daily.count == before + bitten and is_equal_approx(g.target_radius, float(g.stats.start_radius)), "each fruit brings a pet into the line and scores, and the hole keeps its size")
 	for frame in 40: g.step(0.02, Vector2(0, 1))
 	smoke.check(snake.fruits.all(func(f): return not f.eaten and (f.fall >= 0 or not f.hidden)), "eaten fruit comes back somewhere else")
-	smoke.check(snake.orb_at(0).distance_to(Vector3(g.hole_position.x, 0, g.hole_position.z)) < snake.ORB_GAP*1.6 and snake.orbs[0].visible, "the tail follows right behind the saucer")
-	smoke.check(not snake.crashed and g.mode == "playing", "a straight run never bites the tail")
-	# A full loop: the trail circles back to the hole, so a later orb sits on it.
+	var first: MeshInstance3D = snake.pets[0]
+	smoke.check(snake.flat_gap(first.position, g.hole_position) < snake.ORB_GAP*1.6 and first.visible and not snake.pets[snake.length].visible, "the pets hop right behind the saucer")
+	smoke.check(not snake.crashed and g.mode == "playing", "a straight run never bites the line")
+	# The monster catches the last pet: the line and the score drop by one.
+	var line: int = snake.length
+	snake.monster_wait = 0.0
+	snake.monster_at = snake.orb_at(line - 1)
+	g.step(0.02, Vector2.ZERO)
+	smoke.check(snake.length == line - 1 and g.daily.count == line - 1 and snake.chomped == 1 and snake.monster_wait > 0, "the monster chomps the last pet, then chews")
+	snake.length = 0
+	snake.monster_wait = 0.0
+	snake.monster_at = Vector3(g.hole_position.x, 0, g.hole_position.z)
+	var clock: float = g.remaining
+	g.step(0.02, Vector2.ZERO)
+	smoke.check(g.remaining < clock - snake.BITE_TIME + 0.1, "with no pets left the monster bites the saucer's clock")
+	# A full loop: the trail circles back to the hole, so a later pet sits on it.
 	snake.length = 10
+	snake.monster_wait = 99.0
 	var loop: float = 8*snake.ORB_GAP
 	var turn := int(loop/snake.STEP)
 	var centre: Vector3 = Vector3(g.spawn.x, 0, g.spawn.z) + Vector3(loop/TAU, 0, 0)
@@ -48,17 +65,31 @@ static func check_snake(smoke, g) -> void:
 		snake.trail.append(centre + Vector3(cos(angle), 0, sin(angle))*loop/TAU)
 	g.hole_position = snake.trail[-1]
 	snake.update(g, 0.0)
-	smoke.check(snake.crashed and g.daily.done(), "running into the tail ends the snake run")
+	smoke.check(snake.crashed and g.daily.done(), "running into the pet line ends the snake run")
 	g.step(0.02, Vector2.ZERO)
-	smoke.check(g.mode == "result", "the bitten snake goes to the result")
+	smoke.check(g.mode == "result", "the crashed snake goes to the result")
 	g.go_menu()
 
-# Mole munch (mole_patch.gd): moles pop out of manholes near the hole, duck
+# Each classic game plays on its own themed map, not a city: no buildings,
+# traffic or army, and no decoration the hole could swallow.
+static func check_maps(smoke, g) -> void:
+	var limit: float = Campaign.START_RADIUS*g.EAT_RATIO
+	for type in ["snake", "mole", "redlight"]:
+		begin(g, type)
+		var map = g.countryside
+		var city: Array = g.items.filter(func(item): return item.kind in ["shop", "tower", "house", "car", "jamcar", "person"] or item.kind.begins_with("army_") or item.get("defender", false))
+		var decor: Array = g.items.filter(func(item): return item.kind.begins_with("theme_"))
+		smoke.check(map != null and map.theme == g.ThemeMaps.THEME[type] and city.is_empty() and not decor.is_empty(), "%s plays on the %s map with no city" % [type, map.theme if map else "?"])
+		smoke.check(decor.all(func(item): return item.radius > limit), "%s decorations are too big to swallow" % type)
+		g.go_menu()
+	smoke.check(g.daily.light.poles.size() == g.layout.junctions().size() and g.daily.light.poles.all(func(p): return not p.visible), "the track has a traffic light on every crossing, hidden back in the city")
+
+# Mole munch (mole_patch.gd): moles pop out of mole hills near the hole, duck
 # back down if missed, and score 1 (golden 3) when swallowed in time.
 static func check_mole(smoke, g) -> void:
 	begin(g, "mole")
 	var moles = g.daily.moles
-	smoke.check(moles.spots.size() == moles.MANHOLES and moles.lids.all(func(l): return l.visible) and (moles.moles + moles.bombs).all(func(m): return m.hidden), "manholes open on the roads and every mole starts hidden")
+	smoke.check(moles.spots.size() == moles.HILLS and moles.lids.all(func(l): return l.visible) and (moles.moles + moles.bombs).all(func(m): return m.hidden), "mole hills dot the paths and every mole starts hidden")
 	g.started = true
 	var brown: Array = moles.moles.slice(0, moles.MOLES)
 	var up: Array = []
