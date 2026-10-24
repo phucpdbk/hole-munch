@@ -406,8 +406,9 @@ func load_level(index: int) -> void:
 		level.rival = daily_kind == "goldrush"
 		level.seconds = DailyGames.SECONDS[daily_kind]
 		# The sky hop and the puzzle sit above the weather, and fog would hide the
-		# siege's planes, so all three play in clear skies.
-		if daily_kind in ["skyhop", "slide", "siege"]: level.weather = "clear"
+		# siege's planes, so all three play in clear skies; so do the snake and the
+		# red light, where a slippery or windy hole could not steer or stop on cue.
+		if daily_kind in ["skyhop", "slide", "siege", "snake", "redlight"]: level.weather = "clear"
 	var run := run_kind == "runner"
 	if run:
 		level.rival = false
@@ -1309,6 +1310,8 @@ func step(dt: float, input: Vector2) -> void:
 	if remaining <= 10 and remaining > 0 and int(ceil(remaining)) != last_tick:
 		last_tick = int(ceil(remaining))
 		sfx.play("tick")
+	# The snake daily keeps the saucer gliding the last way it was pushed.
+	if run_kind == "daily": input = daily.steer(input)
 	var wanted: Vector3 = screen_move(input)*(5.8+minf(radius,4.0)*0.45)*float(stats.speed)*defense.speed_multiplier()*mechanics.speed_multiplier()*skills.speed_multiplier()*(daily.speed_scale() if run_kind == "daily" else 1.0)
 	hole_velocity = mechanics.steer(wanted, dt, elapsed)
 	hole_position += hole_velocity*dt

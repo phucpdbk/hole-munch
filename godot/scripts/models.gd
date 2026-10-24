@@ -186,6 +186,31 @@ func toy(kind: String, variant: int = 0) -> ArrayMesh:
 			# Daily coin rain: a standing gold coin with a darker rim.
 			parts.append(piece("cyl", Vector3(0, 0.42, 0), Vector3(0.36, 0.08, 0.36), Color("e0a526"), Vector3(PI/2, 0, 0)))
 			parts.append(piece("cyl", Vector3(0, 0.42, 0), Vector3(0.27, 0.1, 0.27), Color("ffd95a"), Vector3(PI/2, 0, 0)))
+		"fruit":
+			# Daily snake and red light: an apple, an orange and a watermelon.
+			match variant:
+				0:
+					parts.append(piece("ball", Vector3(0, 0.36, 0), Vector3(0.4, 0.36, 0.4), Color("e63946")))
+					parts.append(piece("cyl", Vector3(0, 0.6, 0), Vector3(0.04, 0.14, 0.04), Color("6b4226")))
+					parts.append(piece("ball", Vector3(0.08, 0.64, 0), Vector3(0.12, 0.04, 0.07), Color("52b043"), Vector3(0, 0, 0.5)))
+				1:
+					parts.append(piece("ball", Vector3(0, 0.36, 0), Vector3.ONE*0.38, Color("ff9a1f")))
+					parts.append(piece("ball", Vector3(0, 0.72, 0), Vector3(0.1, 0.04, 0.06), Color("52b043")))
+				_:
+					parts.append(piece("ball", Vector3(0, 0.34, 0), Vector3(0.52, 0.36, 0.4), Color("2f8f3a")))
+					for x in [-0.25, 0.0, 0.25]: parts.append(piece("box", Vector3(x, 0.34, 0), Vector3(0.06, 0.68, 0.81), Color("1f6b2a")))
+		"mole":
+			# Daily whack-a-mole: a mole facing +z; variant 1 is golden with a crown.
+			var fur := Color("f2c23a") if variant == 1 else Color("7a5236")
+			parts.append(piece("ball", Vector3(0, 0.4, 0), Vector3(0.5, 0.56, 0.46), fur))
+			parts.append(piece("ball", Vector3(0, 0.36, 0.22), Vector3(0.34, 0.3, 0.2), fur.lightened(0.3)))
+			parts.append(piece("ball", Vector3(0, 0.52, 0.42), Vector3.ONE*0.09, Color("ff8fa8")))
+			for x in [-0.12, 0.12]:
+				parts.append(piece("ball", Vector3(x, 0.64, 0.36), Vector3.ONE*0.05, Color("1d2430")))
+				parts.append(piece("ball", Vector3(x*2.2, 0.32, 0.36), Vector3(0.12, 0.06, 0.1), Color("ffb3c1")))
+			if variant == 1:
+				parts.append(piece("cyl", Vector3(0, 0.86, 0.05), Vector3(0.24, 0.12, 0.24), Color("ffe58a")))
+				for i in 5: parts.append(piece("roof", Vector3(cos(i*TAU/5)*0.19, 0.98, 0.05 + sin(i*TAU/5)*0.19), Vector3.ONE*0.07, Color("ffe58a")))
 		"gold":
 			# Daily gold rush: bars, a treasure chest and a golden statue.
 			match variant:

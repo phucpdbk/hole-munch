@@ -39,13 +39,15 @@ func open() -> void:
 	show()
 	layout()
 
+# Landscape needs a third column once the list is too long for a short screen.
 func columns() -> int:
-	return 2 if size.x > size.y else 1
+	if size.x <= size.y: return 1
+	return 3 if choices().size() > 8 else 2
 
 func card_rect() -> Rect2:
 	var count := choices().size()
 	var lines := ceili(count/float(columns()))
-	var width := minf(size.x - 48, 820.0 if columns() == 2 else 640.0)
+	var width := minf(size.x - 48, [640.0, 820.0, 1100.0][columns() - 1])
 	var height := 88.0 + lines*(ROW_H + GOAL_H + 10)
 	return Rect2((size.x - width)/2, (size.y - height)/2, width, height)
 

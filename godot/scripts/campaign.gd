@@ -592,7 +592,7 @@ func complete_goals(mask: int, score: int) -> void:
 # Reaching the mini-game's target the first time that day pays a bonus and a
 # carry-in power for the campaign (daily_games.gd has the games themselves).
 const DAILY_COIN_BONUS := 1.5
-const DAILY_TYPES := ["stampede", "coinrain", "goldrush", "findcow", "skyhop", "slide", "siege"]
+const DAILY_TYPES := ["stampede", "coinrain", "goldrush", "findcow", "skyhop", "slide", "siege", "snake", "mole", "redlight"]
 const DAILY_ATTEMPTS := 3
 # Rewarded ads can add this many more tries a day ("bonus" in the record).
 const DAILY_AD_TRIES := 2

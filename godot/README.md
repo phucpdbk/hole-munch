@@ -228,7 +228,21 @@ its landmark to conquer it, while dodging independent military defenders.
   about 70–90% of the timer).
 - **Daily challenge** (THỬ THÁCH NGÀY): one city per date for everyone, with a
   rival and one continent tougher defence; the first win of the day pays ×1.5.
-  Mini-games by date (seven, `Campaign.DAILY_TYPES`).
+  Mini-games by date (ten, `Campaign.DAILY_TYPES`).
+  **Classic games with the saucer** (fixed starting hole, checked in
+  `classic_daily_smoke.gd`): **Saucer snake** (`snake_trail.gd`, 90 s) — the
+  saucer never stops (an idle stick keeps its last direction); three fruits sit
+  on the roads, each one eaten adds a glowing orb to a tail that follows the
+  hole's path, and running into the tail past its first 4 orbs ends the run;
+  target 15 fruits, 5 coins each. **Mole munch** (`mole_patch.gd`, 60 s) —
+  whack-a-mole: moles pop out of 16 manholes 3.5–14 from the hole for 3 s
+  (down to 1.3 s as catches add up), two at a time and three from 10 catches;
+  golden moles pay 3 and stay up for less, gas bombs pop up too; target 25.
+  **Red light, green light** (`red_light.gd`, 75 s, clear weather) — 44
+  fruits (watermelons pay 3) and a light ring round the hole: green 2.4–5 s,
+  yellow 0.8 s, red 1.5–3 s (greens shorten and reds lengthen as fruit goes
+  down); moving on red after a 0.3 s grace costs 3 points and a 1.2 s freeze,
+  three strikes end the run; target 30.
   **Checkpoints**: the ladder games keep their furthest point for good
   (`Campaign.checkpoints`, `reach_checkpoint`): the slide puzzle's board, the
   siege's stage, the sky hop every 10 gaps and the cow hunt's level. A run
