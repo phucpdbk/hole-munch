@@ -11,6 +11,7 @@ extends Node3D
 #   snake    - catch roaming pets to grow a line; monsters bite it (snake_trail.gd).
 #   mole     - moles pop out of manholes for a moment: whack-a-mole (mole_patch.gd).
 #   redlight - red light, green light: eat on green, stand still on red (red_light.gd).
+#   beam     - beam toys up and drop each on the pad that wants it (beam_drop.gd).
 # The landmark, its guardian and the defence squads sit the round out. game.gd
 # owns the items; this node adds the game's own items when the city is built,
 # moves them, counts catches and draws the shadows of falling coins.
@@ -23,19 +24,20 @@ const SkySiege = preload("res://scripts/sky_siege.gd")
 const SnakeTrail = preload("res://scripts/snake_trail.gd")
 const MolePatch = preload("res://scripts/mole_patch.gd")
 const RedLight = preload("res://scripts/red_light.gd")
-const SECONDS := {"stampede":45.0, "coinrain":45.0, "goldrush":60.0, "findcow":75.0, "skyhop":120.0, "slide":30.0, "siege":90.0, "snake":90.0, "mole":60.0, "redlight":75.0}
+const BeamDrop = preload("res://scripts/beam_drop.gd")
+const SECONDS := {"stampede":45.0, "coinrain":45.0, "goldrush":60.0, "findcow":75.0, "skyhop":120.0, "slide":30.0, "siege":90.0, "snake":90.0, "mole":60.0, "redlight":75.0, "beam":90.0}
 # The slide puzzle counts boards solved (its first star at 5); the siege counts
 # its stages, so its target is clearing the first one. The puzzle's own board
 # clock replaces SECONDS once a board is up.
-const TARGET := {"stampede":30, "coinrain":24, "goldrush":30, "findcow":1, "skyhop":20, "slide":1, "siege":1, "snake":12, "mole":25, "redlight":30}
+const TARGET := {"stampede":30, "coinrain":24, "goldrush":30, "findcow":1, "skyhop":20, "slide":1, "siege":1, "snake":12, "mole":25, "redlight":30, "beam":12}
 # Coins paid per catch (gold pays per value point, the sky hop per gap, the
 # siege per enemy point plus a stage bonus); the slide puzzle pays a base,
 # this per board solved and SLIDE_PAR_COINS per board solved in par.
-const COIN_RATE := {"stampede":3, "coinrain":4, "goldrush":4, "findcow":1, "skyhop":5, "slide":6, "siege":3, "snake":5, "mole":3, "redlight":3}
+const COIN_RATE := {"stampede":3, "coinrain":4, "goldrush":4, "findcow":1, "skyhop":5, "slide":6, "siege":3, "snake":5, "mole":3, "redlight":3, "beam":5}
 const SLIDE_BASE_COINS := 15
 const SLIDE_PAR_COINS := 4
 const SIEGE_STAGE_COINS := 15
-const ICON := {"stampede":"target", "coinrain":"coin", "goldrush":"chest", "findcow":"target", "skyhop":"star", "slide":"gem", "siege":"fire", "snake":"food", "mole":"bolt", "redlight":"clock"}
+const ICON := {"stampede":"target", "coinrain":"coin", "goldrush":"chest", "findcow":"target", "skyhop":"star", "slide":"gem", "siege":"fire", "snake":"food", "mole":"bolt", "redlight":"clock", "beam":"magnet"}
 const STAR_SHARES := [0.5, 1.0, 1.5]
 # Duck families: a mother leads a line of ducklings. Each duckling eaten from
 # the tail of an unbroken line scores one more than the last (1..5); a mother
@@ -74,7 +76,7 @@ const DROP_RANGE := 10.0
 const GOLD := [[0, 0.32, 1, 20], [1, 0.55, 3, 7], [2, 0.75, 8, 3]]
 # Mini-games whose hole (and the gold rival's) never grows; every prey above
 # fits a starting hole (Campaign.START_RADIUS*EAT_RATIO ~ 0.8).
-const FIXED_HOLE := ["stampede", "coinrain", "goldrush", "snake", "mole", "redlight"]
+const FIXED_HOLE := ["stampede", "coinrain", "goldrush", "snake", "mole", "redlight", "beam"]
 const BANK_RADIUS := 2.6
 const CARRY_SLOW := 0.04
 const CARRY_FLOOR := 0.5
@@ -103,6 +105,7 @@ var siege := SkySiege.new()
 var snake := SnakeTrail.new()
 var moles := MolePatch.new()
 var light := RedLight.new()
+var beam := BeamDrop.new()
 
 func _ready() -> void:
 	var shadow := StandardMaterial3D.new()
@@ -130,6 +133,7 @@ func _ready() -> void:
 	add_child(snake)
 	add_child(moles)
 	add_child(light)
+	add_child(beam)
 
 static func title(type: String) -> String:
 	return I18n.t("dg_" + type)
@@ -204,6 +208,8 @@ func build(game, type: String, value: int) -> void:
 		"redlight":
 			light.build(game, value)
 			prey.append_array(light.snacks)
+		"beam":
+			beam.build(game, value)
 	for item in prey + sky: item.optional = true
 
 # A spot on a road, away from the spawn point.
@@ -228,6 +234,7 @@ func clear() -> void:
 	snake.clear()
 	moles.clear()
 	light.clear()
+	beam.clear()
 
 # The landmark, its guardian and every defender sit out the mini-game.
 func reset(game) -> void:
@@ -267,6 +274,8 @@ func reset(game) -> void:
 	else: moles.clear()
 	if kind == "redlight": light.reset()
 	else: light.clear()
+	if kind == "beam": beam.reset(game)
+	else: beam.clear()
 
 func park(game, drop: Dictionary) -> void:
 	drop.hidden = true
@@ -302,6 +311,9 @@ func update(game, dt: float) -> void:
 		moles.update(game, dt)
 	elif kind == "redlight":
 		light.update(game, dt)
+	elif kind == "beam":
+		beam.update(game, dt)
+		count = beam.placed
 
 # The snake never stops: an idle stick keeps the saucer's last direction.
 func steer(input: Vector2) -> Vector2:
@@ -597,6 +609,7 @@ func dots() -> Array:
 	if kind == "findcow" or kind == "slide": return list
 	if kind == "siege": return siege.dots()
 	if kind == "mole": return moles.dots()
+	if kind == "beam": return beam.dots()
 	if kind == "snake": return snake.dots()
 	for item in prey + sky:
 		if item.get("prey", false) and Traffic.is_active(item) and item.get("falling", 0.0) <= 0:
@@ -611,6 +624,7 @@ func note() -> String:
 	if kind == "goldrush" and carried > 0: return I18n.t("gold_note", carried)
 	if kind == "snake": return snake.note()
 	if kind == "redlight": return light.note()
+	if kind == "beam": return beam.note()
 	return hunt.note() if kind == "findcow" else ""
 
 # Camera zoom: the snake garden is seen closer up.
@@ -621,4 +635,5 @@ func zoom_scale() -> float:
 func speed_scale() -> float:
 	if kind == "goldrush": return maxf(CARRY_FLOOR, 1.0/(1.0 + carried*CARRY_SLOW))
 	if kind == "redlight": return light.speed_scale()
+	if kind == "beam": return beam.speed_scale()
 	return hunt.speed_scale() if kind == "findcow" else 1.0

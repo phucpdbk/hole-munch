@@ -165,6 +165,35 @@ func run(game, campaign_mode: bool) -> void:
 		await snapshot("gold-bank")
 		g.get_tree().quit()
 		return
+	# The beam daily's depot with a toy in the beam over its pad
+	# (test-output/beam-carry.png) and a board part filled (beam-board.png).
+	if "--beam-capture" in OS.get_cmdline_user_args():
+		g.campaign.daily = {}
+		g.daily_override = "beam"
+		g.start_daily()
+		g.started = true
+		var beam = g.daily.beam
+		for pad in beam.pads.slice(0, 2):
+			var pile: Dictionary = beam.piles.filter(func(p): return beam.fits(pad, p.stack[-1]))[0]
+			for at in [pile.at, pad.at]:
+				g.hole_position = at
+				beam.tap(g)
+				await frames(30)
+		var last: Dictionary = beam.pads[2]
+		g.hole_position = beam.piles.filter(func(p): return beam.fits(last, p.stack[-1]))[0].at
+		beam.tap(g)
+		await frames(30)
+		g.hole_position = last.at + Vector3(0.6, 0, 1.4)
+		await frames(20)
+		await snapshot("beam-carry")
+		g.hole_position = last.at
+		beam.tap(g)
+		await frames(30)
+		g.hole_position = Vector3(0, 0, 6.5)
+		await frames(20)
+		await snapshot("beam-board")
+		g.get_tree().quit()
+		return
 	# The classic dailies on their themed maps (test-output/classic-snake.png,
 	# classic-mole.png, classic-green.png, classic-red.png).
 	if "--classic-capture" in OS.get_cmdline_user_args():

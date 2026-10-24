@@ -42,6 +42,7 @@ const ArmySoldiers = preload("res://scripts/army_soldiers.gd")
 const Runner = preload("res://scripts/runner.gd")
 const Countryside = preload("res://scripts/countryside.gd")
 const ThemeMaps = preload("res://scripts/theme_maps.gd")
+const BeamYard = preload("res://scripts/beam_yard.gd")
 # Seconds a carry-in power from the daily mini-game lasts (time adds seconds).
 const CARRY_SECONDS := 12.0
 const CARRY_TIME := 10.0
@@ -409,8 +410,9 @@ func load_level(index: int) -> void:
 		level.seconds = DailyGames.SECONDS[daily_kind]
 		# The sky hop and the puzzle sit above the weather, and fog would hide the
 		# siege's planes, so all three play in clear skies; so do the snake and the
-		# red light, where a slippery or windy hole could not steer or stop on cue.
-		if daily_kind in ["skyhop", "slide", "siege", "snake", "redlight"]: level.weather = "clear"
+		# red light, where a slippery or windy hole could not steer or stop on cue,
+		# and the beam, whose toys must stop right over their pads.
+		if daily_kind in ["skyhop", "slide", "siege", "snake", "redlight", "beam"]: level.weather = "clear"
 	var run := run_kind == "runner"
 	if run:
 		level.rival = false
@@ -418,6 +420,7 @@ func load_level(index: int) -> void:
 	countryside = null
 	if run_kind == "daily" and daily_kind == "findcow": countryside = Countryside.new()
 	elif run_kind == "daily" and ThemeMaps.themed(daily_kind): countryside = ThemeMaps.new(daily_kind, campaign.checkpoint(daily_kind))
+	elif run_kind == "daily" and daily_kind == "beam": countryside = BeamYard.new()
 	goal_list = [] if run else Challenges.goals(level)
 	layout = MapLayout.make(Runner.COLS, Runner.ROWS) if run else MapLayout.make(level.cols, level.rows)
 	if not run: layout.vary_districts(campaign.selected)
@@ -1214,6 +1217,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		slide_input(event)
 		return
 	var tapped: bool = (event is InputEventScreenTouch or event is InputEventMouseButton) and event.pressed
+	# The beam daily lifts and drops its toys on quick taps; drags still steer.
+	if run_kind == "daily" and daily.kind == "beam": daily.beam.input(self, event)
 	# The skill button takes its presses (and the mouse copy of a touch) before the stick.
 	if tapped and hud.skill_hit(event.position):
 		use_skill()

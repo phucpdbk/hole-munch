@@ -592,7 +592,7 @@ func complete_goals(mask: int, score: int) -> void:
 # Reaching the mini-game's target the first time that day pays a bonus and a
 # carry-in power for the campaign (daily_games.gd has the games themselves).
 const DAILY_COIN_BONUS := 1.5
-const DAILY_TYPES := ["stampede", "coinrain", "goldrush", "findcow", "skyhop", "slide", "siege", "snake", "mole", "redlight"]
+const DAILY_TYPES := ["stampede", "coinrain", "goldrush", "findcow", "skyhop", "slide", "siege", "snake", "mole", "redlight", "beam"]
 const DAILY_ATTEMPTS := 3
 # Rewarded ads can add this many more tries a day ("bonus" in the record).
 const DAILY_AD_TRIES := 2
@@ -613,7 +613,19 @@ static func daily_type(date: String) -> String:
 	var pinned := str(ProjectSettings.get_setting("application_custom/testing/daily_type", ""))
 	if OS.has_feature("android"): pinned = str(ProjectSettings.get_setting("application_custom/testing/daily_type_android", pinned))
 	if OS.is_debug_build() and pinned in DAILY_TYPES: return pinned
-	return DAILY_TYPES[absi(hash("type-" + date)) % DAILY_TYPES.size()]
+	# Every mini-game once per cycle of DAILY_TYPES.size() days, in a shuffled
+	# order per cycle, so none is skipped for weeks as a plain hash could.
+	var day := floori(Time.get_unix_time_from_datetime_string(date + "T12:00:00")/86400.0)
+	var count := DAILY_TYPES.size()
+	var order := DAILY_TYPES.duplicate()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("type-cycle-%d" % floori(day/float(count)))
+	for i in range(count - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var swap = order[i]
+		order[i] = order[j]
+		order[j] = swap
+	return order[posmod(day, count)]
 
 # The power a first daily win hands out, also fixed per day.
 static func daily_power(date: String) -> String:

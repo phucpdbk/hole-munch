@@ -677,6 +677,7 @@ func check_daily_games(g) -> void:
 	check_slide_puzzle(g)
 	check_siege(g)
 	preload("res://scripts/classic_daily_smoke.gd").run(self, g)
+	preload("res://scripts/beam_smoke.gd").run(self, g)
 	check_ad_try(g)
 	g.daily_override = ""
 	var saved = Campaign.new()
