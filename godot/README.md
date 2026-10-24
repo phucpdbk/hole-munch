@@ -365,6 +365,13 @@ its landmark to conquer it, while dodging independent military defenders.
 - **Extra daily tries**: with no tries left, the daily button (and PLAY on a
   daily result) offers a rewarded ad for one more try, up to
   `Campaign.DAILY_AD_TRIES` (2) a day; the record keeps them as `bonus`.
+- **Daily swap**: once a day, while tries are left, a rewarded ad swaps today's
+  mini-game for the day's other one (`Campaign.swap_type`, fixed per date) and
+  starts it; the tries used and the ad tries are kept, the day's best starts over.
+  Offered by a SWAP button between daily and endless in the menu and an offer row
+  on a daily result; the record keeps the pick as `swap`. A swapped game's score
+  stays off the daily leaderboard, which ranks the day's own game.
+  `-- --capture --swap-capture` shoots both offers in landscape and portrait.
 - **Daily streak**: a finished daily round keeps it; days 1–7 pay 20–120 coins
   and every seventh day adds a 300-coin bonus. Shown beside today's mini-game.
 - **Daily leaderboard** (`play_games.gd`): Android only, with the GodotPlayGameServices

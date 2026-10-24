@@ -17,6 +17,7 @@ signal give_up_requested
 signal double_requested
 signal update_requested
 signal board_requested
+signal swap_requested
 signal reminder_requested
 signal privacy_requested
 const UiStyle = preload("res://scripts/ui_style.gd")
@@ -27,6 +28,9 @@ const Minimap = preload("res://scripts/minimap.gd")
 const Campaign = preload("res://scripts/campaign.gd")
 var minimap := {}
 var daily_button: BaseButton
+# A rewarded ad swaps today's mini-game (game.gd watch_for_swap): a small button
+# between daily and endless in the menu, an offer row on a daily result.
+var swap_button: BaseButton
 # Replaces "drag to start" for rounds that start another way (the sky hop's tap).
 var start_hint := ""
 var endless_button: BaseButton
@@ -67,6 +71,8 @@ var daily_won := false
 var daily_left := 3
 # No tries left, but a rewarded ad can add one.
 var daily_ad := false
+# Today's mini-game can still be swapped for a rewarded ad (once a day).
+var daily_swap := false
 # Days in a row with a finished daily round (0 once the streak has lapsed).
 var streak := 0
 var daily_title := ""
@@ -174,6 +180,8 @@ func _ready() -> void:
 	styles_button.pressed.connect(func(): styles_requested.emit())
 	daily_button = make_button("daily", Color("a8474f"))
 	daily_button.pressed.connect(func(): daily_requested.emit())
+	swap_button = make_button("replay", Color("c0703a"))
+	swap_button.pressed.connect(func(): swap_requested.emit())
 	endless_button = make_button("endless", Color("2f7a68"))
 	endless_button.pressed.connect(func(): endless_requested.emit())
 	help_button = make_button("help", Color("35546d"))
@@ -237,6 +245,7 @@ func layout() -> void:
 		place(board_button, Rect2(w/2+4, h-232, 260, 52), 14)
 	elif w > h: place(double_button, Rect2(w/2-210, h-232, 420, 52), 17)
 	else: place(double_button, Rect2(44, h-500, w-88, 52), 16)
+	place_result_offers(w, h)
 	if w > h:
 		var left := 36.0 if mode == "menu" else w/2-264
 		var width := 364.0 if mode == "menu" else 528.0
@@ -249,6 +258,7 @@ func layout() -> void:
 			place([levels_button, shop_button, styles_button][i], Rect2(36+i*124, h-94, 116, 56), 15)
 		for i in 2:
 			place([daily_button, endless_button][i], Rect2(36+i*186, h-232, 178, 52), 16)
+		place_swap(Rect2(36, h-232, 364, 52))
 		return
 	place(play_button, Rect2(44, h - 172, w - 88, 66), 26)
 	place(retry_button, Rect2(44, h - 246, w - 88, 56), 18)
@@ -258,6 +268,35 @@ func layout() -> void:
 		place([levels_button, shop_button, styles_button][i], Rect2(44 + i*(third+8), h-94, third, 56), 14)
 	for i in 2:
 		place([daily_button, endless_button][i], Rect2(44 + i*((w-88)/2+4), h-340, (w-88)/2-4, 52), 15)
+	place_swap(Rect2(44, h-340, w-88, 52))
+
+# A daily result's ad offers. Landscape: the swap shares the offer row above
+# play with the double and the leaderboard, split evenly. Portrait: it floats
+# above the result card like the double offer, over it when both show.
+func place_result_offers(w: float, h: float) -> void:
+	if mode != "result" or run_kind != "daily" or not daily_swap: return
+	if w <= h:
+		place(swap_button, Rect2(44, h-500 - (62 if can_double else 0), w-88, 52), 16)
+		return
+	var offers: Array = []
+	if can_double: offers.append(double_button)
+	if board_ready: offers.append(board_button)
+	offers.append(swap_button)
+	var width := (528.0 - 8.0*(offers.size() - 1))/offers.size()
+	for i in offers.size():
+		place(offers[i], Rect2(w/2-264 + i*(width + 8), h-232, width, 52), 17 if offers.size() == 1 else 14)
+
+# The swap offer in the menu sits between the daily and endless buttons: the
+# row (both buttons' slot) splits daily 52%, swap 17%, endless the rest.
+func place_swap(row: Rect2) -> void:
+	if mode == "result" or not daily_swap: return
+	var gap := 6.0
+	var daily_width := roundf(row.size.x*0.52)
+	var swap_width := roundf(row.size.x*0.17)
+	var endless_width := row.size.x - daily_width - swap_width - gap*2
+	place(daily_button, Rect2(row.position, Vector2(daily_width, row.size.y)), 14)
+	place(swap_button, Rect2(row.position.x + daily_width + gap, row.position.y, swap_width, row.size.y), 13)
+	place(endless_button, Rect2(row.end.x - endless_width, row.position.y, endless_width, row.size.y), 14)
 
 # A won campaign city with a star still missing offers a replay of that city.
 func retry_wanted() -> bool:
@@ -266,7 +305,7 @@ func retry_wanted() -> bool:
 func sync() -> void:
 	privacy_button.visible = mode in ["menu", "paused"]
 	privacy_button.text = I18n.t("privacy")
-	var layout_key := mode + str(retry_wanted()) + str(can_double) + str(board_ready)
+	var layout_key := mode + str(retry_wanted()) + str(can_double) + str(board_ready) + str(daily_swap)
 	if last_layout_mode != layout_key:
 		layout()
 		last_layout_mode = layout_key
@@ -301,6 +340,14 @@ func sync() -> void:
 	album_button.text = I18n.t("album")
 	daily_button.text = I18n.t("ad_daily_try") if daily_ad else I18n.t("daily") + (" ★" if daily_won else "") + " %d/3" % daily_left
 	daily_button.disabled = daily_left <= 0 and not daily_ad
+	swap_button.visible = daily_swap and (mode == "menu" or (mode == "result" and run_kind == "daily"))
+	swap_button.text = I18n.t("ad_daily_swap") if mode == "result" else I18n.t("daily_swap_short")
+	# Narrowed beside the swap button, the daily and endless labels shrink to fit.
+	if mode == "menu" and daily_swap:
+		for button in [daily_button, endless_button]:
+			var size_fit := 15
+			while size_fit > 11 and UiStyle.text_width(button.text, size_fit) > button.size.x - 50: size_fit -= 1
+			button.font_size = size_fit
 	endless_button.text = I18n.t("endless") + (" · %d" % endless_best if endless_best > 0 else "")
 	for button in [daily_button, endless_button, levels_button, styles_button, album_button, shop_button, help_button, language_button]:
 		button.visible = mode == "menu"

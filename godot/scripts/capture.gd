@@ -379,6 +379,25 @@ func run(game, campaign_mode: bool) -> void:
 			await snapshot("landmark-%02d-%s" % [index+1, g.level.boss])
 		g.get_tree().quit()
 		return
+	# The daily swap offer: the small button beside the daily one in the menu and
+	# the full row on a daily result, landscape then portrait
+	# (test-output/swap-<shape>-menu.png, swap-<shape>-result.png).
+	if "--swap-capture" in OS.get_cmdline_user_args():
+		for shape in ["landscape", "portrait"]:
+			if shape == "portrait":
+				g.get_window().size = Vector2i(450, 966)
+				await frames(20)
+			g.campaign.daily = {}
+			g.go_menu()
+			await frames(30)
+			await snapshot("swap-%s-menu" % shape)
+			g.launch_daily()
+			await frames(20)
+			g.finish(false)
+			await frames(40)
+			await snapshot("swap-%s-result" % shape)
+		g.get_tree().quit()
+		return
 	# Every guardian in its city, close by the saucer, to review Meshy rigs side by
 	# side (test-output/guardian-NN-<id>.png; cities before the first guardian skipped).
 	if "--guardian-gallery" in OS.get_cmdline_user_args():

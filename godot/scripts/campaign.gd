@@ -559,6 +559,9 @@ func restore_records(value: Dictionary) -> void:
 			var number = saved_daily.get(field, 0)
 			if number is float or number is int: record[field] = maxi(0, int(number))
 		record.bonus = mini(record.bonus, DAILY_AD_TRIES)
+		var swap = saved_daily.get("swap", "")
+		record.swap = swap if swap is String and swap in DAILY_TYPES else ""
+		if record.swap != "": record.type = record.swap
 		record.attempts = mini(record.attempts, DAILY_ATTEMPTS + record.bonus)
 		daily = record
 	var saved_items = value.get("items", {})
@@ -632,9 +635,32 @@ static func daily_power(date: String) -> String:
 	return POWER_KINDS[absi(hash("power-" + date)) % POWER_KINDS.size()]
 
 func daily_record(date: String) -> Dictionary:
-	# The type follows daily_type, so a pinned test type also shows on a day already started.
-	if daily.get("date", "") == date: return daily.merged({"type":daily_type(date), "bonus":int(daily.get("bonus", 0))}, true)
-	return {"date":date, "type":daily_type(date), "attempts":0, "bonus":0, "best":0, "won":false}
+	# The type follows daily_type, so a pinned test type also shows on a day already
+	# started, unless the player swapped the day's game ("swap").
+	if daily.get("date", "") == date:
+		var swap := str(daily.get("swap", ""))
+		return daily.merged({"type":swap if swap in DAILY_TYPES else daily_type(date), "bonus":int(daily.get("bonus", 0)), "swap":swap}, true)
+	return {"date":date, "type":daily_type(date), "attempts":0, "bonus":0, "best":0, "won":false, "swap":""}
+
+# The other mini-game of the day for a player who swaps (a rewarded ad, once a
+# day): fixed per day like daily_type, so everyone who swaps gets the same one.
+static func swap_type(date: String) -> String:
+	var others: Array = DAILY_TYPES.filter(func(type): return type != daily_type(date))
+	return others[absi(hash("swap-" + date)) % others.size()]
+
+func can_swap_daily(date: String) -> bool:
+	return not test_mode and str(daily_record(date).swap) == ""
+
+# Swaps today's mini-game for swap_type. The tries used and the ad tries are
+# kept; the day's best starts over, since it scored the other game.
+func swap_daily(date: String) -> bool:
+	if not can_swap_daily(date): return false
+	var record := daily_record(date).duplicate()
+	record.swap = swap_type(date)
+	record.type = record.swap
+	record.best = 0
+	daily = record
+	return true
 
 func daily_attempts_left(date: String) -> int:
 	# The in-game TEST MODE replays the daily without limit.
@@ -682,7 +708,7 @@ func reach_checkpoint(type: String, at: int, total: int) -> bool:
 func record_daily(date: String, score: int, won: bool) -> bool:
 	var record := daily_record(date)
 	var first_win: bool = won and not record.won
-	daily = {"date":date, "type":record.type, "attempts":record.attempts, "bonus":int(record.bonus), "best":maxi(int(record.best), score), "won":record.won or won}
+	daily = {"date":date, "type":record.type, "attempts":record.attempts, "bonus":int(record.bonus), "best":maxi(int(record.best), score), "won":record.won or won, "swap":record.swap}
 	if first_win:
 		var power := daily_power(date)
 		items[power] = mini(MAX_ITEMS, int(items[power]) + 1)

@@ -975,6 +975,39 @@ func check_ad_try(g) -> void:
 	g.campaign.record_daily(date, 10, false)
 	check(int(g.campaign.daily.bonus) == Campaign.DAILY_AD_TRIES, "a finished run keeps the ad tries")
 	g.campaign.daily = {}
+	check_daily_swap(g)
+
+# Swapping the day's game (game.gd watch_for_swap): once a day for a rewarded
+# ad, from the menu or a daily result, to the day's other game, keeping tries.
+func check_daily_swap(g) -> void:
+	var date := Campaign.today()
+	var override: String = g.daily_override
+	g.daily_override = ""
+	g.campaign.daily = {}
+	g.go_menu()
+	g.campaign.use_daily_attempt(date)
+	g.update_hud()
+	var first := Campaign.daily_type(date)
+	check(g.hud.daily_swap and g.hud.swap_button.visible and Campaign.swap_type(date) != first and Campaign.swap_type(date) == Campaign.swap_type(date), "the menu offers to swap today's game for an ad, to a fixed other game")
+	g.watch_for_swap()
+	check(g.run_kind == "daily" and g.mode == "playing" and g.daily_kind == Campaign.swap_type(date), "the ad swaps today's game and starts the new one")
+	check(int(g.campaign.daily.attempts) == 2 and g.campaign.daily_attempts_left(date) == 1, "the swap keeps the tries already used (1 + 1 for the new game)")
+	# Some games run their own clock (sky hop, slide): end the round directly.
+	g.finish(false)
+	g.update_hud()
+	check(g.mode == "result" and not g.hud.daily_swap and not g.hud.swap_button.visible, "one swap a day: the result offers no second one")
+	var restored = Campaign.new()
+	restored.restore(JSON.parse_string(JSON.stringify(g.campaign.data())))
+	check(str(restored.daily_record(date).type) == Campaign.swap_type(date) and not restored.can_swap_daily(date), "the swapped game survives a save")
+	g.go_menu()
+	g.campaign.daily = {}
+	g.launch_daily()
+	g.finish(false)
+	g.update_hud()
+	check(g.mode == "result" and g.hud.swap_button.visible and g.hud.swap_button.text == I18n.t("ad_daily_swap"), "a daily result offers the swap while tries are left")
+	g.go_menu()
+	g.campaign.daily = {}
+	g.daily_override = override
 
 # Where the test pilot aims: a little under the next gap's centre as it will
 # be when the craft gets there (swaying gaps move meanwhile).

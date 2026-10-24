@@ -304,6 +304,7 @@ func _ready() -> void:
 	hud.levels_requested.connect(func(): open_panel("levels"))
 	hud.shop_requested.connect(func(): open_panel("shop"))
 	hud.daily_requested.connect(start_daily)
+	hud.swap_requested.connect(watch_for_swap)
 	hud.endless_requested.connect(start_endless)
 	hud.styles_requested.connect(func(): open_panel("crafts"))
 	hud.album_requested.connect(func(): open_panel("album"))
@@ -1776,7 +1777,8 @@ func finish(won: bool) -> void:
 				reward = roundi(reward*Campaign.DAILY_COIN_BONUS)
 				record_note = I18n.t("daily_power", I18n.t("item_" + Campaign.daily_power(date)))
 			else: record_note = I18n.t("daily_best", int(campaign.daily.best))
-			submit_daily_score(score)
+			# A swapped game would rank against the day's other game: off the board.
+			if str(campaign.daily_record(date).swap) == "": submit_daily_score(score)
 			# The first finished daily of a day keeps the streak and pays its gift.
 			var gift: Dictionary = campaign.advance_streak(date)
 			if not gift.is_empty():
@@ -1961,6 +1963,21 @@ func watch_for_try() -> void:
 		persist()
 		launch_daily())
 
+# Once a day a rewarded ad swaps today's mini-game for the day's other one
+# (Campaign.swap_type), keeping the tries; the new game starts at once. Offered
+# from the menu and a daily result, while tries are left.
+func can_ad_swap() -> bool:
+	var date := Campaign.today()
+	return mode in ["menu", "result"] and campaign.can_swap_daily(date) and campaign.daily_attempts_left(date) > 0 and ads.rewarded_ready()
+
+func watch_for_swap() -> void:
+	if not can_ad_swap() or ads.showing: return
+	clear_drag()
+	ads.show_rewarded(func(granted: bool):
+		if not granted or not campaign.swap_daily(Campaign.today()): return
+		persist()
+		launch_daily())
+
 # Test mode: play one mini-game from the list ("" is today's).
 func play_daily(type: String) -> void:
 	if not campaign.test_mode or mode != "menu": return
@@ -1973,7 +1990,7 @@ func launch_daily() -> void:
 	if campaign.daily_attempts_left(date) <= 0:
 		if mode == "result": go_menu()
 		return
-	daily_kind = daily_override if daily_override != "" else Campaign.daily_type(date)
+	daily_kind = daily_override if daily_override != "" else str(campaign.daily_record(date).type)
 	var tip := "daily_" + daily_kind
 	if not test_mode and not capture_mode and tip not in campaign.seen:
 		clear_drag()
@@ -2163,6 +2180,7 @@ func update_hud() -> void:
 	var today := campaign.daily_record(Campaign.today())
 	hud.daily_left = campaign.daily_attempts_left(today.date)
 	hud.daily_ad = hud.daily_left <= 0 and can_ad_try()
+	hud.daily_swap = can_ad_swap()
 	# A test-mode pick (pick_daily) shows on the menu in place of today's game.
 	var next_daily: String = daily_override if daily_override != "" else str(today.type)
 	hud.daily_title = DailyGames.title(daily_kind if run_kind == "daily" else next_daily)

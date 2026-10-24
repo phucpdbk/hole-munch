@@ -303,6 +303,8 @@ const S := {
 	"dgoal_siege": ["VƯỢT 3 CHẶNG, HẠ KHÍ CẦU", "CLEAR 3 STAGES, DOWN THE BLIMP", "SUPERA 3 FASES Y DERRIBA EL DIRIGIBLE", "PASSE 3 FASES E DERRUBE O DIRIGÍVEL", "PASSE 3 ÉTAPES, ABATS LE DIRIGEABLE", "LEWATI 3 TAHAP, JATUHKAN BALON"],
 	"dg_count_siege": ["%d điểm", "%d points", "%d puntos", "%d pontos", "%d points", "%d poin"],
 	"ad_daily_try": ["XEM QC: +1 LƯỢT", "WATCH AD: +1 TRY", "VER ANUNCIO: +1 INTENTO", "VER ANÚNCIO: +1 TENTATIVA", "PUB : +1 ESSAI", "TONTON IKLAN: +1 KESEMPATAN"],
+	"ad_daily_swap": ["XEM QC: ĐỔI GAME KHÁC", "WATCH AD: SWAP GAME", "VER ANUNCIO: CAMBIAR JUEGO", "VER ANÚNCIO: TROCAR JOGO", "PUB : CHANGER DE JEU", "TONTON IKLAN: GANTI GAME"],
+	"daily_swap_short": ["ĐỔI", "SWAP", "CAMBIO", "TROCA", "CHANGER", "GANTI"],
 	"siege_g1": ["Qua chặng 1", "Clear stage 1", "Supera la fase 1", "Passe a fase 1", "Passe l'étape 1", "Lewati tahap 1"],
 	"siege_g2": ["Qua chặng 2", "Clear stage 2", "Supera la fase 2", "Passe a fase 2", "Passe l'étape 2", "Lewati tahap 2"],
 	"siege_g3": ["Hạ khí cầu chỉ huy", "Down the command blimp", "Derriba el dirigible", "Derrube o dirigível", "Abats le dirigeable", "Jatuhkan balon komando"],
