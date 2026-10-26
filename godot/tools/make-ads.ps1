@@ -1,5 +1,5 @@
 # Records the ad clips (scripts/ad_capture.gd) as portrait AVI videos plus key-frame
-# PNGs in test-output/ads/. The project window is landscape, so a temporary
+# PNGs in test-output/ads/. The project window is landscape, so a temporary borderless
 # override.cfg switches it to portrait for the run and is always removed after.
 # With ffmpeg on PATH each clip is also converted to an H.264 MP4.
 #   tools/make-ads.ps1                                  # every preset, default cities
@@ -27,6 +27,7 @@ window/size/viewport_width=$($Width/2)
 window/size/viewport_height=$($Height/2)
 window/size/window_width_override=$Width
 window/size/window_height_override=$Height
+window/size/borderless=true
 "@ | Set-Content -LiteralPath $override -Encoding ascii
 try {
     foreach ($level in $Levels) {

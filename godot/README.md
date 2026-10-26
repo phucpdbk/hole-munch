@@ -162,8 +162,12 @@ its landmark to conquer it, while dodging independent military defenders.
   on autopilot at 1.6× speed), `rushhour` (the jam rolls in and gets eaten) and
   `gates` (through ×1.5, then into −30%);
   default cities Paris, New York and Sydney (`-Levels 8,24,40`). The script
-  swaps in a temporary portrait `override.cfg`; with ffmpeg on PATH it also
-  writes MP4s.
+  swaps in a temporary portrait `override.cfg` (borderless, so the window may
+  be taller than the screen); with ffmpeg on PATH it also writes MP4s.
+  Finished ads with captions and an end card: `tools/make-ad-videos.ps1`
+  records the scripts in [ADS-SCRIPTS.md](ADS-SCRIPTS.md) at 1080×1920, main
+  maps plus every daily game (`--ad=daily-<type>`, bots in `ad_daily.gd`,
+  captions in `ad_overlay.gd`), into `test-output/ads/final/`.
 - **Level catalog** (`catalog_capture.gd`): `-- --capture --catalog` (optional
   `--levels=0,4`) shoots every city (landmark with its guardian, guardian close
   up, menu) into `test-output/catalog/` with each city's landmark, guardian,

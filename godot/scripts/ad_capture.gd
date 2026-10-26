@@ -11,7 +11,10 @@ extends RefCounted
 #   rushhour the jam rolls in next to the hole, which then eats its way through
 #   gates    through a green ×1.5 gate, then (oops) a red −30% one
 #   boss     the hole feeds inside a block; the guardian hunts it over the roofs
-# The HUD is hidden (add --ad-hud to keep it); the showtime overlay stays. Key
+#   endcard  icon, name and PLAY FREE over the city, appended to every ad
+#   daily-<type>  a daily mini-game played by a bot (ad_daily.gd), HUD kept
+# Captions (ad_overlay.gd, scripted in ADS-SCRIPTS.md) follow game events;
+# --ad-clean records without them. The HUD is hidden (add --ad-hud to keep it); the showtime overlay stays. Key
 # frames are also saved as PNGs (test-output/ads/<preset>-<city>-*.png) for store
 # art and thumbnails. Never writes the player's save (capture mode).
 const TAP_GAP := 0.16
@@ -19,9 +22,16 @@ const TAP_GAP := 0.16
 const TAP_WAIT := 0.9
 const TAIL := 1.6
 const TIMEOUT := 120.0
+const AdOverlay = preload("res://scripts/ad_overlay.gd")
+const AdDaily = preload("res://scripts/ad_daily.gd")
+const RED := Color("ff5d6c")
+const GOLD := Color("f6cb70")
+const MINT := Color("9ff0d8")
 
 var g
 var cap
+var overlay
+var captions := true
 var preset := "conquer"
 var level := 8
 var speed := 1.0
@@ -41,6 +51,18 @@ func run(game, capture) -> void:
 	if not Array(OS.get_cmdline_user_args()).any(func(arg): return arg.begins_with("--lang=")): g.I18n.set_lang("en")
 	DirAccess.make_dir_recursive_absolute("res://test-output/ads")
 	clip = "%s-%02d" % [preset, level + 1]
+	overlay = AdOverlay.new()
+	g.add_child(overlay)
+	captions = not "--ad-clean" in OS.get_cmdline_user_args()
+	if preset == "endcard":
+		await end_card()
+		return
+	if preset.begins_with("daily-"):
+		clip = preset
+		await AdDaily.new().run(self, preset.trim_prefix("daily-"))
+		Engine.time_scale = 1.0
+		print("AD CLIP: %s" % clip)
+		return
 	g.load_level(level)
 	g.on_play()
 	g.hud.visible = "--ad-hud" in OS.get_cmdline_user_args()
@@ -69,12 +91,19 @@ func conquer() -> void:
 	g.radius = g.target_radius*0.85
 	g.hole_position = Vector3(boss.position.x + 9.0, 0, boss.position.z + 10.0)
 	g.camera_target = g.hole_position
+	say("Can a hole eat
+%s?" % landmark(), 2.2)
 	await hold(0.8)
 	await shot("approach")
+	await hold(0.6)
+	say("Only one way
+to find out...", 2.0)
 	await drive(func(): return g.items[g.boss_index], func(): return g.showtime.busy())
+	say("WAIT FOR IT...", 2.0, GOLD)
 	await hold(0.5)
 	await shot("tremble")
 	await until(func(): return g.showtime.phase == "banner")
+	say("...yes it can.", 2.4, MINT)
 	await hold(0.4)
 	await shot("banner")
 	await until(func(): return g.mode == "result")
@@ -91,11 +120,16 @@ func cling() -> void:
 	g.radius = g.target_radius
 	g.hole_position = Vector3(guardian.position.x + 7.0, 0, guardian.position.z + 6.0)
 	g.camera_target = g.hole_position
+	say("One bite left
+on the BOSS", 2.0)
 	await hold(0.6)
 	await drive(func(): return guardian, func(): return mascot.state == "cling")
+	say("It's HANGING ON!", 1.2, GOLD)
 	await hold(0.5)
 	await shot("cling")
+	say("TAP TAP TAP!", 0, GOLD)
 	await until(func(): return mascot.state != "cling")
+	say("GULP.", 2.0, MINT)
 	await hold(0.8)
 	await shot("dropped")
 
@@ -103,14 +137,23 @@ func cling() -> void:
 func growth() -> void:
 	Engine.time_scale = speed
 	g.remaining = 999.0
+	say("This hole is
+very hungry...", 2.4)
 	await hold(0.4)
 	await shot("start")
+	# Growth share -> caption, said once each on the way up.
+	var beats := [[0.2, "It's getting
+BIGGER", GOLD], [0.45, "Eat EVERYTHING", Color.WHITE], [0.75, "Almost there...", Color.WHITE]]
 	var halfway := false
 	var clock := 0.0
 	while g.mode == "playing" and not g.showtime.busy() and clock < TIMEOUT:
 		var target: Dictionary = g.Rival.best_target(g.items, g.items[g.boss_index], g.hole_position, g.radius)
 		steer(g.layout.steer(g.hole_position, target.position) if not target.is_empty() else Vector3.ZERO)
 		auto_tap(g.get_process_delta_time())
+		if not beats.is_empty() and g.growth() >= beats[0][0]:
+			var beat: Array = beats.pop_front()
+			say(beat[1], 1.8, beat[2])
+		if g.mechanics.guardian_clinging(): say("TAP TAP TAP!", 0.6, GOLD)
 		if not halfway and g.growth() >= 0.5:
 			halfway = true
 			await shot("half")
@@ -118,17 +161,25 @@ func growth() -> void:
 		clock += g.get_process_delta_time()
 	g.bot_input = Vector2.ZERO
 	Engine.time_scale = 1.0
+	say("Wait... is it eating
+%s?!" % city().to_upper(), 2.6, GOLD)
 	await hold(0.6)
 	await shot("tremble")
+	await until(func(): return g.showtime.phase == "banner")
+	say("BYE BYE
+%s" % landmark().to_upper(), 2.6, MINT)
 	await until(func(): return g.mode == "result")
 
 # The jam arrives right away; the hole then eats the nearest vehicle each time.
 func rush_hour() -> void:
 	g.target_radius = 1.45
 	g.radius = g.target_radius
+	say("Traffic jam
+in %s?" % city(), 2.2)
 	await hold(0.5)
 	g.events.round_time = g.events.JAM_AFTER
 	await until(func(): return g.events.jam_state != "wait")
+	say("Leave it to me", 1.8, GOLD)
 	await hold(0.6)
 	await shot("jam")
 	var clock := 0.0
@@ -142,8 +193,11 @@ func rush_hour() -> void:
 		clock += g.get_process_delta_time()
 		if not feasted and clock > 2.5:
 			feasted = true
+			say("NOM NOM NOM", 1.6, GOLD)
 			await shot("feast")
 	g.bot_input = Vector2.ZERO
+	say("Traffic:
+SOLVED", 2.4, MINT)
 
 # Two runs, each starting a little before its gate pair: through the green half
 # of the first, then (oops) the red half of the next. No rush hour here.
@@ -155,6 +209,8 @@ func gates() -> void:
 	g.events.jam_state = "none"
 	g.target_radius = 1.1
 	g.radius = 1.1
+	say("Pick a gate.
+Quick!", 2.0)
 	for i in 2:
 		var pair: Dictionary = pairs[i]
 		var pick: Dictionary = g.events.gates.filter(func(gate): return gate.pair == pair.pair and gate.good == (i == 0))[0]
@@ -166,11 +222,18 @@ func gates() -> void:
 		g.events.last_hole = g.hole_position
 		g.camera_target = g.hole_position
 		await hold(0.5)
+		if i == 1: say("This one
+looks fine...", 1.8)
 		await drive_to(pick.at + pick.along*way*2.5 + lane)
 		await shot("gate%d-before" % (i + 1))
 		await drive_to(pick.at - pick.along*way*2.0 + lane)
+		if i == 0: say("BIGGER! Easy.", 1.6, MINT)
+		else: say("NOOOOO", 1.6, RED)
 		await hold(0.4)
 		await shot("gate%d-after" % (i + 1))
+	await hold(1.0)
+	say("Would YOU
+pick better?", 2.4, GOLD)
 
 # The hole feeds across a block from the guardian, which hops the roofs and
 # attacks. Defence squads stay quiet; only the guardian fights.
@@ -200,6 +263,8 @@ func boss_hunt() -> void:
 	for unit in g.defense.units: unit.cooldown = INF
 	g.defense.grace = 0.0
 	mascot.cooldown = 1.0
+	say("The city sent
+a BOSS", 2.2)
 	var clock := 0.0
 	var hopped := false
 	var struck := false
@@ -209,15 +274,40 @@ func boss_hunt() -> void:
 		else: steer(best)
 		if not hopped and mascot.state == "hop" and mascot.air > 0.6:
 			hopped = true
+			say("It can JUMP?!", 1.6, GOLD)
 			await shot("hop")
 		if not struck and g.saucer_wobble > 0.6:
 			struck = true
+			say("OUCH!", 1.4, RED)
 			await shot("hit")
 		await g.get_tree().process_frame
 		clock += g.get_process_delta_time()
 	g.bot_input = Vector2.ZERO
+	say("Time to
+EAT IT BACK", 2.2, MINT)
+
+# Icon, name and PLAY FREE over the city in the menu.
+func end_card() -> void:
+	clip = "endcard"
+	g.load_level(level)
+	g.go_menu()
+	g.hud.visible = false
+	await hold(0.2)
+	overlay.end_card()
+	await hold(2.8)
+	await shot("card")
+	print("AD CLIP: %s" % clip)
 
 # --- helpers ------------------------------------------------------------------------
+
+func say(text: String, seconds := 1.8, tint := Color.WHITE) -> void:
+	if captions: overlay.say(text, seconds, Color("fff9ed") if tint == Color.WHITE else tint)
+
+func city() -> String:
+	return str(g.level.city)
+
+func landmark() -> String:
+	return g.Campaign.boss_name(g.level.boss)
 
 func clear_guardian() -> void:
 	var guardian: Dictionary = g.mechanics.guardian
