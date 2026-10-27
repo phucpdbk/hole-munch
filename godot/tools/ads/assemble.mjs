@@ -35,10 +35,13 @@ async function latest(dir, stem, ext) {
 // height, lower for clips that keep the HUD), fading in over 0.2 s. Baloo 2 is a
 // variable font drawtext can only draw at its regular weight, so a thick navy
 // pass goes under the white text, which a thin white border fattens.
-function caption(index, top = 0.13) {
-	const text = `fontfile=Baloo2.ttf:textfile=cap-${index}.txt:fontsize=108:x=(w-tw)/2:y=h*${top}:alpha='min(1,t/0.2)'`;
-	return `drawtext=${text}:fontcolor=0x172939:borderw=16:bordercolor=0x172939:shadowcolor=0x172939@0.6:shadowx=0:shadowy=10,` +
-		`drawtext=${text}:fontcolor=white:borderw=3:bordercolor=white`;
+function caption(index, text, top = 0.13) {
+	// Baloo 2 runs about half its size wide per character; long lines shrink to
+	// stay inside the 1080 px frame with a margin.
+	const size = Math.min(108, Math.floor(1850 / text.length));
+	const draw = `fontfile=Baloo2.ttf:textfile=cap-${index}.txt:fontsize=${size}:x=(w-tw)/2:y=h*${top}:alpha='min(1,t/0.2)'`;
+	return `drawtext=${draw}:fontcolor=0x172939:borderw=16:bordercolor=0x172939:shadowcolor=0x172939@0.6:shadowx=0:shadowy=10,` +
+		`drawtext=${draw}:fontcolor=white:borderw=3:bordercolor=white`;
 }
 
 // One edit entry -> work/seg-N.mp4 with picture, caption and its own sound.
@@ -69,7 +72,7 @@ async function segment(ad, entry, index, work) {
 		base = `[1:a]${AUDIO}[base]`;
 		length = entry.to - entry.from;
 	}
-	const chains = [picture.replace("[v]", entry.caption ? `,${caption(index, entry.captionTop)}[v]` : "[v]"), base];
+	const chains = [picture.replace("[v]", entry.caption ? `,${caption(index, entry.caption, entry.captionTop)}[v]` : "[v]"), base];
 	const mixed = ["[base]"];
 	for (const [id, at] of entry.audio ?? []) {
 		const file = join(ANIMATED, ad, "audio", `${id}.wav`);

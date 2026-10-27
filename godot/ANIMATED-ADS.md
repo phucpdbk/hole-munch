@@ -59,13 +59,14 @@ Hook: a king duck relaxes in his bath; the plug is a black hole.
 | 7 | 24–27 | ANIM | QUACKERS slides into the hole like a water slide; his crown spins up and lands on ZIB's head | QUACKERS: "Not the craaaown!" · ZIB: "Ooh, shiny." | |
 | 8 | 27–30 | CARD | End card | | PLAY FREE |
 
-## A3 — "Where's Bella?" (30 s) · daily game, Find the cow
+## A3 — "Where's Max?" (30 s) · daily game, Find the cow
 
-Hook: a farmer begs for help finding his cow.
+Hook: a farmer begs for help finding his cow. The edit calls her Max, the name
+the in-game cow card shows (BELLA's look, Max's name).
 
 | # | Time | Type | Picture | VO / SFX | Caption |
 |---|------|------|---------|----------|---------|
-| 1 | 0–3 | ANIM | A farmer holds up a "MISSING" poster of BELLA (flower crown, yellow bell) to the camera | FARMER: "Have you seen Bella?!" | |
+| 1 | 0–3 | ANIM | A farmer holds up a "MISSING" poster of BELLA (flower crown, yellow bell) to the camera | FARMER: "Have you seen Max?!" | |
 | 2 | 3–5 | ANIM | ZIB salutes from the saucer, sunglasses on | ZIB: "Leave it to me." | |
 | 3 | 5–7 | GAME | `daily-findcow` 0–2 s: the cow card | | Remember her! |
 | 4 | 7–12 | GAME | `daily-findcow` 3–8 s: the saucer roams the farm | bell ringing | warmer… |
@@ -152,5 +153,5 @@ node godot/tools/ads/assemble.mjs a1-snack-time            # -> test-output/anim
 ```
 
 An entry's `captionTop` (share of the height, default 0.13) moves its caption,
-e.g. 0.6 under a daily game's HUD. GAME entries point at caption-free gameplay (`--ad-clean` recordings in
+e.g. 0.6 under a daily game's HUD; long captions shrink to fit the width. GAME entries point at caption-free gameplay (`--ad-clean` recordings in
 `test-output/ads/`); a redone shot only needs its own `animate <ad> <shot>`.

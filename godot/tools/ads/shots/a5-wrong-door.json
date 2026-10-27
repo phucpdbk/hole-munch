@@ -1,0 +1,59 @@
+{
+	"title": "A5 Wrong Door",
+	"voices": {
+		"zib": {"voice": "Puck", "style": "Say it as a tiny squeaky cartoon alien kid with a high, fast, giggly voice"},
+		"tinyzib": {"voice": "Puck", "style": "Say it in a super tiny, sped-up, squeaky chipmunk voice, like a cartoon alien shrunk to the size of a pea"}
+	},
+	"lines": [
+		{"id": "zib-eeny", "who": "zib", "text": "Eeny, meeny, miny...", "mood": "sing-song, thinking"},
+		{"id": "zib-genius", "who": "zib", "text": "I'm a genius!", "mood": "smug and proud"},
+		{"id": "zib-tiny", "who": "tinyzib", "text": "Hellooo? Anybody?", "mood": "tiny and worried"},
+		{"id": "zib-nope", "who": "tinyzib", "text": "Nope nope nope!", "mood": "panicking, fast"}
+	],
+	"sounds": [
+		{"id": "sfx-hum", "seconds": 3, "prompt": "Two glowing magic gates humming, soft sci-fi electric buzz, curious ticking"},
+		{"id": "sfx-flex", "seconds": 3, "prompt": "Cartoon muscle flex creak, a sparkle ding and a tiny crowd cheer"},
+		{"id": "sfx-shrink", "seconds": 3, "prompt": "Comic balloon deflating squeal shrinking down to a tiny pop"},
+		{"id": "sfx-gull", "seconds": 3, "prompt": "Loud seagull squawk, wings flapping, then a cartoon zip whoosh escape"},
+		{"id": "music", "seconds": 10, "prompt": "Bouncy beachy cartoon music loop, ukulele and steel drum with playful percussion, sunny and silly"}
+	],
+	"edit": [
+		{"shot": "s1-eeny", "from": 0, "to": 3, "caption": "pick a gate...", "audio": [["sfx-hum", 0], ["zib-eeny", 0.3]]},
+		{"game": "test-output/ads/gates-41-clean-en.avi", "from": 0.2, "to": 2.8, "caption": "BIGGER!", "captionTop": 0.62},
+		{"shot": "s3-genius", "from": 0, "to": 3, "audio": [["sfx-flex", 0.3], ["zib-genius", 0.8]]},
+		{"game": "test-output/ads/gates-41-clean-en.avi", "from": 3.0, "to": 5.2, "caption": "wait...", "captionTop": 0.62},
+		{"shot": "s5-tiny", "from": 0, "to": 4, "caption": "NOOOO", "audio": [["sfx-shrink", 0], ["zib-tiny", 1.6]]},
+		{"shot": "s6-gull", "from": 0, "to": 3, "caption": "Would YOU pick better?", "audio": [["sfx-gull", 0.3], ["zib-nope", 1.2]]},
+		{"card": "test-output/ads/endcard-09-en.avi"}
+	],
+	"shots": [
+		{
+			"id": "s1-eeny",
+			"cast": ["zib"],
+			"seconds": 3,
+			"keyframe": "ZIB in his silver flying saucer hovers on a sunny Sydney street with the Sydney Opera House and Harbour Bridge in the background. In front of him stand two tall glowing gates side by side across the road: a bright green glowing gate and a red glowing gate. ZIB looks back and forth between them, one finger on his chin, antennae pointing at each gate. No numbers or signs on the gates. Medium wide shot.",
+			"motion": "ZIB points his finger back and forth between the green gate and the red gate, his antennae swing left and right in rhythm, he squints thoughtfully. The gates hum and glow."
+		},
+		{
+			"id": "s3-genius",
+			"cast": ["zib"],
+			"seconds": 3,
+			"keyframe": "ZIB inside the saucer's clear canopy, noticeably bigger and puffed up, flexing both little green arms like a bodybuilder, smug proud grin with eyes closed, sparkles around him. Sunny Sydney harbour background. Medium close-up.",
+			"motion": "ZIB flexes his arms proudly, kisses one bicep, sparkles pop around him, the saucer bobs with pride."
+		},
+		{
+			"id": "s5-tiny",
+			"cast": ["zib"],
+			"seconds": 4,
+			"keyframe": "On a sunny Sydney street, a tiny silver flying saucer the size of a pea hovers just above the asphalt next to a giant yellow crosswalk line, with ZIB tiny inside the clear canopy, looking up worried with huge eyes, waving both arms. Low macro camera angle so the tiny saucer is clearly visible in the middle of the frame, the city huge and blurry behind.",
+			"motion": "The tiny saucer wobbles and spins a little, tiny ZIB waves both arms frantically and shouts, a small puff of dust blows past and nearly knocks the saucer over."
+		},
+		{
+			"id": "s6-gull",
+			"cast": ["zib"],
+			"seconds": 3,
+			"keyframe": "A big cartoon seagull with a mischievous hungry grin leans down over a tiny pea-sized silver flying saucer on a sunny Sydney pavement, its huge eye filling half the frame and staring at the saucer; tiny ZIB inside the clear canopy looks up in terror. Low dramatic angle.",
+			"motion": "The seagull licks its beak and lunges with an open beak; the tiny saucer zips away at the last second with a speed streak, the seagull's beak snaps shut on nothing and it blinks confused."
+		}
+	]
+}

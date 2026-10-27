@@ -1,0 +1,232 @@
+{
+	"title": "A3 Where's Max?",
+	"voices": {
+		"zib": {
+			"voice": "Puck",
+			"style": "Say it as a tiny squeaky cartoon alien kid with a high, fast, giggly voice"
+		},
+		"farmer": {
+			"voice": "Algenib",
+			"style": "Say it as a chubby, panicked old cartoon farmer with a warm country accent"
+		},
+		"cow": {
+			"voice": "Kore",
+			"style": "Say it as a sassy cartoon cow, deadpan and unimpressed"
+		}
+	},
+	"lines": [
+		{
+			"id": "farmer-lost",
+			"who": "farmer",
+			"text": "Have you seen Max?!",
+			"mood": "desperate, quick"
+		},
+		{
+			"id": "zib-leave",
+			"who": "zib",
+			"text": "Leave it to me!",
+			"mood": "cool and confident"
+		},
+		{
+			"id": "cow-moo",
+			"who": "cow",
+			"text": "Moo.",
+			"mood": "offended, flat"
+		},
+		{
+			"id": "zib-oops",
+			"who": "zib",
+			"text": "Oops. Wrong cow!",
+			"mood": "embarrassed, quick"
+		},
+		{
+			"id": "max-moo",
+			"who": "cow",
+			"text": "Mooo!",
+			"mood": "pleased and happy"
+		},
+		{
+			"id": "farmer-more",
+			"who": "farmer",
+			"text": "...and these ones?",
+			"mood": "hopeful, sheepish"
+		}
+	],
+	"sounds": [
+		{
+			"id": "sfx-farm",
+			"seconds": 3,
+			"prompt": "Farm ambience, a rooster crow, wind over fields, a cowbell in the distance"
+		},
+		{
+			"id": "sfx-cool",
+			"seconds": 3,
+			"prompt": "Cartoon sunglasses sliding on with a cool sparkle ding and a short whoosh"
+		},
+		{
+			"id": "sfx-beam",
+			"seconds": 4,
+			"prompt": "Sci-fi tractor beam hum rising, then a comic record scratch"
+		},
+		{
+			"id": "sfx-paper",
+			"seconds": 3,
+			"prompt": "A long paper scroll unrolling to the floor, then a comic trombone wah wah"
+		},
+		{
+			"id": "music",
+			"seconds": 10,
+			"prompt": "Playful country cartoon music loop, banjo and fiddle with light percussion, cheerful detective mood"
+		}
+	],
+	"edit": [
+		{
+			"shot": "s1-poster",
+			"from": 0,
+			"to": 3,
+			"caption": "MISSING: Max",
+			"audio": [
+				[
+					"sfx-farm",
+					0
+				],
+				[
+					"farmer-lost",
+					0.4
+				]
+			]
+		},
+		{
+			"shot": "s2-sunglasses",
+			"from": 0,
+			"to": 3,
+			"audio": [
+				[
+					"sfx-cool",
+					0.2
+				],
+				[
+					"zib-leave",
+					1.2
+				]
+			]
+		},
+		{
+			"game": "test-output/ads/daily-findcow-01-clean-en.avi",
+			"from": 0.3,
+			"to": 3.3,
+			"caption": "remember her!",
+			"captionTop": 0.75
+		},
+		{
+			"game": "test-output/ads/daily-findcow-01-clean-en.avi",
+			"from": 4,
+			"to": 9,
+			"caption": "warmer...",
+			"captionTop": 0.62
+		},
+		{
+			"shot": "s5-wrong",
+			"from": 0,
+			"to": 4,
+			"caption": "NOT HER!",
+			"audio": [
+				[
+					"sfx-beam",
+					0
+				],
+				[
+					"cow-moo",
+					1.6
+				],
+				[
+					"zib-oops",
+					2.6
+				]
+			]
+		},
+		{
+			"game": "test-output/ads/daily-findcow-01-clean-en.avi",
+			"from": 16,
+			"to": 19.6,
+			"caption": "HOTTER!",
+			"captionTop": 0.62
+		},
+		{
+			"shot": "s7-found",
+			"from": 0,
+			"to": 3,
+			"caption": "FOUND HER!",
+			"audio": [
+				[
+					"max-moo",
+					0.6
+				]
+			]
+		},
+		{
+			"shot": "s8-more",
+			"from": 0,
+			"to": 3,
+			"caption": "a NEW game every day",
+			"audio": [
+				[
+					"sfx-paper",
+					0
+				],
+				[
+					"farmer-more",
+					1.4
+				]
+			]
+		},
+		{
+			"card": "test-output/ads/endcard-09-en.avi"
+		}
+	],
+	"shots": [
+		{
+			"id": "s1-poster",
+			"cast": [],
+			"seconds": 3,
+			"keyframe": "A chubby old cartoon farmer with a white walrus moustache, straw hat, red checked shirt and blue overalls stands in front of a red barn on sunny green farmland, holding up a paper poster toward the camera with both hands. The poster shows only a drawing of a brown cow with cream patches wearing a flower crown and a yellow bell (no words). Worried teary eyes. Premium stylized 3D cartoon matching the attached key art. Medium shot.",
+			"motion": "The farmer shakes the poster toward the camera, his moustache trembles, a tear wells up, he looks around desperately. The barn and grass sway in a light breeze."
+		},
+		{
+			"id": "s2-sunglasses",
+			"cast": [
+				"zib"
+			],
+			"seconds": 3,
+			"keyframe": "ZIB in his silver flying saucer hovering low over sunny green farmland, leaning out of the clear bubble canopy, putting on a pair of black cool sunglasses with one hand, confident smirk. A red barn in the background. Medium shot.",
+			"motion": "ZIB slides the sunglasses onto his face, a sparkle glints on the lens, he gives a cool nod and a thumbs-up; the saucer tilts and zooms forward a little."
+		},
+		{
+			"id": "s5-wrong",
+			"cast": [
+				"zib",
+				"bella"
+			],
+			"seconds": 4,
+			"keyframe": "Inside the saucer's clear canopy, ZIB sits beside a cartoon cow that was just beamed up: the cow looks like BELLA's model sheet but wears a pirate tricorn hat instead of a flower crown and a blue bell instead of a yellow one. The cow stares at ZIB with half-closed, deeply unimpressed eyes. ZIB's sunglasses slipped down his nose, awkward grin. Cyan cockpit lights. Medium two-shot.",
+			"motion": "The cow slowly turns her head to stare at ZIB in disgust and chews; ZIB's sunglasses slide down his nose, he grins awkwardly, sweats and scratches his head. Small comic pause, slight push-in on the cow's unimpressed face."
+		},
+		{
+			"id": "s7-found",
+			"cast": [
+				"zib",
+				"bella"
+			],
+			"seconds": 3,
+			"keyframe": "Inside the saucer's clear canopy over sunny farmland, ZIB and the brown cow from BELLA's model sheet (flower crown, yellow bell) sit side by side, both wearing black cool sunglasses, both grinning at the camera, best friends. Medium two-shot.",
+			"motion": "ZIB and the cow both lower their sunglasses at the same time and wink at the camera, the cow's bell jingles, ZIB gives a thumbs-up, sparkles around them."
+		},
+		{
+			"id": "s8-more",
+			"cast": [],
+			"seconds": 3,
+			"keyframe": "The same chubby old cartoon farmer with a white walrus moustache, straw hat, red checked shirt and blue overalls in front of his red barn, sheepishly holding the top of a very long paper scroll that unrolls all the way down to the ground and across the grass, covered in many small drawings of different cows (no words). Sunny farmland. Medium shot.",
+			"motion": "The long scroll unrolls further across the grass, the farmer smiles sheepishly and shrugs with a hopeful look, a cow in the background moos."
+		}
+	]
+}

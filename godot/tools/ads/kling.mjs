@@ -26,15 +26,23 @@ async function klingKey() {
 	return process.env.KLING_API_KEY ?? "";
 }
 
+// Code 1303: the package's parallel-task limit (5 on the trial) is full; wait
+// for running tasks to finish instead of failing.
 async function call(key, method, path, body) {
-	const response = await fetch(API + path, {
-		method,
-		headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-		body: body ? JSON.stringify(body) : undefined,
-	});
-	const json = await response.json().catch(() => ({}));
-	if (!response.ok || json.code !== 0) throw new Error(`kling ${method} ${path} -> ${response.status} ${json.code ?? ""}: ${json.message ?? ""}`);
-	return json.data;
+	for (let attempt = 0; ; attempt++) {
+		const response = await fetch(API + path, {
+			method,
+			headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+			body: body ? JSON.stringify(body) : undefined,
+		});
+		const json = await response.json().catch(() => ({}));
+		if (json.code === 1303 && attempt < 60) {
+			await sleep(15000);
+			continue;
+		}
+		if (!response.ok || json.code !== 0) throw new Error(`kling ${method} ${path} -> ${response.status} ${json.code ?? ""}: ${json.message ?? ""}`);
+		return json.data;
+	}
 }
 
 async function versions(dir, pattern) {
