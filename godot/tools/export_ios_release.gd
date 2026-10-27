@@ -47,6 +47,10 @@ func build() -> void:
 		"application/export_method_release": 0,
 		"application/export_project_only": false,
 		"application/additional_plist_content": "<key>ITSAppUsesNonExemptEncryption</key><false/>",
+		# Automatic signing archives with a development identity and re-signs
+		# for distribution on export; Godot's default "Apple Distribution" here
+		# makes xcodebuild reject the archive as conflicting provisioning settings.
+		"application/code_sign_identity_release": "Apple Development",
 	}
 	for key in overrides:
 		preset.set(key, overrides[key])
