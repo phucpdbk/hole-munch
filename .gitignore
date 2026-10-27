@@ -42,3 +42,6 @@ godot/tools/meshy/gemini.local.json
 godot/override.cfg
 godot/assets/monsters_src/
 godot/assets/critters_src/
+
+# API keys for the animated-ad tools (godot/tools/ads).
+godot/tools/ads/*.local.json

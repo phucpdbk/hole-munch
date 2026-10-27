@@ -1,0 +1,68 @@
+{
+	"title": "A1 Snack Time",
+	"voices": {
+		"zib": {"voice": "Puck", "style": "Say it as a tiny squeaky cartoon alien kid with a high, fast, giggly voice"},
+		"parisian": {"voice": "Charon", "style": "Say it as a chubby cartoon Parisian man with a thick comic French accent, outraged"}
+	},
+	"lines": [
+		{"id": "zib-hungry", "who": "zib", "text": "Nothing... to eat...", "mood": "sad and whiny, slow"},
+		{"id": "zib-donut", "who": "zib", "text": "Ooooh... doughnut!", "mood": "dreamy and greedy"},
+		{"id": "zib-munch", "who": "zib", "text": "MUNCH TIME!", "mood": "shouting with excitement"},
+		{"id": "paris-baguette", "who": "parisian", "text": "Non non non! Mon baguette!", "mood": "shocked and outraged"},
+		{"id": "zib-next", "who": "zib", "text": "Hehe... next city!", "mood": "satisfied, giggling"}
+	],
+	"sounds": [
+		{"id": "sfx-growl", "seconds": 3, "prompt": "Loud comic cartoon stomach growl rumble, funny and exaggerated"},
+		{"id": "sfx-button", "seconds": 3, "prompt": "Cartoon big button slam click, then a sci-fi laser beam zap and a bubbly bloop pop"},
+		{"id": "sfx-wind", "seconds": 5, "prompt": "Cartoon whoosh of strong suction wind with a comic slide whistle and a pop"},
+		{"id": "sfx-burp", "seconds": 3, "prompt": "Huge funny cartoon burp followed by a tiny squeaky giggle"},
+		{"id": "music", "seconds": 10, "prompt": "Upbeat quirky cartoon music loop, bouncy pizzicato strings, xylophone and light drums, playful mischievous"}
+	],
+	"edit": [
+		{"shot": "s1-fridge", "from": 0, "to": 4, "caption": "so... hungry...", "audio": [["sfx-growl", 0], ["zib-hungry", 1.8]]},
+		{"shot": "s2-donut", "from": 0, "to": 3.6, "audio": [["zib-donut", 0.8]]},
+		{"shot": "s3-drop", "from": 0, "to": 3, "caption": "MUNCH TIME!", "audio": [["sfx-button", 0.3], ["zib-munch", 0.2]]},
+		{"game": "test-output/ads/growth-09-clean-en.avi", "from": 0.5, "to": 11.0, "speed": 1.5, "caption": "it's getting BIGGER"},
+		{"shot": "s5-baguette", "from": 0, "to": 5, "audio": [["sfx-wind", 0.6], ["paris-baguette", 1.8]]},
+		{"game": "test-output/ads/growth-09-clean-en.avi", "from": 19.6, "to": 23.6, "caption": "BYE BYE EIFFEL"},
+		{"shot": "s7-burp", "from": 0, "to": 4, "caption": "Next city?", "audio": [["sfx-burp", 1.6], ["zib-next", 2.9]]},
+		{"card": "test-output/ads/endcard-09-en.avi"}
+	],
+	"shots": [
+		{
+			"id": "s1-fridge",
+			"cast": ["zib"],
+			"seconds": 4,
+			"keyframe": "Inside ZIB's flying saucer cockpit, cosy round cabin with glowing cyan control panels and joysticks. ZIB sits in his pilot seat clutching his round green belly with both hands, sad hungry eyes. Beside him a tiny space fridge stands open, completely empty except one sad striped sock on the shelf. Medium shot, ZIB centred.",
+			"motion": "ZIB's belly rumbles and the whole cockpit shakes, his antennae droop, he slowly looks into the empty fridge at the single sock and lets out a long sad sigh, shoulders sinking. Slight camera shake on the rumble, then still."
+		},
+		{
+			"id": "s2-donut",
+			"cast": ["zib"],
+			"seconds": 4,
+			"keyframe": "ZIB presses his face against the inside of the saucer's clear bubble canopy, looking down at planet Earth far below in space. The Earth looks like a giant frosted doughnut with pink icing and colourful sprinkles. ZIB's huge eyes sparkle, mouth open in a greedy grin, a drop of drool on the glass. Over-the-shoulder view from behind ZIB showing both his face reflection and the doughnut Earth.",
+			"motion": "ZIB's eyes grow wide and sparkle, he licks his lips, a drop of drool slides down the glass, the doughnut Earth slowly rotates below. Gentle push-in towards the Earth."
+		},
+		{
+			"id": "s3-drop",
+			"cast": ["zib"],
+			"seconds": 4,
+			"keyframe": "The silver flying saucer hovers low over a charming toy-like Paris street with cream Haussmann buildings, blue roofs, a café with red awnings and the Eiffel Tower in the distance. ZIB visible inside the canopy, grinning, one hand slamming a big red button. Bright sunny day, cyan sky. High three-quarter view looking down at the street.",
+			"motion": "ZIB slams the red button, a cyan beam shoots down from the saucer and a small glowing violet-rimmed black hole pops open on the cobblestones with a bounce. The saucer bobs up. Camera holds steady."
+		},
+		{
+			"id": "s5-baguette",
+			"cast": [],
+			"seconds": 5,
+			"keyframe": "A chubby cartoon Parisian man with a curly moustache, striped shirt and black beret sits at a small round café table on a Paris pavement, holding a long baguette and a tiny coffee cup, smiling contentedly. Behind him on the street a glowing violet-rimmed black hole swirls on the ground. Same toy-like premium 3D cartoon style. Medium shot.",
+			"motion": "A strong wind pulls toward the black hole: the baguette slips out of the man's hand and flies into the hole, then his beret flies off his head after it, his moustache flaps, he gasps with a shocked face and grips the table. Napkins swirl."
+		},
+		{
+			"id": "s7-burp",
+			"cast": ["zib"],
+			"seconds": 4,
+			"keyframe": "Inside the saucer cockpit, ZIB leans back in his pilot seat with a huge round full belly, eyes half closed, blissful satisfied grin, patting his belly with one hand. Warm cosy lighting, cyan control panels. Medium close-up.",
+			"motion": "ZIB pats his round belly twice, then lets out a huge burp, his cheeks puff and a tiny Eiffel Tower tip pops out of his mouth, he giggles and covers his mouth. Small camera shake on the burp."
+		}
+	]
+}

@@ -1,0 +1,215 @@
+{
+	"title": "A4 Driving Test",
+	"voices": {
+		"zib": {
+			"voice": "Puck",
+			"style": "Say it as a tiny squeaky cartoon alien kid with a high, fast, giggly voice"
+		},
+		"pigeon": {
+			"voice": "Charon",
+			"style": "Say it as a strict, nervous cartoon pigeon police sergeant with a clipped, squeaky military voice"
+		}
+	},
+	"lines": [
+		{
+			"id": "pigeon-rule",
+			"who": "pigeon",
+			"text": "Rule one: red means STOP!",
+			"mood": "stern, quick and clipped"
+		},
+		{
+			"id": "zib-easy",
+			"who": "zib",
+			"text": "Easy peasy!",
+			"mood": "overconfident"
+		},
+		{
+			"id": "zib-bite",
+			"who": "zib",
+			"text": "Just... one... bite...",
+			"mood": "tempted, whispering"
+		},
+		{
+			"id": "pigeon-faint",
+			"who": "pigeon",
+			"text": "Oh no. Oh no no no...",
+			"mood": "fainting, voice trailing off"
+		},
+		{
+			"id": "zib-worth",
+			"who": "zib",
+			"text": "Worth it.",
+			"mood": "mouth full, smug"
+		}
+	],
+	"sounds": [
+		{
+			"id": "sfx-clipboard",
+			"seconds": 3,
+			"prompt": "Pencil tapping on a clipboard, a short throat clear, a small door shutting"
+		},
+		{
+			"id": "sfx-whistle",
+			"seconds": 3,
+			"prompt": "Loud referee police whistle blast, comic and shrill"
+		},
+		{
+			"id": "sfx-faint",
+			"seconds": 3,
+			"prompt": "Comic cartoon faint, a dizzy whirl then a soft thud and birds tweeting"
+		},
+		{
+			"id": "sfx-munch",
+			"seconds": 3,
+			"prompt": "Loud juicy cartoon watermelon munching and slurping"
+		},
+		{
+			"id": "music",
+			"seconds": 10,
+			"prompt": "Tense but silly cartoon game show music loop, ticking clock, plucky bass and light percussion, comedic suspense"
+		}
+	],
+	"edit": [
+		{
+			"shot": "s1-rules",
+			"from": 0,
+			"to": 4,
+			"caption": "the UFO driving test",
+			"audio": [
+				[
+					"sfx-clipboard",
+					0
+				],
+				[
+					"pigeon-rule",
+					0.4
+				]
+			]
+		},
+		{
+			"shot": "s2-easy",
+			"from": 0,
+			"to": 3,
+			"audio": [
+				[
+					"zib-easy",
+					0.5
+				]
+			]
+		},
+		{
+			"game": "test-output/ads/daily-redlight-01-clean-en.avi",
+			"from": 0.5,
+			"to": 6.5,
+			"caption": "GREEN = GO",
+			"captionTop": 0.6
+		},
+		{
+			"shot": "s4-melon",
+			"from": 0,
+			"to": 4,
+			"caption": "don't do it...",
+			"audio": [
+				[
+					"zib-bite",
+					0.6
+				]
+			]
+		},
+		{
+			"game": "test-output/ads/daily-redlight-01-clean-en.avi",
+			"from": 16.8,
+			"to": 19.2,
+			"caption": "...oops",
+			"audio": [
+				[
+					"sfx-whistle",
+					1
+				]
+			],
+			"captionTop": 0.6
+		},
+		{
+			"shot": "s6-faint",
+			"from": 0,
+			"to": 4,
+			"audio": [
+				[
+					"pigeon-faint",
+					0.2
+				],
+				[
+					"sfx-faint",
+					1.4
+				]
+			]
+		},
+		{
+			"shot": "s7-worth",
+			"from": 0,
+			"to": 3,
+			"caption": "Could YOU stand still?",
+			"audio": [
+				[
+					"sfx-munch",
+					0
+				],
+				[
+					"zib-worth",
+					1.6
+				]
+			]
+		},
+		{
+			"card": "test-output/ads/endcard-09-en.avi"
+		}
+	],
+	"shots": [
+		{
+			"id": "s1-rules",
+			"cast": [
+				"pigeon",
+				"zib"
+			],
+			"seconds": 4,
+			"keyframe": "Inside the silver flying saucer's round cockpit: SGT. PIGEON in his tiny navy police cap sits stiffly in the passenger seat holding his clipboard and pencil, whistle around his neck, looking sternly at the camera. Beside him ZIB sits at the controls, a little red-and-white learner sticker on the dashboard. Cyan control panels glow. Medium two-shot.",
+			"motion": "SGT. PIGEON taps his pencil on the clipboard, clears his throat and lectures sternly, raising one wing feather like a finger; ZIB nods eagerly beside him, antennae bobbing."
+		},
+		{
+			"id": "s2-easy",
+			"cast": [
+				"zib"
+			],
+			"seconds": 3,
+			"keyframe": "Close-up of ZIB at the saucer controls giving a huge confident thumbs-up to the camera, big toothy grin, one eye winking, cyan cockpit lights on his face.",
+			"motion": "ZIB gives a big thumbs-up, winks and grins confidently, his antennae bounce, a small sparkle glints off his teeth."
+		},
+		{
+			"id": "s4-melon",
+			"cast": [
+				"zib"
+			],
+			"seconds": 4,
+			"keyframe": "ZIB inside the saucer canopy, frozen stiff with a red traffic light glowing in the background, beads of sweat on his forehead, staring down hungrily at a big juicy round watermelon on a blue running track right next to the saucer's black hole. Tense comedic close-up, red light tint on his face. ZIB keeps his exact lime-green skin colour from the model sheet; the red traffic light only adds a soft red rim light on one side of his face.",
+			"motion": "ZIB trembles and sweats, his eyes dart between the red traffic light and the watermelon, he licks his lips and slowly, slowly leans toward the watermelon; the red light glows brighter. Slow tense push-in."
+		},
+		{
+			"id": "s6-faint",
+			"cast": [
+				"pigeon"
+			],
+			"seconds": 4,
+			"keyframe": "SGT. PIGEON in the saucer passenger seat, eyes huge with horror, beak open, clipboard in his wings marked with one huge red cross. Cyan cockpit glow. Medium shot.",
+			"motion": "SGT. PIGEON's eyes roll, he sways dizzily and faints backwards stiff as a board, his cap pops off, the clipboard flutters down, little stars circle his head."
+		},
+		{
+			"id": "s7-worth",
+			"cast": [
+				"zib"
+			],
+			"seconds": 3,
+			"keyframe": "ZIB in the saucer cockpit with cheeks stuffed full of watermelon, a green and pink watermelon rind in one hand, pink juice on his chin, smug half-closed eyes, shrugging. Medium close-up.",
+			"motion": "ZIB chews with puffed cheeks, swallows, shrugs smugly with a satisfied grin and wipes his chin with the back of his hand."
+		}
+	]
+}

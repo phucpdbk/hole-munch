@@ -1,0 +1,214 @@
+{
+	"title": "A2 Royal Bath",
+	"voices": {
+		"zib": {
+			"voice": "Puck",
+			"style": "Say it as a tiny squeaky cartoon alien kid with a high, fast, giggly voice"
+		},
+		"quackers": {
+			"voice": "Fenrir",
+			"style": "Say it as a pompous, vain cartoon duck king with a booming, honking, overly dramatic royal voice"
+		}
+	},
+	"lines": [
+		{
+			"id": "quack-spa",
+			"who": "quackers",
+			"text": "Ahhh... royal spa day.",
+			"mood": "blissful and relaxed"
+		},
+		{
+			"id": "zib-hi",
+			"who": "zib",
+			"text": "Hiii! Is that your city?",
+			"mood": "cheerful and innocent"
+		},
+		{
+			"id": "quack-dare",
+			"who": "quackers",
+			"text": "How DARE you! Guards!",
+			"mood": "furious, shouting fast"
+		},
+		{
+			"id": "zib-ow",
+			"who": "zib",
+			"text": "Ow! Ow! Ouch!",
+			"mood": "yelping"
+		},
+		{
+			"id": "quack-crown",
+			"who": "quackers",
+			"text": "Not the crown!",
+			"mood": "wailing as he falls, quick"
+		},
+		{
+			"id": "zib-shiny",
+			"who": "zib",
+			"text": "Ooh... shiny.",
+			"mood": "delighted whisper"
+		}
+	],
+	"sounds": [
+		{
+			"id": "sfx-bubbles",
+			"seconds": 4,
+			"prompt": "Relaxing bubble bath sounds, gentle water sloshing and soap bubbles popping, a rubber duck squeak"
+		},
+		{
+			"id": "sfx-drain",
+			"seconds": 4,
+			"prompt": "Bath plug pulled, comic loud gurgling drain slurp that turns into a deep sci-fi vortex whoosh"
+		},
+		{
+			"id": "sfx-slide",
+			"seconds": 4,
+			"prompt": "Cartoon slide whistle falling down, water splash, then a tiny bell ding"
+		},
+		{
+			"id": "music",
+			"seconds": 10,
+			"prompt": "Mock-royal comedy music loop, pompous brass fanfare meets bouncy cartoon drums, playful and silly"
+		}
+	],
+	"edit": [
+		{
+			"shot": "s1-spa",
+			"from": 0,
+			"to": 4,
+			"caption": "royal spa day...",
+			"audio": [
+				[
+					"sfx-bubbles",
+					0
+				],
+				[
+					"quack-spa",
+					1
+				]
+			]
+		},
+		{
+			"shot": "s2-drain",
+			"from": 0,
+			"to": 4,
+			"caption": "wait... what?",
+			"audio": [
+				[
+					"sfx-drain",
+					0.4
+				]
+			]
+		},
+		{
+			"shot": "s3-hello",
+			"from": 0,
+			"to": 3,
+			"audio": [
+				[
+					"zib-hi",
+					0.4
+				]
+			]
+		},
+		{
+			"shot": "s4-guards",
+			"from": 0,
+			"to": 3,
+			"caption": "GUARDS!!!",
+			"audio": [
+				[
+					"quack-dare",
+					0.05
+				]
+			]
+		},
+		{
+			"game": "test-output/ads/boss-25-clean-en.avi",
+			"from": 1,
+			"to": 7,
+			"caption": "it can JUMP?!",
+			"audio": [
+				[
+					"zib-ow",
+					4.9
+				]
+			]
+		},
+		{
+			"game": "test-output/ads/cling-25-clean-en.avi",
+			"from": 1.5,
+			"to": 4.6,
+			"caption": "TAP TAP TAP!"
+		},
+		{
+			"shot": "s7-crown",
+			"from": 0,
+			"to": 4,
+			"caption": "long live King Zib",
+			"audio": [
+				[
+					"sfx-slide",
+					0
+				],
+				[
+					"quack-crown",
+					0.2
+				],
+				[
+					"zib-shiny",
+					2.6
+				]
+			]
+		},
+		{
+			"card": "test-output/ads/endcard-09-en.avi"
+		}
+	],
+	"shots": [
+		{
+			"id": "s1-spa",
+			"cast": [
+				"quackers"
+			],
+			"seconds": 4,
+			"keyframe": "KING QUACKERS lounges in his white clawfoot bubble bath on a sunny New York rooftop, the city skyline and the Statue of Liberty far in the background. Two cucumber slices over his eyes, a tiny golden crown on his head, a rubber duck floating beside him, foam bubbles everywhere, holding his wooden bath brush like a sceptre. Blissful smug smile. Medium shot.",
+			"motion": "KING QUACKERS sighs blissfully and sinks a little deeper into the bubbles, hums, gently scrubs his back with the bath brush, bubbles float up and pop, the rubber duck bobs. Calm, slow push-in."
+		},
+		{
+			"id": "s2-drain",
+			"cast": [
+				"quackers"
+			],
+			"seconds": 4,
+			"keyframe": "Close-up of KING QUACKERS' yellow wing pulling the chain of the bath plug out of the water in his white bubble bath on a New York rooftop. Under the water the plug hole glows bright violet. His face in the top of the frame, cucumber slice slipping off one eye, starting to look puzzled. KING QUACKERS must look exactly like his model sheet: round fluffy cartoon chick-like body and head, huge round white eyes, short wide orange beak, and his small golden crown with ball tips on his head.",
+			"motion": "He pulls the plug; instead of draining, the plug hole glows violet and widens into a swirling black hole with a violet rim, the bath water spins into a whirlpool, bubbles get sucked in, the rubber duck spins around it. KING QUACKERS' cucumber slices fall off and his eyes go wide in shock."
+		},
+		{
+			"id": "s3-hello",
+			"cast": [
+				"zib"
+			],
+			"seconds": 3,
+			"keyframe": "The silver flying saucer hovers just above a white clawfoot bathtub on a New York rooftop; inside the saucer's clear bubble canopy ZIB leans forward waving cheerfully with one hand, big innocent grin. A violet-rimmed black hole swirls inside the bathtub water below the saucer. Sunny day, skyline behind.",
+			"motion": "ZIB waves happily with a big friendly grin, the saucer bobs gently up and down, its cyan lights pulse, the violet whirlpool keeps spinning in the bathtub below."
+		},
+		{
+			"id": "s4-guards",
+			"cast": [
+				"quackers"
+			],
+			"seconds": 3,
+			"keyframe": "KING QUACKERS standing furious on the rim of his bathtub on a New York rooftop, dripping wet with foam on his head, crown crooked, pointing his wooden bath brush up at the sky like a sword, beak wide open shouting, angry eyebrows. Low angle, dramatic.",
+			"motion": "KING QUACKERS stamps his foot, shakes the bath brush at the sky and shouts furiously, foam flies off his feathers, his crown wobbles. Quick dramatic push-in on his angry face."
+		},
+		{
+			"id": "s7-crown",
+			"cast": [
+				"zib"
+			],
+			"seconds": 4,
+			"keyframe": "Inside the saucer's clear bubble canopy above New York, ZIB looks up delighted as a small golden crown with ball tips spins down through the air toward his head. Below the saucer a violet-rimmed black hole swirls. Sunny sky. Medium shot of ZIB.",
+			"motion": "The golden crown spins down and lands perfectly on ZIB's head between his antennae with a sparkle; ZIB's eyes sparkle, he grins, adjusts the crown proudly and strikes a royal pose. Camera holds steady."
+		}
+	]
+}
